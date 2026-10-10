@@ -9,6 +9,12 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
 
+  trustedOrigins: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://192.168.173.30:3000",
+  ],
+
   emailAndPassword: {
     enabled: true,
   },

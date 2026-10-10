@@ -43,7 +43,7 @@ export async function GET() {
         }
 
         return NextResponse.json({
-            redirectTo: "/student/profile",
+            redirectTo: "/student/dashboard",
         });
     } catch (error) {
         console.error(

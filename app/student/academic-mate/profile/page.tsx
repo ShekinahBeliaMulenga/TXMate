@@ -140,7 +140,7 @@ const rateTypeLabel: Record<MateOfferingRateType, string> = {
   PER_WEEK: "per week",
   PER_MONTH: "per month",
   PER_COURSE: "per course",
-  CUSTOM: "",
+  CUSTOM: "Custom rate",
 };
 
 const weekdayLabel: Record<Weekday, string> = {
@@ -170,6 +170,8 @@ const iconPaths = {
   back: "M15.75 19.5 8.25 12l7.5-7.5",
   chevron: "m9 5 7 7-7 7",
   tag: "M4.5 7.5V4.75A1.75 1.75 0 0 1 6.25 3h2.9c.464 0 .91.184 1.238.512l9.1 9.1a1.75 1.75 0 0 1 0 2.475l-4.4 4.4a1.75 1.75 0 0 1-2.475 0l-9.1-9.1A1.75 1.75 0 0 1 3 9.15v-1.65Z",
+  info: "M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z",
+  tagSign: "M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"
 } as const;
 
 type IconName = keyof typeof iconPaths;
@@ -179,39 +181,6 @@ function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: str
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <path d={iconPaths[name]} />
     </svg>
-  );
-}
-
-function TopNav() {
-  const link =
-    "rounded-md font-medium text-[#7d1f2a] hover:text-[#5e1720] hover:underline hover:underline-offset-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2";
-
-  return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex items-center gap-1.5 text-sm text-[#6d6260]">
-          <li>
-            <Link href="/student/profile" className={link}>
-              Student profile
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <Icon name="chevron" className="h-3.5 w-3.5 text-[#b5a9a1]" />
-          </li>
-          <li>
-            <Link href="/student/academic-mate" className={link}>
-              Academic Mate
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <Icon name="chevron" className="h-3.5 w-3.5 text-[#b5a9a1]" />
-          </li>
-          <li aria-current="page" className="font-medium text-[#282321]">
-            My profile
-          </li>
-        </ol>
-      </nav>
-    </div>
   );
 }
 
@@ -292,6 +261,24 @@ function formatRate(rate: string, currency: string, rateType: MateOfferingRateTy
   if (numericRate === 0) return "Free";
   const suffix = rateTypeLabel[rateType];
   return suffix ? `${currency} ${formatted} ${suffix}` : `${currency} ${formatted}`;
+}
+
+function formatRateType(rateType: MateOfferingRateType) {
+  return rateTypeLabel[rateType] || titleCase(rateType);
+}
+
+function formatDuration(minutes: number) {
+  return `${minutes} min session`;
+}
+
+function formatStatus(status: string) {
+  return titleCase(status.replace(/_/g, " "));
+}
+
+function statusTone(status: string) {
+  if (status === "ACTIVE" || status === "VERIFIED") return "text-emerald-700";
+  if (status === "PENDING") return "text-amber-700";
+  return "text-[#6b625c]";
 }
 
 function formatExperienceYears(years: number | null) {
@@ -404,7 +391,6 @@ export default function AcademicMateProfilePage() {
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
-          <TopNav />
           <div className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
             <div className="h-32 animate-pulse bg-[#7d1f2a]/70 sm:h-40" />
             <div className="px-5 pb-6 sm:px-8">
@@ -431,9 +417,7 @@ export default function AcademicMateProfilePage() {
   if (error || !data) {
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl">
-          <TopNav />
-        </div>
+        <div className="mx-auto max-w-6xl"></div>
         <div role="alert" className="mx-auto max-w-xl rounded-xl border border-[#e2d9d0] bg-white p-10 text-center shadow-sm">
           <h1 className="text-xl font-semibold text-[#282321]">Couldn’t load your Academic Mate profile</h1>
           <p className="mt-3 text-sm leading-6 text-[#6d6260]">{error ?? "Your Academic Mate profile could not be loaded."}</p>
@@ -459,21 +443,9 @@ export default function AcademicMateProfilePage() {
     { label: "Experience", value: formatExperienceYears(profile.yearsExperience), icon: "briefcase" },
   ];
 
-  const academicRows: [string, string][] = student
-    ? [
-        ["University", student.university.name],
-        ["School", student.school.name],
-        ["Programme", `${student.programme.name} (${student.programme.code})`],
-        ["Level", titleCase(student.programme.level)],
-        ["Year of study", `Year ${student.programmeYear.yearNumber} of ${student.programme.durationYears}`],
-        ["Student status", titleCase(student.status)],
-      ]
-    : [];
-
   return (
     <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <TopNav />
 
         {/* Header */}
         <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
@@ -560,54 +532,59 @@ export default function AcademicMateProfilePage() {
               ) : (
                 <ul className="space-y-3">
                   {sortedOfferings.map((offering) => (
-                    <li key={offering.id} className="rounded-lg border border-[#ece5de] p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <span className="flex h-10 min-w-12 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 px-2 text-[11px] font-bold text-[#7d1f2a]">
-                            {offering.course.code}
-                          </span>
-                          <div className="min-w-0">
-                            <h3 className="text-sm font-semibold text-[#282321]">{offering.course.name}</h3>
-                            {offering.title ? <p className="mt-0.5 text-sm text-[#514844]">{offering.title}</p> : null}
+                    <li key={offering.id} className="rounded-xl border border-[#e2d9d0] bg-white p-5 shadow-sm">
+                      {/* Course */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex min-w-0 items-baseline gap-2">
+                            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-[#7d1f2a]">
+                              {offering.course.code}
+                            </span>
+                            <h3 className="truncate text-sm font-semibold text-[#241f1c]">
+                              {offering.course.name}
+                            </h3>
                           </div>
-                        </div>
 
-                        <p className="shrink-0 text-right text-sm">
-                          <span className="font-semibold text-[#282321]">{formatRate(offering.rate, offering.currency, offering.rateType)}</span>
-                          <span className="mt-0.5 flex items-center justify-end gap-1 text-xs text-[#7a6f6a]">
-                            <Icon name="clock" className="h-3.5 w-3.5" />
-                            {offering.sessionDurationMinutes} min session
-                          </span>
-                        </p>
+                          {offering.title && (
+                            <p className="mt-0.5 truncate text-xs text-[#6b625c]">
+                              {offering.title}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      {offering.description ? <p className="mt-3 text-sm leading-6 text-[#6d6260]">{offering.description}</p> : null}
-                      {offering.rateDetails ? <p className="mt-2 text-xs leading-5 text-[#7a6f6a]">{offering.rateDetails}</p> : null}
-
-                      {offering.topics.length > 0 ? (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {offering.topics.map((topic) => (
-                            <span key={topic.id} className="inline-flex items-center gap-1 rounded-full bg-[#f6f1ec] px-2.5 py-1 text-[11px] font-medium text-[#6d6260]">
-                              <Icon name="tag" className="h-3 w-3 text-[#8a7f7a]" />
-                              {topic.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {offering.isOutsideCurrentCurriculum || offering.verificationStatus !== "UNVERIFIED" ? (
-                        <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-[#7a6f6a]">
-                          {offering.verificationStatus === "VERIFIED" ? (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                              <Icon name="check" className="h-3.5 w-3.5" />
-                              Verified offering
-                            </span>
-                          ) : offering.verificationStatus !== "UNVERIFIED" ? (
-                            <span>{verificationLabel[offering.verificationStatus]}</span>
-                          ) : null}
-                          {offering.isOutsideCurrentCurriculum ? <span className="text-amber-700">Outside current curriculum</span> : null}
+                      {/* Description */}
+                      {offering.description && (
+                        <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#625b55]">
+                          {offering.description}
                         </p>
-                      ) : null}
+                      )}
+
+                      {/* Details: icon + plain text */}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-[#4e4742]">
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-[#241f1c]">
+                          <Icon name="tag" className="h-3.5 w-3.5 text-[#7d1f2a]" />
+                          {offering.currency} {offering.rate} · {formatRateType(offering.rateType)}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1.5">
+                          <Icon name="clock" className="h-3.5 w-3.5 text-[#8a817a]" />
+                          {formatDuration(offering.sessionDurationMinutes)}
+                        </span>
+
+                        <span className={`inline-flex items-center gap-1.5 font-medium ${statusTone(offering.status)}`}>
+                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+                          {formatStatus(offering.status)}
+                        </span>
+                      </div>
+
+                      {/* Custom pricing note */}
+                      {offering.rateType === "CUSTOM" && offering.rateDetails && (
+                        <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#6b625c]">
+                          <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a817a]" />
+                          <span>{offering.rateDetails}</span>
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -732,7 +709,6 @@ export default function AcademicMateProfilePage() {
                                     title={offering.course.name}
                                     className="inline-flex items-center gap-1 border-l border-[#e2d9d0] pl-2 text-[11px] font-semibold text-[#7d1f2a]"
                                   >
-                                    <Icon name="book" className="h-3 w-3 opacity-70" />
                                     {offering.course.code}
                                   </span>
                                 ) : null}
@@ -746,25 +722,6 @@ export default function AcademicMateProfilePage() {
                 </ul>
               )}
             </Section>
-
-            <Section title="Academic background" subtitle="Linked student profile" icon="university">
-              {student ? (
-                <dl className="divide-y divide-[#ece5de]">
-                  {academicRows.map(([label, value]) => (
-                    <div key={label} className="py-2.5 first:pt-0 last:pb-0">
-                      <dt className="text-xs text-[#7a6f6a]">{label}</dt>
-                      <dd className="mt-0.5 break-words text-sm font-medium text-[#282321]">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : (
-                <Empty text="No student profile is linked to this Academic Mate profile." />
-              )}
-            </Section>
-
-            <p className="px-1 text-xs leading-5 text-[#7a6f6a]">
-              Member since {formatDate(profile.createdAt)}. Information is provided by the profile owner. Verification shows whether TXMate has completed its checks.
-            </p>
           </aside>
         </div>
       </div>

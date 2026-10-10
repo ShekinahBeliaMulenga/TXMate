@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { authClient } from "@/lib/auth-client";
 
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -374,6 +375,14 @@ function IconAlert(props: IconProps) {
   );
 }
 
+function IconLogout(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5m5 5H3" />
+    </IconBase>
+  );
+}
+
 const SECTION_ICONS: Record<SectionId, typeof IconOverview> = {
   overview: IconOverview,
   academic: IconAcademic,
@@ -395,17 +404,34 @@ function formatTime(minutes: number) {
   return `${displayHour}:${String(mins).padStart(2, "0")} ${suffix}`;
 }
 
+const DATE_FORMATTER = new Intl.DateTimeFormat("en-ZM", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 function formatDate(value: string | null) {
   if (!value) {
     return "Not available";
   }
 
-  return new Intl.DateTimeFormat("en-ZM", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return DATE_FORMATTER.format(date);
 }
+
+const RATE_TYPE_LABEL: Record<Offering["rateType"], string> = {
+  PER_SESSION: "session",
+  PER_HOUR: "hour",
+  PER_WEEK: "week",
+  PER_MONTH: "month",
+  PER_COURSE: "course",
+  CUSTOM: "",
+};
 
 function formatRate(
   rate: string,
@@ -422,16 +448,7 @@ function formatRate(
     return "Free";
   }
 
-  const typeLabel: Record<Offering["rateType"], string> = {
-    PER_SESSION: "session",
-    PER_HOUR: "hour",
-    PER_WEEK: "week",
-    PER_MONTH: "month",
-    PER_COURSE: "course",
-    CUSTOM: "",
-  };
-
-  const suffix = typeLabel[rateType];
+  const suffix = RATE_TYPE_LABEL[rateType];
 
   return suffix
     ? `${currency} ${amount.toLocaleString("en-ZM")} / ${suffix}`
@@ -453,6 +470,57 @@ function labelFor(value: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+const STATUS_TONE: Record<
+  string,
+  { dot: string; light: string; dark: string }
+> = {
+  PENDING: {
+    dot: "bg-amber-500",
+    light: "text-amber-800",
+    dark: "text-amber-300",
+  },
+  VERIFIED: {
+    dot: "bg-emerald-500",
+    light: "text-emerald-800",
+    dark: "text-emerald-300",
+  },
+  REJECTED: {
+    dot: "bg-red-500",
+    light: "text-red-800",
+    dark: "text-red-300",
+  },
+  UNVERIFIED: {
+    dot: "bg-stone-400",
+    light: "text-stone-600",
+    dark: "text-stone-300",
+  },
+  ACTIVE: {
+    dot: "bg-emerald-500",
+    light: "text-emerald-800",
+    dark: "text-emerald-300",
+  },
+  INACTIVE: {
+    dot: "bg-stone-400",
+    light: "text-stone-600",
+    dark: "text-stone-300",
+  },
+  SUSPENDED: {
+    dot: "bg-red-500",
+    light: "text-red-800",
+    dark: "text-red-300",
+  },
+  GRADUATED: {
+    dot: "bg-sky-500",
+    light: "text-sky-800",
+    dark: "text-sky-300",
+  },
+  WITHDRAWN: {
+    dot: "bg-stone-400",
+    light: "text-stone-600",
+    dark: "text-stone-300",
+  },
+};
+
 function StatusBadge({
   status,
   onDark = false,
@@ -460,55 +528,7 @@ function StatusBadge({
   status: VerificationStatus | ProfileStatus | StudentData["status"];
   onDark?: boolean;
 }) {
-  const tone: Record<string, { dot: string; light: string; dark: string }> = {
-    PENDING: {
-      dot: "bg-amber-500",
-      light: "text-amber-800",
-      dark: "text-amber-300",
-    },
-    VERIFIED: {
-      dot: "bg-emerald-500",
-      light: "text-emerald-800",
-      dark: "text-emerald-300",
-    },
-    REJECTED: {
-      dot: "bg-red-500",
-      light: "text-red-800",
-      dark: "text-red-300",
-    },
-    UNVERIFIED: {
-      dot: "bg-stone-400",
-      light: "text-stone-600",
-      dark: "text-stone-300",
-    },
-    ACTIVE: {
-      dot: "bg-emerald-500",
-      light: "text-emerald-800",
-      dark: "text-emerald-300",
-    },
-    INACTIVE: {
-      dot: "bg-stone-400",
-      light: "text-stone-600",
-      dark: "text-stone-300",
-    },
-    SUSPENDED: {
-      dot: "bg-red-500",
-      light: "text-red-800",
-      dark: "text-red-300",
-    },
-    GRADUATED: {
-      dot: "bg-sky-500",
-      light: "text-sky-800",
-      dark: "text-sky-300",
-    },
-    WITHDRAWN: {
-      dot: "bg-stone-400",
-      light: "text-stone-600",
-      dark: "text-stone-300",
-    },
-  };
-
-  const style = tone[status] ?? tone.UNVERIFIED;
+  const style = STATUS_TONE[status] ?? STATUS_TONE.UNVERIFIED;
 
   return (
     <span
@@ -531,13 +551,46 @@ function StatusBadge({
   );
 }
 
-function Field({
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function TopBar({
   label,
-  children,
+  onSignOut,
+  signingOut,
 }: {
   label: string;
-  children: ReactNode;
+  onSignOut: () => void;
+  signingOut: boolean;
 }) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <Link
+        href="/admin/academic-mates"
+        className={`text-sm font-medium text-[#7d1f2a] hover:underline ${FOCUS_RING}`}
+      >
+        {label}
+      </Link>
+
+      <button
+        type="button"
+        onClick={onSignOut}
+        disabled={signingOut}
+        className={`inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 disabled:opacity-60 ${FOCUS_RING}`}
+      >
+        <IconLogout />
+        {signingOut ? "Signing out…" : "Sign out"}
+      </button>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <dt className="text-sm text-stone-500">{label}</dt>
@@ -678,7 +731,9 @@ function ChecklistItem({
 
       <span className={complete ? "text-stone-800" : "text-stone-500"}>
         {label}
-        <span className="sr-only">{complete ? " (complete)" : " (missing)"}</span>
+        <span className="sr-only">
+          {complete ? " (complete)" : " (missing)"}
+        </span>
       </span>
     </li>
   );
@@ -707,8 +762,46 @@ export default function AcademicMateVerificationDetailPage() {
 
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
 
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    if (signingOut) {
+      return;
+    }
+
+    try {
+      setSigningOut(true);
+
+      const result = await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            router.replace("/login");
+          },
+        },
+      });
+
+      if (result?.error) {
+        throw new Error(result.error.message);
+      }
+    } catch {
+      setSigningOut(false);
+      setError("Unable to sign out. Please try again.");
+    }
+  }
+
+  const abortRef = useRef<AbortController | null>(null);
+  const paneRef = useRef<HTMLDivElement | null>(null);
+
   const loadProfile = useCallback(
     async (showLoading = true) => {
+      /* Cancel any request still in flight so an old response can never
+         overwrite a newer one. */
+      abortRef.current?.abort();
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       try {
         if (showLoading) {
           setLoading(true);
@@ -721,30 +814,39 @@ export default function AcademicMateVerificationDetailPage() {
           {
             method: "GET",
             cache: "no-store",
+            signal: controller.signal,
           }
         );
 
-        const json = (await response.json()) as
-          | DetailResponse
-          | { error?: string };
+        const json = await readJson<DetailResponse | { error?: string }>(
+          response
+        );
 
         if (!response.ok) {
           throw new Error(
-            "error" in json && json.error
+            json && "error" in json && json.error
               ? json.error
               : "Unable to load the Academic Mate profile."
           );
         }
 
-        setData(json as DetailResponse);
+        if (!json || !("profile" in json)) {
+          throw new Error("The server returned an invalid response.");
+        }
+
+        setData(json);
       } catch (err) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setError(
           err instanceof Error
             ? err.message
             : "Unable to load the Academic Mate profile."
         );
       } finally {
-        if (showLoading) {
+        if (showLoading && abortRef.current === controller) {
           setLoading(false);
         }
       }
@@ -754,6 +856,11 @@ export default function AcademicMateVerificationDetailPage() {
 
   useEffect(() => {
     void loadProfile();
+
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
   }, [loadProfile]);
 
   const currentCurriculumCourseIds = useMemo(() => {
@@ -762,6 +869,73 @@ export default function AcademicMateVerificationDetailPage() {
     }
 
     return new Set(data.student.courses.map((course) => course.course.id));
+  }, [data]);
+
+  /* Derived values are memoised so typing in the notes box does not
+     recompute them on every keystroke. */
+  const derived = useMemo(() => {
+    if (!data) {
+      return null;
+    }
+
+    const {
+      profile,
+      student,
+      offerings,
+      availability,
+      experiences,
+      qualifications,
+      reviews,
+      verificationHistory,
+    } = data;
+
+    const averageRating =
+      reviews.length > 0
+        ? (
+            reviews.reduce((sum, review) => sum + review.rating, 0) /
+            reviews.length
+          ).toFixed(1)
+        : null;
+
+    const checklist = [
+      {
+        label: "Active student profile",
+        complete: student?.status === "ACTIVE",
+      },
+      {
+        label: "Headline provided",
+        complete: Boolean(profile.headline?.trim()),
+      },
+      {
+        label: "Biography provided",
+        complete: Boolean(profile.bio?.trim()),
+      },
+      {
+        label: "Active offering",
+        complete: offerings.some((offering) => offering.status === "ACTIVE"),
+      },
+      {
+        label: "Academic identity",
+        complete: Boolean(student?.programme && student.programmeYear),
+      },
+    ];
+
+    const sectionCounts: Partial<Record<SectionId, number>> = {
+      academic: student?.courses.length ?? 0,
+      offerings: offerings.length,
+      background: experiences.length + qualifications.length,
+      availability: availability.length,
+      reviews: reviews.length,
+      history: verificationHistory.length,
+    };
+
+    const navItems = SECTIONS.map((section) => ({
+      id: section.id,
+      label: section.label,
+      count: sectionCounts[section.id],
+    }));
+
+    return { averageRating, checklist, navItems };
   }, [data]);
 
   /* Close the confirmation dialog with Escape. */
@@ -785,7 +959,7 @@ export default function AcademicMateVerificationDetailPage() {
     setActiveSection(id);
 
     /* If the top of the pane has scrolled out of view, bring it back. */
-    const pane = document.getElementById("review-pane");
+    const pane = paneRef.current;
 
     if (pane && pane.getBoundingClientRect().top < 0) {
       pane.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -793,7 +967,7 @@ export default function AcademicMateVerificationDetailPage() {
   }
 
   async function submitDecision() {
-    if (!decision) {
+    if (!decision || submitting) {
       return;
     }
 
@@ -821,16 +995,15 @@ export default function AcademicMateVerificationDetailPage() {
         }
       );
 
-      const json = (await response.json()) as {
-        message?: string;
-        error?: string;
-      };
+      const json = await readJson<{ message?: string; error?: string }>(
+        response
+      );
 
       if (!response.ok) {
-        throw new Error(json.error ?? "Unable to process the verification.");
+        throw new Error(json?.error ?? "Unable to process the verification.");
       }
 
-      setSuccess(json.message ?? "Verification decision saved.");
+      setSuccess(json?.message ?? "Verification decision saved.");
 
       setDecision(null);
       setNotes("");
@@ -875,12 +1048,11 @@ export default function AcademicMateVerificationDetailPage() {
         <MotionStyles />
 
         <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-          <Link
-            href="/admin/academic-mates"
-            className={`text-sm font-medium text-[#7d1f2a] hover:underline ${FOCUS_RING}`}
-          >
-            Back to Academic Mates
-          </Link>
+          <TopBar
+            label="Back to Academic Mates"
+            onSignOut={handleSignOut}
+            signingOut={signingOut}
+          />
 
           <div
             role="alert"
@@ -903,7 +1075,7 @@ export default function AcademicMateVerificationDetailPage() {
     );
   }
 
-  if (!data) {
+  if (!data || !derived) {
     return null;
   }
 
@@ -922,51 +1094,7 @@ export default function AcademicMateVerificationDetailPage() {
 
   const isPending = profile.verificationStatus === "PENDING";
 
-  const averageRating =
-    reviews.length > 0
-      ? (
-          reviews.reduce((sum, review) => sum + review.rating, 0) /
-          reviews.length
-        ).toFixed(1)
-      : null;
-
-  const checklist = [
-    {
-      label: "Active student profile",
-      complete: student?.status === "ACTIVE",
-    },
-    {
-      label: "Headline provided",
-      complete: Boolean(profile.headline?.trim()),
-    },
-    {
-      label: "Biography provided",
-      complete: Boolean(profile.bio?.trim()),
-    },
-    {
-      label: "Active offering",
-      complete: offerings.some((offering) => offering.status === "ACTIVE"),
-    },
-    {
-      label: "Academic identity",
-      complete: Boolean(student?.programme && student.programmeYear),
-    },
-  ];
-
-  const sectionCounts: Partial<Record<SectionId, number>> = {
-    academic: student?.courses.length ?? 0,
-    offerings: offerings.length,
-    background: experiences.length + qualifications.length,
-    availability: availability.length,
-    reviews: reviews.length,
-    history: verificationHistory.length,
-  };
-
-  const navItems = SECTIONS.map((section) => ({
-    id: section.id,
-    label: section.label,
-    count: sectionCounts[section.id],
-  }));
+  const { averageRating, checklist, navItems } = derived;
 
   const activeIndex = SECTIONS.findIndex(
     (section) => section.id === activeSection
@@ -982,14 +1110,11 @@ export default function AcademicMateVerificationDetailPage() {
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="am-rise pb-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Link
-              href="/admin/academic-mates"
-              className={`text-sm font-medium text-[#7d1f2a] hover:underline ${FOCUS_RING}`}
-            >
-              Academic Mate verification
-            </Link>
-          </div>
+          <TopBar
+            label="Academic Mate Verification"
+            onSignOut={handleSignOut}
+            signingOut={signingOut}
+          />
 
           <div className="overflow-hidden rounded-2xl border border-[#6f1c27] bg-[#7d1f2a] text-white shadow-md shadow-[#7d1f2a]/20">
             <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
@@ -1071,6 +1196,7 @@ export default function AcademicMateVerificationDetailPage() {
           {/* One section at a time */}
           <div
             id="review-pane"
+            ref={paneRef}
             className="min-w-0 scroll-mt-16 overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm shadow-stone-900/5"
           >
             <section

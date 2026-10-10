@@ -18,56 +18,62 @@ export default function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-
+  
     const normalizedEmail = email.trim().toLowerCase();
-
+  
     if (!normalizedEmail) {
       setError("Please enter your email address.");
       return;
     }
-
+  
     if (!password) {
       setError("Please enter your password.");
       return;
     }
-
+  
     setLoading(true);
-
-    const { error } = await authClient.signIn.email({
-      email: normalizedEmail,
-      password,
-    });
-
-    if (error) {
+  
+    try {
+      const result = await authClient.signIn.email({
+        email: normalizedEmail,
+        password,
+      });
+  
+      if (result.error) {
+        setError(result.error.message || "Unable to sign in.");
+        setLoading(false);
+        return;
+      }
+  
+      const redirectResponse = await fetch("/api/auth/redirect", {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+  
+      if (!redirectResponse.ok) {
+        setError("Unable to determine where to take you.");
+        setLoading(false);
+        return;
+      }
+  
+      const redirectData = (await redirectResponse.json()) as {
+        redirectTo?: string;
+      };
+  
+      if (!redirectData.redirectTo) {
+        setError("Unable to determine where to take you.");
+        setLoading(false);
+        return;
+      }
+  
+      // Success: keep the button in its loading state while navigating
+      router.replace(redirectData.redirectTo);
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
       setLoading(false);
-      setError(error.message || "Unable to sign in.");
-      return;
     }
-
-    const redirectResponse = await fetch("/api/auth/redirect", {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (!redirectResponse.ok) {
-      setLoading(false);
-      setError("Unable to determine where to take you.");
-      return;
-    }
-
-    const redirectData = (await redirectResponse.json()) as {
-      redirectTo?: string;
-    };
-
-    setLoading(false);
-
-    if (!redirectData.redirectTo) {
-      setError("Unable to determine where to take you.");
-      return;
-    }
-
-    router.push(redirectData.redirectTo);
-    router.refresh();
   }
 
   return (
@@ -79,14 +85,9 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md">
         {/* Brand Header */}
         <div className="mb-8 text-center">
-          
           <div className="mb-1 text-xl font-bold tracking-tight text-[#4d0014]">
             TXMate
           </div>
-
-          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
-            Welcome back
-          </h1>
 
           <p className="mt-1.5 text-sm text-gray-600">
             Sign in to access your TXMate account.
@@ -297,7 +298,10 @@ export default function LoginPage() {
           {/* Footer Link */}
           <div className="mt-6 border-t border-gray-100 pt-6 text-center text-sm text-gray-600">
             Don't have an account?{" "}
-            <Link className="font-semibold text-[#4d0014] underline-offset-2 transition hover:text-[#8f4e00] hover:underline" href="/register">
+            <Link
+              className="font-semibold text-[#4d0014] underline-offset-2 transition hover:text-[#8f4e00] hover:underline"
+              href="/register"
+            >
               Create an account
             </Link>
           </div>

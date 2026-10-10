@@ -1,7 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 type RateType =
   | "PER_SESSION"
@@ -78,6 +77,8 @@ const rateOptions: RateOption[] = [
   },
 ];
 
+const MAX_VISIBLE_COURSES = 50;
+
 const inputClass =
   "w-full rounded-xl border border-[#d8cec5] bg-white px-4 py-2.5 text-sm text-[#302a26] shadow-xs outline-none transition placeholder:text-[#9a918a] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/15";
 
@@ -125,25 +126,10 @@ function formatStatus(value: string) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function StatusBadge({ label, value }: { label: string; value: string }) {
-  const isPositive = value === "ACTIVE" || value === "VERIFIED";
-  const isWarning = value === "PENDING" || value === "UNVERIFIED";
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2d9d0] bg-white px-3 py-1 text-xs font-semibold text-[#4e4742] shadow-xs">
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          isPositive
-            ? "bg-emerald-500"
-            : isWarning
-              ? "bg-amber-500"
-              : "bg-gray-400"
-        }`}
-      />
-      <span>{label}:</span>
-      <span className="font-bold text-[#241f1c]">{formatStatus(value)}</span>
-    </span>
-  );
+function statusTone(value: string) {
+  if (value === "ACTIVE" || value === "VERIFIED") return "text-emerald-700";
+  if (value === "PENDING" || value === "UNVERIFIED") return "text-amber-700";
+  return "text-[#8a817a]";
 }
 
 function Field({
@@ -259,6 +245,63 @@ function TrashIcon({ className }: { className: string }) {
   );
 }
 
+function ClockIcon({ className }: { className: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.8}
+        d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+}
+
+function ShieldCheckIcon({ className }: { className: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.8}
+        d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+      />
+    </svg>
+  );
+}
+
+function InfoIcon({ className }: { className: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.8}
+        d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+      />
+    </svg>
+  );
+}
+
 export default function AcademicMateOfferingsPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [offerings, setOfferings] = useState<Offering[]>([]);
@@ -277,6 +320,11 @@ export default function AcademicMateOfferingsPage() {
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const [courseSearch, setCourseSearch] = useState("");
+  const [courseListOpen, setCourseListOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const comboRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const deferredCourseSearch = useDeferredValue(courseSearch);
   const [offeringSearch, setOfferingSearch] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [title, setTitle] = useState("");
@@ -286,19 +334,46 @@ export default function AcademicMateOfferingsPage() {
   const [rateDetails, setRateDetails] = useState("");
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState("60");
 
-  const filteredCourses = useMemo(() => {
-    const query = courseSearch.trim().toLowerCase();
+  const { matchedCourses, totalMatches } = useMemo(() => {
+    const query = deferredCourseSearch.trim().toLowerCase();
 
     if (!query) {
-      return courses;
+      return {
+        matchedCourses: courses.slice(0, MAX_VISIBLE_COURSES),
+        totalMatches: courses.length,
+      };
     }
 
-    return courses.filter(
-      (course) =>
-        course.code.toLowerCase().includes(query) ||
-        course.name.toLowerCase().includes(query),
+    const compactQuery = query.replace(/\s+/g, "");
+    const terms = query.split(/\s+/);
+    const scored: { course: Course; score: number }[] = [];
+
+    for (const course of courses) {
+      const code = course.code.toLowerCase();
+      const codeCompact = code.replace(/\s+/g, "");
+      const name = course.name.toLowerCase();
+      const haystack = `${code} ${codeCompact} ${name}`;
+
+      if (!terms.every((term) => haystack.includes(term))) continue;
+
+      let score = 3;
+      if (code === query || codeCompact === compactQuery) score = 0;
+      else if (code.startsWith(query) || codeCompact.startsWith(compactQuery))
+        score = 1;
+      else if (name.startsWith(query)) score = 2;
+
+      scored.push({ course, score });
+    }
+
+    scored.sort(
+      (a, b) => a.score - b.score || a.course.code.localeCompare(b.course.code),
     );
-  }, [courseSearch, courses]);
+
+    return {
+      matchedCourses: scored.slice(0, MAX_VISIBLE_COURSES).map((s) => s.course),
+      totalMatches: scored.length,
+    };
+  }, [deferredCourseSearch, courses]);
 
   const selectedCourse = useMemo(
     () => courses.find((course) => course.id === selectedCourseId) ?? null,
@@ -397,6 +472,51 @@ export default function AcademicMateOfferingsPage() {
     void loadData();
   }, []);
 
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (comboRef.current && !comboRef.current.contains(event.target as Node)) {
+        setCourseListOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (!courseListOpen) return;
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${highlightedIndex}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex, courseListOpen]);
+
+  function selectCourse(course: Course) {
+    setSelectedCourseId(course.id);
+    setCourseSearch("");
+    setCourseListOpen(false);
+    setHighlightedIndex(0);
+  }
+
+  function handleCourseKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setCourseListOpen(true);
+      setHighlightedIndex((index) =>
+        Math.min(index + 1, matchedCourses.length - 1),
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlightedIndex((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter") {
+      if (courseListOpen && matchedCourses[highlightedIndex]) {
+        event.preventDefault(); // stops the form from submitting
+        selectCourse(matchedCourses[highlightedIndex]);
+      }
+    } else if (event.key === "Escape") {
+      setCourseListOpen(false);
+    }
+  }
+
   function resetForm() {
     setEditingOfferingId(null);
     setCourseSearch("");
@@ -407,6 +527,7 @@ export default function AcademicMateOfferingsPage() {
     setRateType("PER_SESSION");
     setRateDetails("");
     setSessionDurationMinutes("60");
+    setCourseListOpen(false);
   }
 
   function startEditing(offering: Offering) {
@@ -587,36 +708,12 @@ export default function AcademicMateOfferingsPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f1ed] antialiased">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <Link
-            href="/student/academic-mate"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#7d1f2a] transition hover:text-[#5c161f]"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Back to Academic Mate
-          </Link>
-
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <span className="inline-block rounded-full bg-[#7d1f2a]/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#7d1f2a]">
-                Academic Mate
-              </span>
-
               <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#241f1c] sm:text-4xl">
-                Your offerings
+                Your Course offers
               </h1>
 
               <p className="mt-2 max-w-xl text-sm text-[#625b55] sm:text-base">
@@ -697,7 +794,7 @@ export default function AcademicMateOfferingsPage() {
                 : "text-[#4e4742] hover:bg-[#f6f1ec]"
             }`}
           >
-            Current offerings
+          Your offers
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                 activeTab === "offerings"
@@ -754,71 +851,119 @@ export default function AcademicMateOfferingsPage() {
               <div className="space-y-6 px-6 py-6 sm:px-8">
                 <Field
                   label="Course"
-                  description="Choose the course you are prepared to support."
+                  description="Search by course code or name, then pick it from the list."
                 >
-                  <input
-                    type="search"
-                    value={courseSearch}
-                    onChange={(event) => setCourseSearch(event.target.value)}
-                    placeholder="Search by course code or name"
-                    className={inputClass}
-                  />
+                  <div ref={comboRef} className="relative">
+                    <div className="relative">
+                      <svg
+                        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a918a]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.8}
+                          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
+                        />
+                      </svg>
 
-                  <div className="mt-3 max-h-60 overflow-y-auto rounded-xl border border-[#d8cec5] bg-white">
-                    {loading ? (
-                      <div className="px-4 py-4 text-sm text-[#8a817a]">
-                        Loading courses...
-                      </div>
-                    ) : filteredCourses.length === 0 ? (
-                      <div className="px-4 py-4 text-sm text-[#8a817a]">
-                        No matching courses found.
-                      </div>
-                    ) : (
-                      filteredCourses.map((course) => {
-                        const selected = course.id === selectedCourseId;
+                      <input
+                        type="text"
+                        role="combobox"
+                        aria-expanded={courseListOpen}
+                        aria-controls="course-listbox"
+                        aria-autocomplete="list"
+                        autoComplete="off"
+                        value={courseSearch}
+                        onChange={(event) => {
+                          setCourseSearch(event.target.value);
+                          setCourseListOpen(true);
+                          setHighlightedIndex(0);
+                        }}
+                        onFocus={() => setCourseListOpen(true)}
+                        onKeyDown={handleCourseKeyDown}
+                        placeholder={
+                          loading
+                            ? "Loading courses..."
+                            : `Search ${courses.length.toLocaleString()} courses by code or name`
+                        }
+                        disabled={loading}
+                        className={`${inputClass} pl-10`}
+                      />
+                    </div>
 
-                        return (
-                          <button
-                            key={course.id}
-                            type="button"
-                            onClick={() => setSelectedCourseId(course.id)}
-                            className={`w-full border-b border-[#eee7df] px-4 py-3 text-left transition last:border-b-0 ${
-                              selected
-                                ? "bg-[#f6f1ec]"
-                                : "hover:bg-[#faf8f6]"
-                            }`}
+                    {courseListOpen && !loading && (
+                      <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-[#d8cec5] bg-white shadow-lg">
+                        {matchedCourses.length === 0 ? (
+                          <div className="px-4 py-4 text-sm text-[#8a817a]">
+                            No courses match &ldquo;{courseSearch.trim()}&rdquo;.
+                          </div>
+                        ) : (
+                          <ul
+                            id="course-listbox"
+                            role="listbox"
+                            ref={listRef}
+                            className="max-h-64 overflow-y-auto"
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0">
-                                <p
-                                  className={`text-sm font-semibold ${
-                                    selected
-                                      ? "text-[#7d1f2a]"
-                                      : "text-[#302a26]"
+                            {matchedCourses.map((course, index) => {
+                              const selected = course.id === selectedCourseId;
+                              const highlighted = index === highlightedIndex;
+
+                              return (
+                                <li
+                                  key={course.id}
+                                  role="option"
+                                  aria-selected={selected}
+                                  data-index={index}
+                                  onMouseEnter={() => setHighlightedIndex(index)}
+                                  onClick={() => selectCourse(course)}
+                                  className={`flex cursor-pointer items-center justify-between gap-3 border-b border-[#eee7df] px-4 py-3 last:border-b-0 ${
+                                    highlighted ? "bg-[#f6f1ec]" : "bg-white"
                                   }`}
                                 >
-                                  {course.code}
-                                </p>
-                                <p className="mt-0.5 text-sm text-[#6b625c]">
-                                  {course.name}
-                                </p>
-                              </div>
+                                  <div className="min-w-0">
+                                    <p
+                                      className={`text-sm font-semibold ${
+                                        selected ? "text-[#7d1f2a]" : "text-[#302a26]"
+                                      }`}
+                                    >
+                                      {course.code}
+                                      {selected && (
+                                        <span className="ml-2 text-[10px] font-bold uppercase tracking-wide">
+                                          Selected
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="mt-0.5 truncate text-sm text-[#6b625c]">
+                                      {course.name}
+                                    </p>
+                                  </div>
 
-                              <span
-                                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                                  course.isCurrentCurriculum
-                                    ? "bg-[#f1ece7] text-[#6b625c]"
-                                    : "bg-[#7d1f2a]/10 text-[#7d1f2a]"
-                                }`}
-                              >
-                                {course.isCurrentCurriculum
-                                  ? "Current curriculum"
-                                  : "Outside curriculum"}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })
+                                  <span
+                                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                      course.isCurrentCurriculum
+                                        ? "bg-[#f1ece7] text-[#6b625c]"
+                                        : "bg-[#7d1f2a]/10 text-[#7d1f2a]"
+                                    }`}
+                                  >
+                                    {course.isCurrentCurriculum
+                                      ? "Current curriculum"
+                                      : "Outside curriculum"}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+
+                        <div className="border-t border-[#eee7df] bg-[#faf8f6] px-4 py-2 text-[11px] font-medium text-[#8a817a]">
+                          {totalMatches > MAX_VISIBLE_COURSES
+                            ? `Showing the first ${MAX_VISIBLE_COURSES} of ${totalMatches.toLocaleString()} courses. Keep typing to narrow it down.`
+                            : `${totalMatches.toLocaleString()} ${totalMatches === 1 ? "course" : "courses"}`}
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -826,7 +971,7 @@ export default function AcademicMateOfferingsPage() {
                     <div className="mt-3 rounded-xl border border-[#e2d9d0] bg-[#faf8f6] px-4 py-3">
                       <div className="flex items-start gap-3">
                         <BookIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7d1f2a]" />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold uppercase tracking-wide text-[#7d1f2a]">
                             Selected course
                           </p>
@@ -839,6 +984,13 @@ export default function AcademicMateOfferingsPage() {
                               : "This course is outside your current curriculum. You can still offer academic support for it."}
                           </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCourseId("")}
+                          className="shrink-0 text-xs font-semibold text-[#7d1f2a] hover:underline"
+                        >
+                          Clear
+                        </button>
                       </div>
                     </div>
                   )}
@@ -887,8 +1039,7 @@ export default function AcademicMateOfferingsPage() {
                       Pricing
                     </h2>
                     <p className="text-xs text-[#6b625c]">
-                      Choose how your rate is charged instead of assuming every
-                      arrangement is per session.
+                      Choose how your rate is charged.
                     </p>
                   </div>
                 </div>
@@ -995,7 +1146,7 @@ export default function AcademicMateOfferingsPage() {
               </div>
             </section>
 
-            <div className="flex flex-col-reverse items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-center">
+            <div className="flex flex-col-reverse items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-end">
               {editingOffering && (
                 <button
                   type="button"
@@ -1009,13 +1160,6 @@ export default function AcademicMateOfferingsPage() {
                   Cancel edit
                 </button>
               )}
-
-              <Link
-                href="/student/academic-mate"
-                className="rounded-xl border border-[#d8cec5] bg-white px-5 py-2.5 text-center text-sm font-semibold text-[#4e4742] shadow-sm transition hover:bg-[#f6f1ec] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/20"
-              >
-                Back to profile
-              </Link>
 
               <button
                 type="submit"
@@ -1063,10 +1207,10 @@ export default function AcademicMateOfferingsPage() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-base font-bold text-[#241f1c]">
-                    Current offerings
+                    Your offers
                   </h2>
                   <p className="text-xs text-[#6b625c]">
-                    Each offering can be edited or removed independently.
+                    Each offering can be modified independently.
                   </p>
                 </div>
 
@@ -1124,7 +1268,7 @@ export default function AcademicMateOfferingsPage() {
                     No offerings yet
                   </h3>
                   <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-[#746b65]">
-                    Add a course using the form to make your academic support
+                    Add a course to make your academic support
                     available through TXMate.
                   </p>
 
@@ -1154,110 +1298,121 @@ export default function AcademicMateOfferingsPage() {
                   </button>
                 </div>
               ) : (
-                filteredOfferings.map((offering) => (
-                  <article
-                    key={offering.id}
-                    className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-xs transition hover:shadow-sm"
-                  >
-                    <div className="space-y-4 px-5 py-5">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-widest text-[#7d1f2a]">
-                            {offering.course.code}
+                <ul className="-m-4 space-y-2 bg-white sm:-m-5">
+                  {filteredOfferings.map((offering) => {
+                    const deleting = deletingId === offering.id;
+
+                    return (
+                      <li
+                        key={offering.id}
+                        className={`rounded-xl border border-[#e2d9d0] bg-white p-5 shadow-sm ${
+                          deleting ? "opacity-60" : ""
+                        }`}
+                      >
+                        {/* Course + actions */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-baseline gap-2">
+                              <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-[#7d1f2a]">
+                                {offering.course.code}
+                              </span>
+                              <h3 className="truncate text-sm font-semibold text-[#241f1c]">
+                                {offering.course.name}
+                              </h3>
+                            </div>
+
+                            {offering.title && (
+                              <p className="mt-0.5 truncate text-xs text-[#6b625c]">
+                                {offering.title}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="-mr-1.5 -mt-1 flex shrink-0 items-center">
+                            <button
+                              type="button"
+                              onClick={() => startEditing(offering)}
+                              disabled={deleting}
+                              aria-label={`Edit ${offering.course.code} offering`}
+                              title="Edit"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6b625c] transition hover:bg-[#f6f1ec] hover:text-[#7d1f2a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(offering)}
+                              disabled={deleting}
+                              aria-label={
+                                deleting
+                                  ? `Deleting ${offering.course.code} offering`
+                                  : `Delete ${offering.course.code} offering`
+                              }
+                              title={deleting ? "Deleting..." : "Delete"}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6b625c] transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        {offering.description && (
+                          <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#625b55]">
+                            {offering.description}
+                          </p>
+                        )}
+
+                        {/* Details: icon + plain text, no labels */}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-[#4e4742]">
+                          <span className="inline-flex items-center gap-1.5 font-semibold text-[#241f1c]">
+                            <RateIcon className="h-3.5 w-3.5 text-[#7d1f2a]" />
+                            {offering.currency} {offering.rate} ·{" "}
+                            {formatRateType(offering.rateType)}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5">
+                            <ClockIcon className="h-3.5 w-3.5 text-[#8a817a]" />
+                            {formatDuration(offering.sessionDurationMinutes)}
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 font-medium ${statusTone(offering.status)}`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-1.5 rounded-full bg-current"
+                            />
+                            {formatStatus(offering.status)}
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1.5 font-medium ${statusTone(offering.verificationStatus)}`}
+                          >
+                            <ShieldCheckIcon className="h-3.5 w-3.5" />
+                            {formatStatus(offering.verificationStatus)}
                           </span>
 
                           {offering.isOutsideCurrentCurriculum && (
-                            <span className="rounded-full bg-[#7d1f2a]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#7d1f2a]">
+                            <span className="inline-flex items-center gap-1.5 font-medium text-[#7d1f2a]">
+                              <BookIcon className="h-3.5 w-3.5" />
                               Outside curriculum
                             </span>
                           )}
                         </div>
 
-                        <h3 className="mt-1.5 text-base font-bold leading-snug text-[#241f1c]">
-                          {offering.course.name}
-                        </h3>
-
-                        {offering.title && (
-                          <p className="mt-1 text-sm font-medium text-[#4e4742]">
-                            {offering.title}
+                        {/* Custom pricing note */}
+                        {offering.rateType === "CUSTOM" && offering.rateDetails && (
+                          <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#6b625c]">
+                            <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a817a]" />
+                            <span>{offering.rateDetails}</span>
                           </p>
                         )}
-                      </div>
-
-                      <div className="rounded-lg bg-[#faf8f6] px-4 py-3">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#8a817a]">
-                          Description
-                        </p>
-                        {offering.description ? (
-                          <p className="mt-1.5 whitespace-pre-line text-sm leading-6 text-[#4e4742]">
-                            {offering.description}
-                          </p>
-                        ) : (
-                          <p className="mt-1.5 text-sm italic leading-6 text-[#9a918a]">
-                            No description added.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-semibold text-[#4e4742]">
-                          <RateIcon className="h-3.5 w-3.5 text-[#7d1f2a]" />
-                          {offering.currency} {offering.rate} ·{" "}
-                          {formatRateType(offering.rateType)}
-                        </span>
-
-                        <span className="rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-semibold text-[#4e4742]">
-                          Session Duration:{" "}
-                          {formatDuration(offering.sessionDurationMinutes)}
-                        </span>
-                      </div>
-
-                      {offering.rateType === "CUSTOM" &&
-                        offering.rateDetails && (
-                          <div className="rounded-lg border border-[#e2d9d0] bg-[#faf8f6] px-4 py-3">
-                            <p className="text-[11px] font-bold uppercase tracking-wider text-[#8a817a]">
-                              Pricing details
-                            </p>
-                            <p className="mt-1 text-sm leading-5 text-[#4e4742]">
-                              {offering.rateDetails}
-                            </p>
-                          </div>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col gap-3 border-t border-[#eee7df] bg-[#faf8f6]/60 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex flex-wrap gap-2">
-                        <StatusBadge label="Status" value={offering.status} />
-                        <StatusBadge
-                          label="Verification"
-                          value={offering.verificationStatus}
-                        />
-                      </div>
-
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => startEditing(offering)}
-                          disabled={deletingId === offering.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#d8cec5] bg-white px-3 py-2 text-xs font-semibold text-[#4e4742] transition hover:border-[#7d1f2a]/40 hover:bg-[#faf8f6] hover:text-[#7d1f2a] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <PencilIcon className="h-3.5 w-3.5" />
-                          Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(offering)}
-                          disabled={deletingId === offering.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <TrashIcon className="h-3.5 w-3.5" />
-                          {deletingId === offering.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
           </section>

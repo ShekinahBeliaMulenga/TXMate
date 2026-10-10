@@ -377,30 +377,9 @@ export default function AcademicMateVerificationPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f1ed] antialiased">
-      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-        
+      <div className="mx-auto max-w-5xl px-4 pb-10 pt-4 sm:px-6 lg:px-8">
         {/* HEADER */}
-        <div className="mb-8">
-            <Link
-                href="/student/academic-mate"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#7d1f2a] transition hover:text-[#5c161f]"
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M7 17 17 7M7 7h10v10"
-                  />
-                </svg>
-                View Profile
-            </Link>
-
+        <div className="mb-6">
           <div className="mt-5">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7d1f2a]/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#7d1f2a]">
               <Icon name="shield" className="h-3.5 w-3.5" />
@@ -438,7 +417,7 @@ export default function AcademicMateVerificationPage() {
         )}
 
         {/* SEGMENTED CONTROL NAVIGATION */}
-        <div className="mb-6 inline-flex rounded-xl bg-[#e2d9d0]/40 p-1">
+        <div className="mx-auto mb-6 flex w-fit rounded-xl bg-[#e2d9d0]/40 p-1">
           <button
             onClick={() => setActiveView("STATUS")}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
@@ -458,8 +437,7 @@ export default function AcademicMateVerificationPage() {
                 : "text-[#6d6260] hover:text-[#282321] hover:bg-white/50"
             }`}
           >
-            <Icon name="history" className="h-4 w-4" />
-            Verification History
+            <Icon name="history" className="h-4 w-4" /> History
           </button>
         </div>
 

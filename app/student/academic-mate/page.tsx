@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+
 
 type Status = "ACTIVE" | "INACTIVE" | "SUSPENDED";
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -114,8 +113,6 @@ export default function AcademicMatePage() {
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [signingOut, setSigningOut] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -164,51 +161,16 @@ export default function AcademicMatePage() {
     };
   }, []);
 
-  async function handleSignOut() {
-    try {
-      setSigningOut(true);
-  
-      await authClient.signOut({
-        fetchOptions: {
-          onSuccess: () => {
-            router.replace("/login");
-          },
-        },
-      });
-    } catch {
-      setSigningOut(false);
-      setError("Unable to sign out. Please try again.");
-    }
-  }
-
   if (loading) return <LoadingState />;
 
-  const topBar = (
-    <div className="flex items-center justify-between border-b border-[#e2d9d0] pb-4">
-      <Link href="/student/profile" className={`${LINK} inline-flex items-center gap-1.5`}>
-        <Icon name="back" />
-        Student profile
-      </Link>
-      <button
-        type="button"
-        onClick={handleSignOut}
-        disabled={signingOut}
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#4e4742] hover:text-[#241f1c] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30 disabled:opacity-60"
-      >
-        <Icon name="logout" />
-        {signingOut ? "Signing out…" : "Sign out"}
-      </button>
-    </div>
-  );
 
   if (error || !data) {
     return (
       <Shell>
-        {topBar}
         <div role="alert" className="mt-8 rounded-md border border-red-200 bg-red-50 px-5 py-4 text-red-800">
           <h1 className="font-semibold">Couldn’t load your profile</h1>
           <p className="mt-1 text-sm">
-            {error || "Your Academic Mate profile could not be loaded."} Refresh the page to try again.
+            {error || "Your Academic Mate profile could not be loaded."}
           </p>
         </div>
       </Shell>
@@ -217,11 +179,11 @@ export default function AcademicMatePage() {
 
   return (
     <Shell>
-      {topBar}
+      
       <ProfileHeader data={data} />
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
-        <div className="space-y-6">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
+        <div className="min-w-0 space-y-6">
           <AboutSection profile={data.profile} userName={data.user.name} />
           <CoursesSection offerings={data.offerings} />
           <BackgroundSection
@@ -231,7 +193,7 @@ export default function AcademicMatePage() {
           <ReviewsSection reviews={data.reviews} />
         </div>
 
-        <aside className="space-y-6">
+        <aside className="min-w-0 space-y-6">
           <VerificationSection status={data.profile.verificationStatus} />
           <AvailabilitySection availability={data.availability} offerings={data.offerings} />
         </aside>
@@ -291,14 +253,14 @@ function ProfileHeader({ data }: { data: ProfileData }) {
           <div className="flex gap-2">
             <Link
               href="/student/academic-mate/profile"
-              className="inline-flex items-center gap-2 rounded-lg border border-[#d8cec5] bg-white px-4 py-2 text-sm font-medium text-[#3d3631] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30"
+              className="inline-flex items-center gap-2  px-4 py-2 text-sm font-medium text-[#3d3631] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30"
             >
               <Icon name="eye" />
               Preview
             </Link>
             <Link
               href="/student/academic-mate/edit"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#7d1f2a] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#3d3631]  hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
             >
               <Icon name="edit" />
               Edit profile
@@ -504,7 +466,7 @@ function ReviewsSection({ reviews }: { reviews: Review[] }) {
               <li key={r.id} className="py-3.5 first:pt-0 last:pb-0">
                 <Stars value={r.rating} />
                 {r.comment && (
-                  <p className="mt-1.5 text-sm leading-6 text-[#4e4742]">{r.comment}</p>
+                  <p className="mt-1.5 break-words text-sm leading-6 text-[#4e4742]">{r.comment}</p>
                 )}
               </li>
             ))}
@@ -636,7 +598,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return (
     <div>
       <h3 className={`text-xs font-medium ${MUTED}`}>{label}</h3>
-      <p className="mt-1 max-w-prose whitespace-pre-line text-sm leading-6 text-[#3d3631]">
+      <p className="mt-1 max-w-prose whitespace-pre-line break-words text-sm leading-6 text-[#3d3631]">
         {children}
       </p>
     </div>
@@ -733,7 +695,7 @@ function LoadingState() {
           <div className="h-4 w-72 animate-pulse rounded bg-[#e2d9d0]" />
         </div>
       </div>
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1.7fr_1fr]">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1.7fr_1fr]">
         <div className="space-y-6">
           <div className="h-48 animate-pulse rounded-lg bg-[#e2d9d0]" />
           <div className="h-64 animate-pulse rounded-lg bg-[#e2d9d0]" />

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useState, type ChangeEvent } from "react";
+import { FormEvent, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import ImageCropModal from "@/components/ImageCropModal"; // adjust the path to where you put the file
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 
@@ -70,9 +70,15 @@ function initials(name: string) {
 async function requestJson<T>(url: string, init: RequestInit, fallback: string): Promise<T> {
   const response = await fetch(url, init);
   const contentType = response.headers.get("content-type") ?? "";
-  const raw = await response.text();
   if (!contentType.includes("application/json")) throw new Error("The service returned an unexpected response.");
-  const body = JSON.parse(raw) as { error?: string };
+
+  let body: { error?: string };
+  try {
+    body = (await response.json()) as { error?: string };
+  } catch {
+    throw new Error("The service returned an unreadable response.");
+  }
+
   if (!response.ok) throw new Error(body.error || fallback);
   return body as T;
 }
@@ -95,19 +101,19 @@ async function resizeProfileImage(file: File): Promise<string> {
   return dataUrl;
 }
 
-function Card({ id, title, subtitle, icon, children }: { id: string; title: string; subtitle: string; icon: IconName; children: React.ReactNode }) {
+function Card({ id, title, subtitle, icon, children }: { id: string; title: string; subtitle: string; icon: IconName; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-28 overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-      <div className="flex items-start gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-6 py-4">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]">
-          <Icon name={icon} className="h-5 w-5" />
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24 overflow-hidden rounded-lg border border-[#e2d9d0] bg-white">
+      <div className="flex items-center gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#7d1f2a]/10 text-[#7d1f2a]">
+          <Icon name={icon} className="h-4 w-4" />
         </span>
-        <div>
-          <h2 id={`${id}-title`} className="text-base font-semibold text-[#282321]">{title}</h2>
-          <p className="mt-0.5 text-sm text-[#7a6f6a]">{subtitle}</p>
+        <div className="min-w-0">
+          <h2 id={`${id}-title`} className="text-sm font-semibold text-[#282321]">{title}</h2>
+          <p className="mt-0.5 text-xs leading-5 text-[#7a6f6a]">{subtitle}</p>
         </div>
       </div>
-      <div className="px-6 py-6">{children}</div>
+      <div className="px-5 py-4">{children}</div>
     </section>
   );
 }
@@ -176,6 +182,7 @@ export default function StudentSettingsPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageSuccess, setImageSuccess] = useState(false);
   const [imageInputKey, setImageInputKey] = useState(0);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [activeSection, setActiveSection] = useState(sections[0].id);
 
   function applyProfile(data: ProfileResponse) {
@@ -257,7 +264,8 @@ export default function StudentSettingsPage() {
       showStudentId !== profile.studentProfile.showStudentId ||
       showPhoneNumber !== profile.studentProfile.showPhoneNumber);
 
-  async function handleProfileImageChange(event: ChangeEvent<HTMLInputElement>) {
+  // Step 1: validate the chosen file, then open the crop dialog instead of uploading
+  function handleProfileImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -271,6 +279,13 @@ export default function StudentSettingsPage() {
       setImageError("The selected image is too large. Maximum size is 8 MB.");
       return;
     }
+    setPendingFile(file);
+  }
+
+  // Step 2: upload the cropped result. On failure the dialog stays open and shows the error.
+  async function uploadCroppedImage(file: File) {
+    setImageError(null);
+    setImageSuccess(false);
     setImageUploading(true);
     try {
       const image = await resizeProfileImage(file);
@@ -282,12 +297,19 @@ export default function StudentSettingsPage() {
       if (typeof body.image !== "string") throw new Error("The profile image service returned an invalid image.");
       setProfile((current) => (current ? { ...current, user: { ...current.user, image: body.image ?? null } } : current));
       setImageSuccess(true);
+      setPendingFile(null);
+      setImageInputKey((value) => value + 1);
     } catch (err) {
       setImageError(err instanceof Error ? err.message : "Unable to update your profile picture.");
     } finally {
       setImageUploading(false);
-      setImageInputKey((value) => value + 1);
     }
+  }
+
+  function cancelCrop() {
+    setPendingFile(null);
+    setImageError(null);
+    setImageInputKey((value) => value + 1);
   }
 
   async function handleRemoveProfileImage() {
@@ -370,28 +392,24 @@ export default function StudentSettingsPage() {
 
   return (
     <main className="min-h-screen bg-[#f4f1ed] text-[#282321]">
-      <div className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-8">
         <header>
-          <Link href="/student/profile" className={`inline-flex items-center gap-1.5 rounded-lg text-sm font-semibold text-[#7d1f2a] hover:text-[#691923] ${FOCUS}`}>
-            <Icon name="chevronLeft" className="h-4 w-4" />
-            Back to profile
-          </Link>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-[#6d6260]">Manage your photo, personal details and who can see them.</p>
         </header>
 
-        <div className="sticky top-0 z-20 -mx-4 mt-4 border-b border-[#e2d9d0] bg-[#f4f1ed]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
+        <div className="sticky top-16 z-20 -mx-4 mt-4 border-b border-[#e2d9d0] bg-[#f9f8f6]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
           <SectionNav compact active={activeSection} onSelect={goToSection} />
         </div>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="hidden lg:block">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
+          <div className="hidden border-r border-[#e2d9d0] pr-5 lg:block">
             <div className="sticky top-6">
               <SectionNav active={activeSection} onSelect={goToSection} />
             </div>
           </div>
 
-          <form id="settings-form" onSubmit={handleSubmit} className="min-w-0 space-y-6">
+          <form id="settings-form" onSubmit={handleSubmit} className="min-w-0 space-y-4">
             <Card id="photo" title="Profile photo" subtitle="Shown next to your name across TXMate." icon="camera">
               <div className="flex items-center gap-4">
                 <div className="relative shrink-0">
@@ -416,7 +434,6 @@ export default function StudentSettingsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold text-[#282321]">{user.name}</p>
-                  <p className="mt-0.5 text-sm text-[#8a7f7a]">Student profile</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <button type="button" onClick={openImagePicker} disabled={imageUploading} className="text-xs font-semibold text-[#7d1f2a] hover:text-[#691923] disabled:cursor-not-allowed disabled:opacity-60">
                       {imageUploading ? "Updating..." : user.image ? "Change photo" : "Add photo"}
@@ -432,7 +449,7 @@ export default function StudentSettingsPage() {
                   </div>
                 </div>
               </div>
-              {imageError ? <p role="alert" className="mt-4 text-xs leading-5 text-[#7d1f2a]">{imageError}</p> : null}
+              {!pendingFile && imageError ? <p role="alert" className="mt-4 text-xs leading-5 text-[#7d1f2a]">{imageError}</p> : null}
               {imageSuccess ? <p role="status" className="mt-4 text-xs leading-5 text-[#28633b]">Profile picture updated successfully.</p> : null}
             </Card>
 
@@ -444,9 +461,26 @@ export default function StudentSettingsPage() {
                 </div>
                 <div>
                   <label htmlFor="phone" className="block text-sm font-semibold text-[#3f3734]">Phone number</label>
-                  <div className="mt-2 flex items-center gap-3 rounded-lg border border-[#d9cec5] bg-white px-3.5 py-2.5 focus-within:border-[#7d1f2a] focus-within:ring-2 focus-within:ring-[#7d1f2a]/10">
-                    <Icon name="phone" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
-                    <input id="phone" name="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} autoComplete="tel" maxLength={30} inputMode="tel" placeholder="e.g. +260 97 1234567" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a79b95]" />
+                  <div className="mt-2 flex items-center overflow-hidden rounded-lg border border-[#d9cec5] bg-white focus-within:border-[#7d1f2a] focus-within:ring-2 focus-within:ring-[#7d1f2a]/10">
+                    <div className="flex items-center gap-2 border-r border-[#d9cec5] bg-[#fcfaf7] px-3.5 py-2.5 text-sm font-medium text-[#3f3734]">
+                      <Icon name="phone" className="h-4 w-4 text-[#8a7f7a]" />
+                      <span>+260</span>
+                    </div>
+                    <input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      placeholder="97 1234567"
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        // Digits only; drop a pasted leading 260 or 0; max 9 digits
+                        const clean = e.target.value.replace(/\D/g, "").replace(/^260|^0/, "").slice(0, 9);
+                        setPhoneNumber(clean);
+                      }}
+                      className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-sm outline-none placeholder:text-[#a79b95]"
+                    />
                   </div>
                 </div>
                 <div>
@@ -512,16 +546,26 @@ export default function StudentSettingsPage() {
       </div>
 
       {dirty || saving ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e2d9d0] bg-white/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="tx-savebar-enter fixed bottom-0 left-0 right-0 z-40 border-t border-[#e2d9d0] bg-white/95 shadow-[0_-8px_24px_rgba(40,35,33,0.06)] backdrop-blur lg:left-64">
+          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
             <p role={error ? "alert" : undefined} className={`text-sm ${error ? "font-medium text-[#7d1f2a]" : "text-[#6d6260]"}`}>
               {error ?? "You have unsaved changes."}
             </p>
-            <div className="flex gap-2">
-              <button type="button" disabled={saving} onClick={() => applyProfile(profile)} className={`rounded-lg border border-[#d9cec5] px-4 py-2 text-sm font-medium text-[#4e4742] hover:bg-[#faf8f6] disabled:opacity-60 ${FOCUS}`}>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => applyProfile(profile)}
+                className={`rounded-md border border-[#d9cec5] px-4 py-2 text-sm font-medium text-[#4e4742] transition hover:bg-[#faf8f6] disabled:opacity-60 ${FOCUS}`}
+              >
                 Discard
               </button>
-              <button type="submit" form="settings-form" disabled={saving} className={`rounded-lg bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white hover:bg-[#691923] disabled:opacity-60 ${FOCUS}`}>
+              <button
+                type="submit"
+                form="settings-form"
+                disabled={saving}
+                className={`rounded-md bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#691923] disabled:opacity-60 ${FOCUS}`}
+              >
                 {saving ? "Saving…" : "Save changes"}
               </button>
             </div>
@@ -534,6 +578,16 @@ export default function StudentSettingsPage() {
           <Icon name="check" className="h-4 w-4" />
           Changes saved
         </div>
+      ) : null}
+
+      {pendingFile ? (
+        <ImageCropModal
+          file={pendingFile}
+          busy={imageUploading}
+          externalError={imageError}
+          onCancel={cancelCrop}
+          onConfirm={(cropped) => void uploadCroppedImage(cropped)}
+        />
       ) : null}
     </main>
   );

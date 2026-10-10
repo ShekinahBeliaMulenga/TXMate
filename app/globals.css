@@ -1,8 +1,10 @@
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f9f8f6;
+  --foreground: #282321;
 }
 
 @theme inline {
@@ -12,15 +14,63 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  min-height: 100vh;
+  background: #f9f8f6;
+  color: #282321;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* TXMate scrollbar theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c8b9af #f5f1ed;
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #f5f1ed;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #c8b9af;
+  border-radius: 999px;
+  border: 1px solid #f5f1ed;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #7d1f2a;
+}
+
+@keyframes tx-savebar-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tx-savebar-enter {
+  animation: tx-savebar-fade-in 220ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-savebar-enter {
+    animation: none;
+  }
 }

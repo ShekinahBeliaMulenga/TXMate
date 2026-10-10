@@ -237,7 +237,7 @@ export async function GET() {
 
     if (!academicMate) {
       return NextResponse.json(
-        { error: "Academic Mate profile not found. Create One." },
+        { error: "Academic Mate profile not found. Become an Academic Mate first." },
         { status: 404 },
       );
     }

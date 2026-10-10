@@ -1,13 +1,10 @@
 "use client";
-
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 
-
-// --- Types remain unchanged ---
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
+
 type StudentStatus = "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
+
 type StudentCourseStatus = "ENROLLED" | "COMPLETED" | "DROPPED" | "REPEATING";
 
 type StudentCourse = {
@@ -97,6 +94,7 @@ type StudentProfileResponse = {
 };
 
 // --- Styles and Labels ---
+
 const statusLabel: Record<StudentStatus, string> = {
   ACTIVE: "Active",
   GRADUATED: "Graduated",
@@ -141,6 +139,7 @@ const iconPaths = {
 } as const;
 
 function Icon({ name, className = "h-4 w-4" }: { name: keyof typeof iconPaths; className?: string }) {
+
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <path d={iconPaths[name]} />
@@ -149,7 +148,9 @@ function Icon({ name, className = "h-4 w-4" }: { name: keyof typeof iconPaths; c
 }
 
 // --- Enhanced Reusable UI Components ---
+
 function Section({ title, icon, aside, children, className = "" }: { title: string; icon?: keyof typeof iconPaths; aside?: ReactNode; children: ReactNode; className?: string }) {
+
   return (
     <section className={`flex flex-col rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden ${className}`}>
       <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] px-5 py-3.5 bg-[#faf8f6]/50">
@@ -165,6 +166,7 @@ function Section({ title, icon, aside, children, className = "" }: { title: stri
 }
 
 function InfoItem({ icon, label, value, muted = false }: { icon: keyof typeof iconPaths; label: string; value: ReactNode; muted?: boolean }) {
+
   return (
     <div className="flex items-center gap-4 py-2.5 border-b border-[#f0ebe5] last:border-0">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f1ed] text-[#7d1f2a]">
@@ -198,18 +200,14 @@ function formatDate(value: string) {
 }
 
 // --- Main Page Component ---
+
 export default function StudentProfilePage() {
   const [data, setData] = useState<StudentProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
-  const router = useRouter();
-  
   const [activeTab, setActiveTab] = useState<"overview" | "courses" | "privacy">("overview");
-
   useEffect(() => {
     const controller = new AbortController();
-
     async function loadProfile() {
       try {
         setLoading(true);
@@ -220,18 +218,13 @@ export default function StudentProfilePage() {
           cache: "no-store",
           signal: controller.signal,
         });
-
         const contentType = response.headers.get("content-type") ?? "";
         const rawBody = await response.text();
-
         if (!contentType.includes("application/json")) throw new Error(`Expected a JSON response, but received ${contentType || "non-JSON content"}.`);
-
         let body: { error?: string } & Partial<StudentProfileResponse>;
         try { body = JSON.parse(rawBody); } catch { throw new Error("The profile service returned invalid JSON."); }
-
         if (!response.ok) throw new Error(body.error || "Unable to load your student profile.");
         if (!body.studentProfile || !body.user || !body.university || !body.academic) throw new Error("The profile service returned an incomplete profile.");
-
         setData(body as StudentProfileResponse);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -240,28 +233,9 @@ export default function StudentProfilePage() {
         if (!controller.signal.aborted) setLoading(false);
       }
     }
-
     void loadProfile();
     return () => controller.abort();
   }, []);
-
-  async function handleSignOut() {
-    try {
-      setSigningOut(true);
-  
-      await authClient.signOut({
-        fetchOptions: {
-          onSuccess: () => {
-            router.replace("/login");
-          },
-        },
-      });
-    } catch {
-      setSigningOut(false);
-      setError("Unable to sign out. Please try again.");
-    }
-  }
-
   const sortedCourses = useMemo(() => {
     if (!data) return [];
     return [...data.academic.courses].sort((a, b) => {
@@ -274,11 +248,80 @@ export default function StudentProfilePage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-5xl animate-pulse">
-          <div className="h-48 rounded-t-3xl bg-black/5" />
-          <div className="h-56 rounded-b-3xl bg-white shadow-sm ring-1 ring-black/5 mb-8" />
-          <div className="h-80 rounded-2xl bg-white shadow-sm ring-1 ring-black/5" />
+      <main className="min-h-screen bg-[#f8f6f3] px-4 py-5 sm:px-6 sm:py-7 lg:px-8" aria-busy="true">
+        <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
+          <section role="status" aria-live="polite" aria-label="Loading student profile" className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
+            <span className="sr-only">Loading your student profile...</span>
+            <div className="relative h-28 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-36">
+              <div aria-hidden="true" className="absolute -right-7 -top-12 h-40 w-40 rounded-full border-[18px] border-white/[0.07] sm:-right-3 sm:-top-16 sm:h-52 sm:w-52 sm:border-[24px]" />
+              <div aria-hidden="true" className="absolute -bottom-16 left-1/3 h-36 w-36 rounded-full border-[16px] border-white/[0.06] sm:h-44 sm:w-44" />
+              <div className="absolute right-4 top-4 h-6 w-24 rounded-full bg-white/20 sm:right-5 sm:top-5 sm:w-28" />
+            </div>
+            <div className="px-4 pb-5 sm:px-7 sm:pb-6">
+              <div className="relative z-10 -mt-10 flex flex-wrap items-end justify-between gap-3 sm:-mt-12">
+                <div className="h-20 w-20 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-24 sm:w-24" />
+                <div className="mb-1 h-6 w-20 rounded-full bg-[#eee8e2]" />
+              </div>
+              <div className="mt-4">
+                <div className="h-7 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-8 sm:w-60" />
+                <div className="mt-2 h-4 w-60 max-w-full rounded bg-[#eee8e2]" />
+                <div className="mt-2 h-3.5 w-52 max-w-full rounded bg-[#f0ebe5]" />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="h-7 w-28 rounded-full bg-[#f0ebe5]" />
+                  <div className="h-7 w-36 rounded-full bg-[#f0ebe5]" />
+                </div>
+                <div className="mt-5 max-w-2xl">
+                  <div className="h-2.5 w-12 rounded bg-[#e8e0d8]" />
+                  <div className="mt-2 h-3 w-full max-w-xl rounded bg-[#eee8e2]" />
+                  <div className="mt-2 h-3 w-4/5 max-w-lg rounded bg-[#f0ebe5]" />
+                </div>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <div className="h-10 w-full rounded-lg border border-[#e2d9d0] bg-[#faf8f6] sm:w-32" />
+                  <div className="h-10 w-full rounded-lg bg-[#ead7d9] sm:w-48" />
+                </div>
+              </div>
+            </div>
+          </section>
+          <div className="mt-5 flex justify-center">
+            <div className="flex w-full max-w-sm items-center justify-between gap-1 rounded-xl border border-[#e2d9d0] bg-white p-1.5 sm:w-auto sm:justify-center sm:gap-2">
+              <div className="h-8 flex-1 rounded-lg bg-[#f1e7e5] sm:w-24 sm:flex-none" />
+              <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
+              <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
+            </div>
+          </div>
+          <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2 sm:mt-5">
+            <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
+              <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] bg-[#faf8f6]/70 px-4 py-3.5 sm:px-5">
+                <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
+                <div className="h-3.5 w-36 rounded bg-[#e8e0d8]" />
+              </div>
+              <div className="px-4 py-2 sm:px-5">
+                {[0, 1, 2, 3, 4].map((item) => (
+                  <div key={item} className="flex items-center gap-3 border-b border-[#f0ebe5] py-3 last:border-0">
+                    <div className="h-8 w-8 shrink-0 rounded-lg bg-[#f1eae5]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-2.5 w-20 rounded bg-[#eee8e2]" />
+                      <div className="mt-2 h-3 w-3/4 max-w-56 rounded bg-[#f0ebe5]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
+              <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] bg-[#faf8f6]/70 px-4 py-3.5 sm:px-5">
+                <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
+                <div className="h-3.5 w-32 rounded bg-[#e8e0d8]" />
+              </div>
+              <div className="flex min-h-[230px] flex-col items-center justify-center px-5 py-8">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#eadfda] bg-[#faf5f2]">
+                  <div className="h-5 w-5 rounded-full bg-[#ead7d9]" />
+                </div>
+                <div className="mt-4 h-3.5 w-28 rounded bg-[#e8e0d8]" />
+                <div className="mt-2 h-6 w-32 rounded-full bg-[#f3e8e9]" />
+                <div className="mt-4 h-2.5 w-36 rounded bg-[#eee8e2]" />
+              </div>
+            </section>
+          </div>
         </div>
       </main>
     );
@@ -311,20 +354,6 @@ export default function StudentProfilePage() {
   return (
     <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 sm:px-6 lg:px-8 pb-16">
       <div className="mx-auto max-w-5xl">
-        
-        {/* Top App Bar - Justified End for Sign Out */}
-        <div className="flex items-center justify-end pb-5">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="inline-flex items-center gap-2 text-[13px] font-bold text-[#8a7f7a] hover:text-[#7d1f2a] transition-colors rounded-md disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30"
-          >
-            <Icon name="logout" className="h-3.5 w-3.5" />
-            {signingOut ? "Signing Out…" : "Sign Out"}
-          </button>
-        </div>
-
         {/* --- HERO PROFILE SECTION --- */}
         <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
           <div
@@ -333,7 +362,6 @@ export default function StudentProfilePage() {
           >
             <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
             <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
-
             {/* Visibility pill */}
             <div className="absolute right-4 top-4 sm:right-5 sm:top-5">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm ring-1 ring-white/30 backdrop-blur-md">
@@ -342,7 +370,6 @@ export default function StudentProfilePage() {
               </span>
             </div>
           </div>
-
           <div className="px-5 pb-6 sm:px-8">
             <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
               {user.image ? (
@@ -359,7 +386,6 @@ export default function StudentProfilePage() {
                   {initials(user.name)}
                 </div>
               )}
-
               <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-[#e2d9d0] bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span
                   className={`h-2 w-2 rounded-full ${
@@ -375,42 +401,35 @@ export default function StudentProfilePage() {
                 {statusLabel[studentProfile.status]}
               </span>
             </div>
-
             <div className="mt-4">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">
                     {user.name}
                   </h1>
-
                   <p className="mt-1.5 text-[15px] text-[#3f3734]">
                     {academic.programme.name}
                     <span className="text-[#8a7f7a]"> · Year {academic.year.yearNumber}</span>
                   </p>
-
                   <p className="mt-1 text-sm text-[#6d6260]">
                     {university.name}
                     <span className="text-[#8a7f7a]"> · {academic.school.name}</span>
                   </p>
-
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-medium text-[#5f5551]">
                       <Icon name="eye" className="h-3.5 w-3.5" />
                       {visibilityLabel[studentProfile.profileVisibility]}
                     </span>
-
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-medium text-[#5f5551]">
                       <Icon name="calendar" className="h-3.5 w-3.5" />
                       {currentAcademicYear?.name ?? "Academic year not assigned"}
                     </span>
                   </div>
-
                   {/* Bio Block */}
                   <div className="mt-5">
                     <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8a7f7a]">
                       About
                     </h3>
-
                     {studentProfile.bio ? (
                       <p className="max-w-2xl text-[13px] leading-relaxed text-[#4b423e] text-balance">
                         {studentProfile.bio}
@@ -422,34 +441,33 @@ export default function StudentProfilePage() {
                     )}
                   </div>
                 </div>
-
                 {/* Action Buttons */}
-                <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-end">
                   <a
                     href="/student/settings"
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d8cec5] bg-white px-3.5 py-2.5 text-sm font-semibold text-[#4b423e] transition hover:border-[#bdb0a6] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30 focus-visible:ring-offset-2"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#6d6260] transition-colors hover:text-[#7d1f2a] focus-visible:outline-none focus-visible:underline"
                   >
                     <Icon name="pencil" className="h-4 w-4" />
-                    Edit Profile
+                    Edit profile
                   </a>
 
                   <a
                     href={data.academicMate ? "/student/academic-mate" : "/student/academic-mate/edit"}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-3.5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#6d6260] transition-colors hover:text-[#7d1f2a] focus-visible:outline-none focus-visible:underline"
                   >
                     <Icon
                       name={data.academicMate ? "badgeCheck" : "academic"}
                       className="h-4 w-4"
                     />
-                    {data.academicMate ? "Academic Mate Profile" : "Be an Academic Mate"}
+                    {data.academicMate ? "Academic Mate profile" : "Become an Academic Mate"}
                   </a>
                 </div>
-              </div>
+                              </div>
             </div>
           </div>
         </section>
         {/* --- NAVIGATION TABS --- */}
-        <div className="mt-6 mb-5 flex justify-center sm:justify-start">
+        <div className="mt-6 mb-5 flex justify-center">
           <nav className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5" aria-label="Tabs">
             {[
               { id: "overview", label: "Overview", icon: "university" },
@@ -472,10 +490,8 @@ export default function StudentProfilePage() {
             ))}
           </nav>
         </div>
-
         {/* --- TAB CONTENT --- */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          
           {activeTab === "overview" && (
             <div className="grid gap-5 md:grid-cols-2 items-stretch">
               <Section title="Institutional Details" className="h-full">
@@ -485,13 +501,11 @@ export default function StudentProfilePage() {
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">University</dt>
                     <dd className="text-[13px] text-[#282321]">{university.name}</dd>
                   </div>
-
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="university" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">School</dt>
                     <dd className="text-[13px] text-[#282321]">{academic.school.name}</dd>
                   </div>
-
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="book" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">Programme</dt>
@@ -499,7 +513,6 @@ export default function StudentProfilePage() {
                       {academic.programme.name} ({academic.programme.code})
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="academic" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">Degree Level</dt>
@@ -507,7 +520,6 @@ export default function StudentProfilePage() {
                       {titleCase(academic.programme.level)}
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 py-3">
                     <Icon name="calendar" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">Total Duration</dt>
@@ -517,7 +529,6 @@ export default function StudentProfilePage() {
                   </div>
                 </dl>
               </Section>
-              
               <Section title="Academic Timeline" className="h-full">
                 <div className="flex flex-col items-center justify-center h-full min-h-[200px] rounded-xl bg-[#faf8f6] border border-dashed border-[#e2d9d0]">
                    <Icon name="calendar" className="h-7 w-7 text-[#d8cec5] mb-2.5" />
@@ -532,7 +543,6 @@ export default function StudentProfilePage() {
               </Section>
             </div>
           )}
-
           {activeTab === "courses" && (
             <Section
               title="Course Enrollment"
@@ -564,11 +574,9 @@ export default function StudentProfilePage() {
                         <p className="text-sm font-medium text-[#7d1f2a]">
                           {item.course.code}
                         </p>
-
                         <p className="text-sm font-medium text-[#282321]">
                           {item.course.name}
                         </p>
-
                         <p className="text-sm text-[#6d6260]">
                           {item.isCompulsory
                             ? "Compulsory"
@@ -576,7 +584,6 @@ export default function StudentProfilePage() {
                               ? `Elective (${item.electiveGroup.name})`
                               : "Elective"}
                         </p>
-
                         <p
                           className={`text-sm font-medium sm:text-right ${
                             item.status === "ENROLLED"
@@ -597,7 +604,6 @@ export default function StudentProfilePage() {
               )}
             </Section>
           )}
-
           {activeTab === "privacy" && (
             <div className="grid gap-5 md:grid-cols-2 items-stretch">
               <Section title="Contact Information" className="h-full">
@@ -611,7 +617,6 @@ export default function StudentProfilePage() {
                       {user.email}
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="phone" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">
@@ -631,7 +636,6 @@ export default function StudentProfilePage() {
                         : "Not provided"}
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 py-3">
                     <Icon name="idCard" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">
@@ -651,7 +655,6 @@ export default function StudentProfilePage() {
                   </div>
                 </div>
               </Section>
-
               <Section title="Privacy Configuration" className="h-full">
                 <div>
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
@@ -663,7 +666,6 @@ export default function StudentProfilePage() {
                       {visibilityLabel[studentProfile.profileVisibility]}
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="lock" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">
@@ -675,7 +677,6 @@ export default function StudentProfilePage() {
                         : "Strictly Private"}
                     </dd>
                   </div>
-
                   <div className="flex items-center gap-3 py-3">
                     <Icon name="lock" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">
@@ -691,14 +692,11 @@ export default function StudentProfilePage() {
               </Section>
             </div>
           )}
-          
         </div>
-
         {/* Global Footer */}
         <footer className="mt-12 text-center text-[10px] font-bold uppercase tracking-widest text-[#a39a95]">
           Account Active Since {formatDate(studentProfile.createdAt)}
         </footer>
-
       </div>
     </main>
   );

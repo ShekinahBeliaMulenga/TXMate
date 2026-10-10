@@ -36,6 +36,8 @@ type Availability = {
 
 type ApiResponse<T> = { data?: T; offerings?: T; availability?: T; error?: string; message?: string };
 
+type View = "schedule" | "form";
+
 const DAYS: { value: Weekday; label: string; short: string }[] = [
   { value: "MONDAY", label: "Monday", short: "Mon" },
   { value: "TUESDAY", label: "Tuesday", short: "Tue" },
@@ -129,6 +131,8 @@ export default function AcademicMateAvailabilityPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const [view, setView] = useState<View>("schedule");
+
   const [selectedOfferingId, setSelectedOfferingId] = useState("");
   const [selectedDay, setSelectedDay] = useState<Weekday>("MONDAY");
   const [startTime, setStartTime] = useState("15:00");
@@ -162,6 +166,7 @@ export default function AcademicMateAvailabilityPage() {
   }, [availability]);
 
   const activeSlotsCount = useMemo(() => availability.filter((item) => item.isActive).length, [availability]);
+  const inactiveSlotsCount = availability.length - activeSlotsCount;
 
   useEffect(() => {
     setTimezone(getBrowserTimezone());
@@ -222,9 +227,16 @@ export default function AcademicMateAvailabilityPage() {
     setTimezone(item.timezone);
     setError("");
     setSuccess("");
-    const form = document.getElementById("slot-form");
-    if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
-    else window.scrollTo({ top: 0, behavior: "smooth" });
+    setView("form");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next: View = view === "schedule" ? "form" : "schedule";
+    setView(next);
+    document.getElementById(`tab-${next}`)?.focus();
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -270,6 +282,7 @@ export default function AcademicMateAvailabilityPage() {
 
       await loadData(false);
       resetForm(false);
+      setView("schedule");
       setSuccess(wasEditing ? "Availability updated successfully." : "Availability added successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save availability.");
@@ -354,45 +367,33 @@ export default function AcademicMateAvailabilityPage() {
   const canSubmit = !saving && !!selectedOfferingId && !!calculatedEndTime;
   const startMinuteNow = timeToMinute(startTime);
 
+  const tabs: { id: View; label: string; count: number | null }[] = [
+    { id: "schedule", label: "Your schedule", count: availability.length },
+    { id: "form", label: editingId ? "Edit slot" : "Add slot", count: null },
+  ];
+
   return (
     <main className="min-h-screen bg-[#f4f1ed] text-[#282321]">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-6 py-2 sm:px-6 lg:px-8">
         <header>
-        <Link
-              href="/student/academic-mate"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#7d1f2a] transition hover:text-[#5c161f]"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 17 17 7M7 7h10v10"
-                />
-              </svg>
-              Academic Mate Profile
-            </Link>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">Availability</h1>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight">Availability</h1>
           <p className="mt-1 text-sm text-[#6d6260]">Set the weekly times students can book sessions with you.</p>
 
-          {offerings.length > 0 && (
-            <dl className="mt-4 grid max-w-xl grid-cols-3 divide-x divide-[#ece5de] overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-              {[
-                { label: "Active slots", value: activeSlotsCount },
-                { label: "Total slots", value: availability.length },
-                { label: "Courses", value: offerings.length },
-              ].map((stat) => (
-                <div key={stat.label} className="px-4 py-3">
-                  <dd className="text-xl font-semibold leading-none">{stat.value}</dd>
-                  <dt className="mt-1 text-xs text-[#6d6260]">{stat.label}</dt>
-                </div>
-              ))}
-            </dl>
+          {availability.length > 0 && (
+            <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[#6d6260]">
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-500" />
+                <strong className="font-semibold text-emerald-800">{activeSlotsCount}</strong> active
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#b9b0a8]" />
+                <strong className="font-semibold text-[#5f5650]">{inactiveSlotsCount}</strong> inactive
+              </span>
+              <span>
+                across <strong className="font-semibold text-[#3f3734]">{groupedAvailability.length}</strong>{" "}
+                {groupedAvailability.length === 1 ? "course" : "courses"}
+              </span>
+            </p>
           )}
         </header>
 
@@ -425,214 +426,302 @@ export default function AcademicMateAvailabilityPage() {
             </Link>
           </section>
         ) : (
-          <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-            {/* Form */}
-            <aside id="slot-form" className="order-1 scroll-mt-6 lg:order-2 lg:sticky lg:top-6 lg:self-start">
-              <section className={`overflow-hidden rounded-xl border bg-white shadow-sm ${editingId ? "border-[#7d1f2a] ring-2 ring-[#7d1f2a]/10" : "border-[#e2d9d0]"}`}>
-                <div className="flex items-center justify-between gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]">
-                      <Icon name={editingId ? "edit" : "plus"} />
-                    </span>
-                    <h2 className="text-[15px] font-semibold">{editingId ? "Edit time slot" : "Add a time slot"}</h2>
-                  </div>
-                  {editingId && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Editing</span>}
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
-                  <div>
-                    <label htmlFor="offering" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Course</label>
-                    <select
-                      id="offering"
-                      value={selectedOfferingId}
-                      onChange={(event) => {
-                        setSelectedOfferingId(event.target.value);
-                        setError("");
-                      }}
-                      className={INPUT}
-                    >
-                      <option value="">Select a course</option>
-                      {offerings
-                        .filter((offering) => offering.status === "ACTIVE" || offering.id === selectedOfferingId)
-                        .map((offering) => (
-                          <option key={offering.id} value={offering.id}>
-                            {offering.course.code} – {offering.course.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-
-                  <fieldset>
-                    <legend className="mb-1.5 text-sm font-semibold text-[#3f3734]">Day</legend>
-                    <div className="grid grid-cols-7 gap-1">
-                      {DAYS.map((day) => {
-                        const selected = selectedDay === day.value;
-                        return (
-                          <button
-                            key={day.value}
-                            type="button"
-                            aria-pressed={selected}
-                            aria-label={day.label}
-                            onClick={() => setSelectedDay(day.value)}
-                            className={`rounded-lg py-2 text-xs font-semibold transition ${FOCUS} ${
-                              selected ? "bg-[#7d1f2a] text-white shadow-sm" : "border border-[#e2d9d0] bg-white text-[#514b46] hover:bg-[#f6f1ec]"
-                            }`}
-                          >
-                            {day.short}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </fieldset>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="startTime" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Start</label>
-                      <input
-                        id="startTime"
-                        type="time"
-                        value={startTime}
-                        onChange={(event) => {
-                          setStartTime(event.target.value);
-                          setError("");
-                        }}
-                        className={INPUT}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="endTime" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">End</label>
-                      <input id="endTime" type="time" value={calculatedEndTime} readOnly className="w-full cursor-not-allowed rounded-lg border border-[#e2d9d0] bg-[#f8f5f2] px-3.5 py-2.5 text-sm text-[#6d6260] outline-none" />
-                    </div>
-                  </div>
-
-                  {selectedOffering && (
-                    <p className="flex items-start gap-2 rounded-lg bg-[#f6f1ec] px-3.5 py-2.5 text-xs leading-5 text-[#6d6260]">
-                      <Icon name="clock" className="mt-0.5 h-4 w-4 shrink-0 text-[#7d1f2a]" />
-                      <span>
-                        {formatDuration(selectedOffering.sessionDurationMinutes)} per session
-                        {calculatedEndTime && !Number.isNaN(startMinuteNow)
-                          ? `, ${formatTime(startMinuteNow)} to ${formatTime(startMinuteNow + selectedOffering.sessionDurationMinutes)}`
-                          : ". Choose an earlier start so the session fits in the day."}
+          <>
+            {/* Tabs */}
+            <div
+              role="tablist"
+              aria-label="Availability sections"
+              onKeyDown={handleTabKeyDown}
+              className="mt-6 flex w-full gap-1 rounded-xl border border-[#e2d9d0] bg-white p-1 shadow-sm sm:inline-flex sm:w-auto"
+            >
+              {tabs.map((tab) => {
+                const selected = view === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    id={`tab-${tab.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`panel-${tab.id}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setView(tab.id)}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${FOCUS} ${
+                      selected ? "bg-[#7d1f2a] text-white shadow-sm" : "text-[#514b46] hover:bg-[#f6f1ec]"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.count !== null && tab.count > 0 ? (
+                      <span
+                        className={`rounded-full px-1.5 text-[11px] font-bold tabular-nums ${
+                          selected ? "bg-white/20 text-white" : "bg-[#7d1f2a]/10 text-[#7d1f2a]"
+                        }`}
+                      >
+                        {tab.count}
                       </span>
-                    </p>
-                  )}
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
 
-                  <div>
-                    <label htmlFor="timezone" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Timezone</label>
-                    <input id="timezone" type="text" value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder="Africa/Lusaka" className={INPUT} />
-                    <p className="mt-1.5 text-xs text-[#7a6f6a]">Students see times converted from this timezone.</p>
-                  </div>
+            <div className="mt-4">
+              {/* Form */}
+              {view === "form" && (
+                <div role="tabpanel" id="panel-form" aria-labelledby="tab-form" className="max-w-xl">
+                  <aside id="slot-form">
+                    <section className={`overflow-hidden rounded-xl border bg-white shadow-sm ${editingId ? "border-[#7d1f2a] ring-2 ring-[#7d1f2a]/10" : "border-[#e2d9d0]"}`}>
+                      <div className="flex items-center justify-between gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]">
+                            <Icon name={editingId ? "edit" : "plus"} />
+                          </span>
+                          <h2 className="text-[15px] font-semibold">{editingId ? "Edit time slot" : "Add a time slot"}</h2>
+                        </div>
+                        {editingId && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Editing</span>}
+                      </div>
 
-                  <div className="flex gap-2 pt-1">
-                    <button type="submit" disabled={!canSubmit} className={`flex-1 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#681a23] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}>
-                      {saving ? "Saving..." : editingId ? "Update slot" : "Add slot"}
-                    </button>
-                    {editingId && (
-                      <button type="button" onClick={() => resetForm()} className={`rounded-lg border border-[#d9cec5] bg-white px-4 py-2.5 text-sm font-medium text-[#514b46] hover:bg-[#f6f1ec] ${FOCUS}`}>
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </form>
-              </section>
-            </aside>
-
-            {/* Schedule */}
-            <section className="order-2 min-w-0 lg:order-1" aria-labelledby="schedule-title">
-              <div className="mb-3">
-                <h2 id="schedule-title" className="text-lg font-semibold">Your schedule</h2>
-                <p className="mt-0.5 text-sm text-[#6d6260]">Only active slots can be booked by students.</p>
-              </div>
-
-              {groupedAvailability.length === 0 ? (
-                <div className="flex flex-col items-center rounded-xl border border-dashed border-[#d8cec5] bg-white px-6 py-12 text-center">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#7d1f2a]/10 text-[#7d1f2a]">
-                    <Icon name="calendar" className="h-6 w-6" />
-                  </span>
-                  <p className="mt-3 text-sm font-medium">No time slots yet</p>
-                  <p className="mt-1 max-w-xs text-sm text-[#6d6260]">Use the form to add your first weekly slot.</p>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {groupedAvailability.map(([offeringId, entries]) => {
-                    const fallback = offerings.find((offering) => offering.id === offeringId);
-                    const course = entries[0].mateOffering?.course ?? fallback?.course;
-                    const title = entries[0].mateOffering?.title ?? fallback?.title ?? null;
-                    const duration = entries[0].mateOffering?.sessionDurationMinutes ?? fallback?.sessionDurationMinutes;
-
-                    const dayOrder = DAYS.map((day) => day.value);
-                    const sortedEntries = [...entries].sort((a, b) => {
-                      const dayDifference = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
-                      return dayDifference !== 0 ? dayDifference : a.startMinute - b.startMinute;
-                    });
-
-                    return (
-                      <div key={offeringId} className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-                        <div className="flex items-center justify-between gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3.5">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span className="flex h-10 min-w-12 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 px-2 text-[11px] font-bold text-[#7d1f2a]">
-                              {course?.code ?? "—"}
-                            </span>
-                            <div className="min-w-0">
-                              <h3 className="truncate text-sm font-semibold">{course?.name ?? "Course"}</h3>
-                              {title && <p className="truncate text-xs text-[#6d6260]">{title}</p>}
-                            </div>
-                          </div>
-                          {duration !== undefined && (
-                            <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[#e2d9d0] bg-white px-2.5 py-1 text-xs font-medium text-[#514b46] sm:inline-flex">
-                              <Icon name="clock" className="h-3.5 w-3.5 text-[#7d1f2a]" />
-                              {formatDuration(duration)}
-                            </span>
-                          )}
+                      <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
+                        <div>
+                          <label htmlFor="offering" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Course</label>
+                          <select
+                            id="offering"
+                            value={selectedOfferingId}
+                            onChange={(event) => {
+                              setSelectedOfferingId(event.target.value);
+                              setError("");
+                            }}
+                            className={INPUT}
+                          >
+                            <option value="">Select a course</option>
+                            {offerings
+                              .filter((offering) => offering.status === "ACTIVE" || offering.id === selectedOfferingId)
+                              .map((offering) => (
+                                <option key={offering.id} value={offering.id}>
+                                  {offering.course.code} – {offering.course.name}
+                                </option>
+                              ))}
+                          </select>
                         </div>
 
-                        <ul className="divide-y divide-[#ece5de]">
-                          {sortedEntries.map((item) => {
-                            const isEditing = editingId === item.id;
-                            return (
-                              <li key={item.id} className={`flex items-center gap-3 px-5 py-3.5 ${isEditing ? "bg-[#fdf7f8]" : ""} ${item.isActive ? "" : "bg-[#fbf9f7]"}`}>
-
-                                <div className="min-w-0 flex-1">
-                                  <p className={`text-sm font-medium tabular-nums ${item.isActive ? "" : "text-[#8a7f7a]"}`}>
-                                    {formatTime(item.startMinute)} – {formatTime(item.endMinute)}
-                                  </p>
-                                  <p className="truncate text-xs text-[#7a6f6a]">
-                                    {getDayLabel(item.day)} · {item.timezone}
-                                  </p>
-                                </div>
-
+                        <fieldset>
+                          <legend className="mb-1.5 text-sm font-semibold text-[#3f3734]">Day</legend>
+                          <div className="grid grid-cols-7 gap-1">
+                            {DAYS.map((day) => {
+                              const selected = selectedDay === day.value;
+                              return (
                                 <button
+                                  key={day.value}
                                   type="button"
-                                  role="switch"
-                                  aria-checked={item.isActive}
-                                  aria-label={`${item.isActive ? "Deactivate" : "Activate"} ${getDayLabel(item.day)} ${formatTime(item.startMinute)}`}
-                                  title={item.isActive ? "Active. Click to deactivate" : "Inactive. Click to activate"}
-                                  onClick={() => void handleToggle(item)}
-                                  disabled={togglingId === item.id}
-                                  className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-50 ${FOCUS} ${item.isActive ? "bg-[#7d1f2a]" : "bg-[#d9cec5]"}`}
+                                  aria-pressed={selected}
+                                  aria-label={day.label}
+                                  onClick={() => setSelectedDay(day.value)}
+                                  className={`rounded-lg py-2 text-xs font-semibold transition ${FOCUS} ${
+                                    selected ? "bg-[#7d1f2a] text-white shadow-sm" : "border border-[#e2d9d0] bg-white text-[#514b46] hover:bg-[#f6f1ec]"
+                                  }`}
                                 >
-                                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${item.isActive ? "translate-x-5" : ""}`} />
+                                  {day.short}
                                 </button>
+                              );
+                            })}
+                          </div>
+                        </fieldset>
 
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <button type="button" onClick={() => beginEdit(item)} aria-label="Edit slot" title="Edit" className={`rounded-lg p-2 text-[#6d6260] hover:bg-[#f6f1ec] hover:text-[#7d1f2a] ${FOCUS}`}>
-                                    <Icon name="edit" />
-                                  </button>
-                                  <button type="button" onClick={() => void handleDelete(item)} disabled={deletingId === item.id} aria-label="Delete slot" title="Delete" className={`rounded-lg p-2 text-[#6d6260] hover:bg-red-50 hover:text-red-700 disabled:opacity-50 ${FOCUS}`}>
-                                    <Icon name="trash" />
-                                  </button>
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    );
-                  })}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="startTime" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Start</label>
+                            <input
+                              id="startTime"
+                              type="time"
+                              value={startTime}
+                              onChange={(event) => {
+                                setStartTime(event.target.value);
+                                setError("");
+                              }}
+                              className={INPUT}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="endTime" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">End</label>
+                            <input id="endTime" type="time" value={calculatedEndTime} readOnly className="w-full cursor-not-allowed rounded-lg border border-[#e2d9d0] bg-[#f8f5f2] px-3.5 py-2.5 text-sm text-[#6d6260] outline-none" />
+                          </div>
+                        </div>
+
+                        {selectedOffering && (
+                          <p className="flex items-start gap-2 rounded-lg bg-[#f6f1ec] px-3.5 py-2.5 text-xs leading-5 text-[#6d6260]">
+                            <Icon name="clock" className="mt-0.5 h-4 w-4 shrink-0 text-[#7d1f2a]" />
+                            <span>
+                              {formatDuration(selectedOffering.sessionDurationMinutes)} per session
+                              {calculatedEndTime && !Number.isNaN(startMinuteNow)
+                                ? `, ${formatTime(startMinuteNow)} to ${formatTime(startMinuteNow + selectedOffering.sessionDurationMinutes)}`
+                                : ". Choose an earlier start so the session fits in the day."}
+                            </span>
+                          </p>
+                        )}
+
+                        <div>
+                          <label htmlFor="timezone" className="mb-1.5 block text-sm font-semibold text-[#3f3734]">Timezone</label>
+                          <input id="timezone" type="text" value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder="Africa/Lusaka" className={INPUT} />
+                          <p className="mt-1.5 text-xs text-[#7a6f6a]">Students see times converted from this timezone.</p>
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <button type="submit" disabled={!canSubmit} className={`flex-1 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#681a23] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}>
+                            {saving ? "Saving..." : editingId ? "Update slot" : "Add slot"}
+                          </button>
+                          {editingId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetForm();
+                                setView("schedule");
+                              }}
+                              className={`rounded-lg border border-[#d9cec5] bg-white px-4 py-2.5 text-sm font-medium text-[#514b46] hover:bg-[#f6f1ec] ${FOCUS}`}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </section>
+                  </aside>
                 </div>
               )}
-            </section>
-          </div>
+
+              {/* Schedule */}
+              {view === "schedule" && (
+                <div role="tabpanel" id="panel-schedule" aria-labelledby="tab-schedule">
+                  <section className="min-w-0" aria-labelledby="schedule-title">
+                    <div className="mb-3">
+                      <h2 id="schedule-title" className="text-lg font-semibold">Your schedule</h2>
+                      <p className="mt-0.5 text-sm text-[#6d6260]">Students can only book slots marked active.</p>
+                    </div>
+
+                    {groupedAvailability.length === 0 ? (
+                      <div className="flex flex-col items-center rounded-xl border border-dashed border-[#d8cec5] bg-white px-6 py-12 text-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#7d1f2a]/10 text-[#7d1f2a]">
+                          <Icon name="calendar" className="h-6 w-6" />
+                        </span>
+                        <p className="mt-3 text-sm font-medium">No time slots yet</p>
+                        <p className="mt-1 max-w-xs text-sm text-[#6d6260]">Use the form to add your first weekly slot.</p>
+                        <button
+                          type="button"
+                          onClick={() => setView("form")}
+                          className={`mt-5 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#681a23] ${FOCUS}`}
+                        >
+                          Add a slot
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-5">
+                        {groupedAvailability.map(([offeringId, entries]) => {
+                          const fallback = offerings.find((offering) => offering.id === offeringId);
+                          const course = entries[0].mateOffering?.course ?? fallback?.course;
+                          const title = entries[0].mateOffering?.title ?? fallback?.title ?? null;
+                          const duration = entries[0].mateOffering?.sessionDurationMinutes ?? fallback?.sessionDurationMinutes;
+                          const activeInGroup = entries.filter((entry) => entry.isActive).length;
+
+                          const dayOrder = DAYS.map((day) => day.value);
+                          const sortedEntries = [...entries].sort((a, b) => {
+                            const dayDifference = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
+                            return dayDifference !== 0 ? dayDifference : a.startMinute - b.startMinute;
+                          });
+
+                          return (
+                            <div key={offeringId} className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
+                              <div className="flex items-center justify-between gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3.5">
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <span className="flex h-10 min-w-12 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 px-2 text-[11px] font-bold text-[#7d1f2a]">
+                                    {course?.code ?? "—"}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <h3 className="truncate text-sm font-semibold">{course?.name ?? "Course"}</h3>
+                                    <p className="truncate text-xs text-[#6d6260]">
+                                      {title ? `${title} · ` : ""}
+                                      {activeInGroup} of {entries.length} active
+                                    </p>
+                                  </div>
+                                </div>
+                                {duration !== undefined && (
+                                  <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-[#e2d9d0] bg-white px-2.5 py-1 text-xs font-medium text-[#514b46] sm:inline-flex">
+                                    <Icon name="clock" className="h-3.5 w-3.5 text-[#7d1f2a]" />
+                                    {formatDuration(duration)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <ul className="divide-y divide-[#ece5de]">
+                                {sortedEntries.map((item) => {
+                                  const isEditing = editingId === item.id;
+                                  return (
+                                    <li
+                                      key={item.id}
+                                      className={`flex items-center gap-3 border-l-[3px] px-5 py-3.5 ${
+                                        item.isActive ? "border-l-emerald-500" : "border-l-[#d3cbc3] bg-[#f8f6f3]"
+                                      } ${isEditing ? "bg-[#fdf7f8]" : ""}`}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <p
+                                          className={`text-sm font-medium tabular-nums ${
+                                            item.isActive ? "text-[#282321]" : "text-[#9a8f88]"
+                                          }`}
+                                        >
+                                          {formatTime(item.startMinute)} – {formatTime(item.endMinute)}
+                                        </p>
+                                        <p className="truncate text-xs text-[#7a6f6a]">
+                                          <span
+                                            className={`inline-flex items-center gap-1 font-semibold ${
+                                              item.isActive ? "text-emerald-700" : "text-[#8a7f78]"
+                                            }`}
+                                          >
+                                            <span
+                                              aria-hidden="true"
+                                              className={`h-1.5 w-1.5 rounded-full ${item.isActive ? "bg-emerald-500" : "bg-[#b9b0a8]"}`}
+                                            />
+                                            {item.isActive ? "Active" : "Inactive"}
+                                          </span>
+                                          {" · "}
+                                          {getDayLabel(item.day)} · {item.timezone}
+                                        </p>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={item.isActive}
+                                        aria-label={`${item.isActive ? "Deactivate" : "Activate"} ${getDayLabel(item.day)} ${formatTime(item.startMinute)}`}
+                                        title={item.isActive ? "Active. Click to deactivate" : "Inactive. Click to activate"}
+                                        onClick={() => void handleToggle(item)}
+                                        disabled={togglingId === item.id}
+                                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${FOCUS} ${
+                                          item.isActive ? "bg-emerald-600" : "bg-[#cfc7c0]"
+                                        }`}
+                                      >
+                                        <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${item.isActive ? "translate-x-5" : ""}`} />
+                                      </button>
+
+                                      <div className="flex shrink-0 items-center gap-1">
+                                        <button type="button" onClick={() => beginEdit(item)} aria-label="Edit slot" title="Edit" className={`rounded-lg p-2 text-[#6d6260] hover:bg-[#f6f1ec] hover:text-[#7d1f2a] ${FOCUS}`}>
+                                          <Icon name="edit" />
+                                        </button>
+                                        <button type="button" onClick={() => void handleDelete(item)} disabled={deletingId === item.id} aria-label="Delete slot" title="Delete" className={`rounded-lg p-2 text-[#6d6260] hover:bg-red-50 hover:text-red-700 disabled:opacity-50 ${FOCUS}`}>
+                                          <Icon name="trash" />
+                                        </button>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </main>
