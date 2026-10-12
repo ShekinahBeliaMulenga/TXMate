@@ -1,27 +1,21 @@
 import { NextResponse } from "next/server";
-
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
 type VerificationDecision = "VERIFIED" | "REJECTED";
-
 const REVIEWER_ROLES = new Set([
     "PLATFORM_ADMIN",
     "UNIVERSITY_ADMIN",
     "MODERATOR",
 ]);
-
 async function getAuthenticatedAdmin() {
     const session = await auth.api.getSession({
         headers: await import("next/headers").then(({ headers }) =>
             headers(),
         ),
     });
-
     if (!session?.user?.id) {
         return null;
     }
-
     const admin = await prisma.adminProfile.findUnique({
         where: {
             userId: session.user.id,
@@ -36,18 +30,14 @@ async function getAuthenticatedAdmin() {
             },
         },
     });
-
     if (!admin) {
         return null;
     }
-
     return admin;
 }
-
 function canReviewVerification(role: string) {
     return REVIEWER_ROLES.has(role);
 }
-
 function canAccessUniversity(
     admin: Awaited<ReturnType<typeof getAuthenticatedAdmin>>,
     universityId: string,
@@ -55,24 +45,19 @@ function canAccessUniversity(
     if (!admin) {
         return false;
     }
-
     if (admin.role === "PLATFORM_ADMIN") {
         return true;
     }
-
     return admin.universityAccess.some(
         (access) => access.universityId === universityId,
     );
 }
-
 function isValidAcademicMateId(value: string) {
     return value.trim().length > 0 && value.length <= 100;
 }
-
 function serializeDate(value: Date | null) {
     return value ? value.toISOString() : null;
 }
-
 /**
  * GET /api/admin/academic-mates/verification/[academicMateId]
  *
@@ -89,7 +74,6 @@ export async function GET(
 ) {
     try {
         const admin = await getAuthenticatedAdmin();
-
         if (!admin) {
             return NextResponse.json(
                 {
@@ -98,7 +82,6 @@ export async function GET(
                 { status: 401 },
             );
         }
-
         if (!canReviewVerification(admin.role)) {
             return NextResponse.json(
                 {
@@ -107,9 +90,7 @@ export async function GET(
                 { status: 403 },
             );
         }
-
         const { academicMateId } = await context.params;
-
         if (!isValidAcademicMateId(academicMateId)) {
             return NextResponse.json(
                 {
@@ -118,7 +99,6 @@ export async function GET(
                 { status: 400 },
             );
         }
-
         const academicMate =
             await prisma.academicMateProfile.findUnique({
                 where: {
@@ -140,7 +120,6 @@ export async function GET(
                     verifiedByAdminId: true,
                     createdAt: true,
                     updatedAt: true,
-
                     user: {
                         select: {
                             id: true,
@@ -149,7 +128,6 @@ export async function GET(
                             image: true,
                         },
                     },
-
                     university: {
                         select: {
                             id: true,
@@ -157,14 +135,12 @@ export async function GET(
                             name: true,
                         },
                     },
-
                     studentProfile: {
                         select: {
                             id: true,
                             studentId: true,
                             gender: true,
                             status: true,
-
                             programme: {
                                 select: {
                                     id: true,
@@ -177,16 +153,21 @@ export async function GET(
                                             name: true,
                                         },
                                     },
+                                    department: {
+                                        select: {
+                                            id: true,
+                                            code: true,
+                                            name: true,
+                                        },
+                                    },
                                 },
                             },
-
                             programmeYear: {
                                 select: {
                                     id: true,
                                     yearNumber: true,
                                 },
                             },
-
                             courses: {
                                 orderBy: [
                                     {
@@ -210,7 +191,6 @@ export async function GET(
                             },
                         },
                     },
-
                     offerings: {
                         orderBy: {
                             createdAt: "desc",
@@ -228,7 +208,6 @@ export async function GET(
                             rateDetails: true,
                             createdAt: true,
                             updatedAt: true,
-
                             course: {
                                 select: {
                                     id: true,
@@ -236,7 +215,6 @@ export async function GET(
                                     name: true,
                                 },
                             },
-
                             topics: {
                                 select: {
                                     topic: {
@@ -248,7 +226,6 @@ export async function GET(
                                     },
                                 },
                             },
-
                             verifications: {
                                 orderBy: {
                                     createdAt: "desc",
@@ -274,7 +251,6 @@ export async function GET(
                             },
                         },
                     },
-
                     availabilities: {
                         orderBy: [
                             {
@@ -304,7 +280,6 @@ export async function GET(
                             },
                         },
                     },
-
                     experiences: {
                         orderBy: [
                             {
@@ -324,7 +299,6 @@ export async function GET(
                             createdAt: true,
                         },
                     },
-
                     qualifications: {
                         orderBy: [
                             {
@@ -343,7 +317,6 @@ export async function GET(
                             createdAt: true,
                         },
                     },
-
                     reviews: {
                         orderBy: {
                             createdAt: "desc",
@@ -360,7 +333,6 @@ export async function GET(
                             },
                         },
                     },
-
                     verifiedByAdmin: {
                         select: {
                             id: true,
@@ -371,7 +343,6 @@ export async function GET(
                             },
                         },
                     },
-
                     verificationHistory: {
                         orderBy: {
                             createdAt: "desc",
@@ -396,7 +367,6 @@ export async function GET(
                     },
                 },
             });
-
         if (!academicMate) {
             return NextResponse.json(
                 {
@@ -405,7 +375,6 @@ export async function GET(
                 { status: 404 },
             );
         }
-
         if (
             !canAccessUniversity(
                 admin,
@@ -420,7 +389,6 @@ export async function GET(
                 { status: 403 },
             );
         }
-
         return NextResponse.json({
             profile: {
                 id: academicMate.id,
@@ -453,17 +421,13 @@ export async function GET(
                 updatedAt:
                     academicMate.updatedAt.toISOString(),
             },
-
             user: academicMate.user,
-
             university: academicMate.university,
-
             student: academicMate.studentProfile
                 ? {
                     ...academicMate.studentProfile,
                 }
                 : null,
-
             offerings: academicMate.offerings.map(
                 (offering) => ({
                     id: offering.id,
@@ -519,7 +483,6 @@ export async function GET(
                         ),
                 }),
             ),
-
             availability:
                 academicMate.availabilities.map(
                     (item) => ({
@@ -532,12 +495,9 @@ export async function GET(
                         offering: item.mateOffering,
                     }),
                 ),
-
             experiences: academicMate.experiences,
-
             qualifications:
                 academicMate.qualifications,
-
             reviews: academicMate.reviews.map(
                 (review) => ({
                     id: review.id,
@@ -549,7 +509,6 @@ export async function GET(
                         review.reviewerUser.name,
                 }),
             ),
-
             verificationHistory:
                 academicMate.verificationHistory.map(
                     (entry) => ({
@@ -583,7 +542,6 @@ export async function GET(
             "GET /api/admin/academic-mates/verification/[academicMateId] failed:",
             error,
         );
-
         return NextResponse.json(
             {
                 error: "An unexpected error occurred.",
@@ -592,7 +550,6 @@ export async function GET(
         );
     }
 }
-
 /**
  * PATCH /api/admin/academic-mates/verification/[academicMateId]
  *
@@ -608,7 +565,6 @@ export async function PATCH(
 ) {
     try {
         const admin = await getAuthenticatedAdmin();
-
         if (!admin) {
             return NextResponse.json(
                 {
@@ -617,7 +573,6 @@ export async function PATCH(
                 { status: 401 },
             );
         }
-
         if (!canReviewVerification(admin.role)) {
             return NextResponse.json(
                 {
@@ -627,9 +582,7 @@ export async function PATCH(
                 { status: 403 },
             );
         }
-
         const { academicMateId } = await context.params;
-
         if (!isValidAcademicMateId(academicMateId)) {
             return NextResponse.json(
                 {
@@ -638,9 +591,7 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         let body: unknown;
-
         try {
             body = await request.json();
         } catch {
@@ -652,7 +603,6 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         if (
             typeof body !== "object" ||
             body === null ||
@@ -666,14 +616,11 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         const payload = body as Record<
             string,
             unknown
         >;
-
         const decision = payload.decision;
-
         if (
             decision !== "VERIFIED" &&
             decision !== "REJECTED"
@@ -686,9 +633,7 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         const rawNotes = payload.notes;
-
         if (
             rawNotes !== undefined &&
             rawNotes !== null &&
@@ -701,12 +646,10 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         const notes =
             typeof rawNotes === "string"
                 ? rawNotes.trim()
                 : null;
-
         if (notes && notes.length > 2000) {
             return NextResponse.json(
                 {
@@ -716,7 +659,6 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         if (decision === "REJECTED" && !notes) {
             return NextResponse.json(
                 {
@@ -726,7 +668,6 @@ export async function PATCH(
                 { status: 400 },
             );
         }
-
         const academicMate =
             await prisma.academicMateProfile.findUnique({
                 where: {
@@ -745,7 +686,6 @@ export async function PATCH(
                     },
                 },
             });
-
         if (!academicMate) {
             return NextResponse.json(
                 {
@@ -755,7 +695,6 @@ export async function PATCH(
                 { status: 404 },
             );
         }
-
         if (
             !canAccessUniversity(
                 admin,
@@ -770,7 +709,6 @@ export async function PATCH(
                 { status: 403 },
             );
         }
-
         if (
             academicMate.verificationStatus !==
             "PENDING"
@@ -783,7 +721,6 @@ export async function PATCH(
                 { status: 409 },
             );
         }
-
         if (academicMate.status !== "ACTIVE") {
             return NextResponse.json(
                 {
@@ -793,7 +730,6 @@ export async function PATCH(
                 { status: 409 },
             );
         }
-
         if (
             !academicMate.studentProfileId ||
             academicMate.studentProfile?.status !==
@@ -807,9 +743,7 @@ export async function PATCH(
                 { status: 409 },
             );
         }
-
         const reviewedAt = new Date();
-
         const result = await prisma.$transaction(
             async (tx) => {
                 const current =
@@ -825,13 +759,11 @@ export async function PATCH(
                             },
                         },
                     );
-
                 if (!current) {
                     throw new Error(
                         "ACADEMIC_MATE_NOT_FOUND",
                     );
                 }
-
                 if (
                     current.verificationStatus !==
                     "PENDING"
@@ -840,13 +772,11 @@ export async function PATCH(
                         "VERIFICATION_STATE_CHANGED",
                     );
                 }
-
                 if (current.status !== "ACTIVE") {
                     throw new Error(
                         "ACADEMIC_MATE_NOT_ACTIVE",
                     );
                 }
-
                 const updated =
                     await tx.academicMateProfile.update(
                         {
@@ -873,7 +803,6 @@ export async function PATCH(
                             },
                         },
                     );
-
                 const history =
                     await tx.academicMateVerification.create(
                         {
@@ -896,14 +825,12 @@ export async function PATCH(
                             },
                         },
                     );
-
                 return {
                     updated,
                     history,
                 };
             },
         );
-
         return NextResponse.json({
             message:
                 decision === "VERIFIED"
@@ -948,7 +875,6 @@ export async function PATCH(
                 { status: 409 },
             );
         }
-
         if (
             error instanceof Error &&
             error.message ===
@@ -962,7 +888,6 @@ export async function PATCH(
                 { status: 404 },
             );
         }
-
         if (
             error instanceof Error &&
             error.message ===
@@ -976,12 +901,10 @@ export async function PATCH(
                 { status: 409 },
             );
         }
-
         console.error(
             "PATCH /api/admin/academic-mates/verification/[academicMateId] failed:",
             error,
         );
-
         return NextResponse.json(
             {
                 error: "An unexpected error occurred.",

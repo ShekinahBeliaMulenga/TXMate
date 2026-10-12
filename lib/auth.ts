@@ -12,7 +12,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.173.30:3000",
+    "http://192.168.*.*:3000", // Allows any local IP in the 192.168.x.x range on port 3000
   ],
 
   emailAndPassword: {

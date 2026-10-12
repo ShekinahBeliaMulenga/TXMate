@@ -78,11 +78,16 @@ async function main() {
                 accountId: user.id,
                 providerId: "credential",
                 password: passwordHash,
+                user: {
+                    connect: {
+                        id: user.id,
+                    },
+                },
                 createdAt: new Date(),
                 updatedAt: new Date(),
             },
         });
-
+    
         console.log("Credential account created.");
     }
 

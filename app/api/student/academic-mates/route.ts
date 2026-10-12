@@ -8,15 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
+    const session = await auth.api.getSession({ headers: await headers() });
     if (!session) {
-      return NextResponse.json(
-        { error: "You must be signed in to find an Academic Mate." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "You must be signed in to find an Academic Mate." }, { status: 401 });
     }
 
     const student = await prisma.studentProfile.findUnique({
@@ -26,30 +20,18 @@ export async function GET() {
         universityId: true,
         courses: {
           where: { status: { in: ["ENROLLED", "REPEATING"] } },
-          select: {
-            courseId: true,
-            course: {
-              select: { id: true, code: true, name: true },
-            },
-          },
+          select: { courseId: true, course: { select: { id: true, code: true, name: true } } },
         },
       },
     });
 
     if (!student) {
-      return NextResponse.json(
-        { error: "Student profile not found. Complete onboarding first." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Student profile not found. Complete onboarding first." }, { status: 404 });
     }
 
     const courseIds = student.courses.map((course) => course.courseId);
-
     if (courseIds.length === 0) {
-      return NextResponse.json({
-        academicMates: [],
-        matchedCourses: [],
-      });
+      return NextResponse.json({ academicMates: [], matchedCourses: [] });
     }
 
     const offerings = await prisma.mateOffering.findMany({
@@ -76,9 +58,7 @@ export async function GET() {
         sessionDurationMinutes: true,
         rateType: true,
         rateDetails: true,
-        course: {
-          select: { id: true, code: true, name: true },
-        },
+        course: { select: { id: true, code: true, name: true } },
         academicMateProfile: {
           select: {
             id: true,
@@ -87,8 +67,15 @@ export async function GET() {
             teachingExperience: true,
             yearsExperience: true,
             verificationStatus: true,
-            user: {
-              select: { id: true, name: true, image: true },
+            user: { select: { id: true, name: true, image: true } },
+            studentProfile: {
+              select: {
+                programme: {
+                  select: {
+                    department: { select: { id: true, code: true, name: true } },
+                  },
+                },
+              },
             },
           },
         },
@@ -96,7 +83,6 @@ export async function GET() {
     });
 
     const offeringIds = offerings.map((offering) => offering.id);
-
     const existingRequests = offeringIds.length
       ? await prisma.mateRequest.findMany({
           where: {
@@ -104,19 +90,12 @@ export async function GET() {
             offeringId: { in: offeringIds },
             status: { in: ["REQUESTED", "ACCEPTED"] },
           },
-          select: {
-            id: true,
-            offeringId: true,
-            status: true,
-          },
+          select: { id: true, offeringId: true, status: true },
         })
       : [];
 
     const requestsByOffering = new Map(
-      existingRequests.map((request) => [
-        request.offeringId,
-        { id: request.id, status: request.status },
-      ]),
+      existingRequests.map((request) => [request.offeringId, { id: request.id, status: request.status }]),
     );
 
     const academicMates = offerings.map((offering) => ({
@@ -133,10 +112,7 @@ export async function GET() {
       existingRequest: requestsByOffering.get(offering.id) ?? null,
     }));
 
-    const matchedCourseIds = new Set(
-      offerings.map((offering) => offering.course.id),
-    );
-
+    const matchedCourseIds = new Set(offerings.map((offering) => offering.course.id));
     const matchedCourses = student.courses
       .filter((course) => matchedCourseIds.has(course.course.id))
       .map((course) => course.course);
@@ -144,9 +120,6 @@ export async function GET() {
     return NextResponse.json({ academicMates, matchedCourses });
   } catch (error) {
     console.error("Academic Mate matching GET failed:", error);
-    return NextResponse.json(
-      { error: "Unable to find Academic Mates at this time." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Unable to find Academic Mates at this time." }, { status: 500 });
   }
 }

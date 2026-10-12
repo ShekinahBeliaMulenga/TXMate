@@ -42,6 +42,7 @@ type StudentData = {
   studentId: string;
   gender: "MALE" | "FEMALE";
   status: "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
+
   programme: {
     id: string;
     code: string;
@@ -51,6 +52,11 @@ type StudentData = {
       code: string;
       name: string;
     };
+    department: {
+      id: string;
+      code: string;
+      name: string;
+    } | null;
   };
   programmeYear: {
     id: string;
@@ -1294,6 +1300,10 @@ export default function AcademicMateVerificationDetailPage() {
 
                         <Field label="School">
                           {student.programme.school.name}
+                        </Field>
+                        
+                        <Field label="Department">
+                          {student.programme.department?.name ?? "Not assigned"}
                         </Field>
 
                         <Field label="Programme">

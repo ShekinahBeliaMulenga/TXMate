@@ -12,6 +12,7 @@ type StudentCourse = {
   semester: number | null;
   status: StudentCourseStatus;
   isCompulsory: boolean;
+  isInCurriculum: boolean;
   electiveGroup: {
     id: string;
     name: string;
@@ -71,6 +72,13 @@ type StudentProfileResponse = {
       code: string;
       name: string;
     };
+
+    department: {
+      id: string;
+      code: string;
+      name: string;
+    } | null;
+
     programme: {
       id: string;
       code: string;
@@ -386,7 +394,7 @@ export default function StudentProfilePage() {
                   {initials(user.name)}
                 </div>
               )}
-              <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-[#e2d9d0] bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
+              <span className="mb-1 inline-flex items-center gap-2  bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     studentProfile.status === "ACTIVE"
@@ -411,9 +419,12 @@ export default function StudentProfilePage() {
                     {academic.programme.name}
                     <span className="text-[#8a7f7a]"> · Year {academic.year.yearNumber}</span>
                   </p>
-                  <p className="mt-1 text-sm text-[#6d6260]">
+                 <p className="mt-1 text-sm text-[#6d6260]">
                     {university.name}
                     <span className="text-[#8a7f7a]"> · {academic.school.name}</span>
+                    <span className="text-[#8a7f7a]">
+                      {" · "}{academic.department?.name ?? "Department not assigned"}
+                    </span>
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-medium text-[#5f5551]">
@@ -496,16 +507,27 @@ export default function StudentProfilePage() {
             <div className="grid gap-5 md:grid-cols-2 items-stretch">
               <Section title="Institutional Details" className="h-full">
                 <dl className="space-y-0">
+
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="university" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">University</dt>
                     <dd className="text-[13px] text-[#282321]">{university.name}</dd>
                   </div>
+                  
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="university" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">School</dt>
                     <dd className="text-[13px] text-[#282321]">{academic.school.name}</dd>
                   </div>
+
+                  <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
+                    <Icon name="academic" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
+                    <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">Department</dt>
+                    <dd className="text-[13px] text-[#282321]">
+                      {academic.department?.name ?? "Not assigned"}
+                    </dd>
+                  </div>
+
                   <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3">
                     <Icon name="book" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
                     <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">Programme</dt>
@@ -578,7 +600,9 @@ export default function StudentProfilePage() {
                           {item.course.name}
                         </p>
                         <p className="text-sm text-[#6d6260]">
-                          {item.isCompulsory
+                        {!item.isInCurriculum
+                          ? "Outside current curriculum"
+                          : item.isCompulsory
                             ? "Compulsory"
                             : item.electiveGroup
                               ? `Elective (${item.electiveGroup.name})`

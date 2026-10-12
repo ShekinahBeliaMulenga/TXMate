@@ -1,6 +1,5 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -64,10 +63,17 @@ export async function GET() {
             name: true,
             level: true,
             durationYears: true,
-            school: { select: { id: true, code: true, name: true } },
+            school: {
+              select: { id: true, code: true, name: true },
+            },
+            department: {
+              select: { id: true, code: true, name: true },
+            },
           },
         },
-        programmeYear: { select: { id: true, yearNumber: true } },
+        programmeYear: {
+          select: { id: true, yearNumber: true },
+        },
         courses: {
           orderBy: { course: { code: "asc" } },
           select: {
@@ -106,10 +112,8 @@ export async function GET() {
 
     /*
      * Load the Academic Mate identity directly by userId.
-     *
-     * This is intentional because AcademicMateProfile has its own
-     * unique userId relation. It ensures the student is recognised
-     * as an Academic Mate even when studentProfileId is not linked.
+     * This recognises the user as an Academic Mate even when
+     * studentProfileId is not linked.
      */
     const academicMate = await prisma.academicMateProfile.findUnique({
       where: {
@@ -128,7 +132,12 @@ export async function GET() {
         courseId: true,
         isCompulsory: true,
         electiveGroup: {
-          select: { id: true, name: true, minSelections: true, maxSelections: true },
+          select: {
+            id: true,
+            name: true,
+            minSelections: true,
+            maxSelections: true,
+          },
         },
       },
     });
@@ -143,6 +152,7 @@ export async function GET() {
         id: studentCourse.id,
         semester: studentCourse.semester,
         status: studentCourse.status,
+        isInCurriculum: curriculum !== undefined,
         isCompulsory: curriculum?.isCompulsory ?? false,
         electiveGroup: curriculum?.electiveGroup ?? null,
         course: studentCourse.course,
@@ -174,6 +184,7 @@ export async function GET() {
       university: profile.university,
       academic: {
         school: profile.programme.school,
+        department: profile.programme.department,
         programme: {
           id: profile.programme.id,
           code: profile.programme.code,
@@ -255,7 +266,10 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (typeof showStudentId !== "boolean" || typeof showPhoneNumber !== "boolean") {
+    if (
+      typeof showStudentId !== "boolean" ||
+      typeof showPhoneNumber !== "boolean"
+    ) {
       return NextResponse.json(
         { error: "Privacy settings must be valid boolean values." },
         { status: 400 },
@@ -314,7 +328,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Student profile PATCH failed:", error);
-
     return NextResponse.json(
       { error: "Unable to save your profile changes." },
       { status: 500 },

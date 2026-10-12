@@ -1,4 +1,5 @@
 import "dotenv/config";
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 
@@ -250,6 +251,31 @@ async function main() {
     },
   });
 
+  /*
+   * Create or update the Computer Science Department
+   * under the School of Information and Communication Technology.
+   */
+  const department = await prisma.department.upsert({
+    where: {
+      schoolId_code: {
+        schoolId: school.id,
+        code: "CS",
+      },
+    },
+    update: {
+      name: "Computer Science Department",
+    },
+    create: {
+      schoolId: school.id,
+      code: "CS",
+      name: "Computer Science Department",
+    },
+  });
+
+  /*
+   * Associate the Computer Science programme with its department.
+   * The existing university and school relationships are preserved.
+   */
   const programme = await prisma.programme.upsert({
     where: {
       universityId_code: {
@@ -259,6 +285,7 @@ async function main() {
     },
     update: {
       schoolId: school.id,
+      departmentId: department.id,
       name: "Bachelor of Science in Computer Science",
       level: "BACHELOR",
       durationYears: 4,
@@ -266,6 +293,7 @@ async function main() {
     create: {
       universityId: university.id,
       schoolId: school.id,
+      departmentId: department.id,
       code: "BSC-CS",
       name: "Bachelor of Science in Computer Science",
       level: "BACHELOR",
@@ -297,6 +325,10 @@ async function main() {
       }
     >();
 
+    /*
+     * Create or update the elective groups before
+     * assigning courses to those groups.
+     */
     for (const courseData of yearData.courses) {
       if (!courseData.electiveGroup) {
         continue;
@@ -332,6 +364,9 @@ async function main() {
       electiveGroups.set(groupConfig.name, existingGroup);
     }
 
+    /*
+     * Create or update courses and their curriculum mappings.
+     */
     for (const courseData of yearData.courses) {
       const course = await prisma.course.upsert({
         where: {
@@ -411,12 +446,14 @@ async function main() {
   console.log("TXMate academic seed completed.");
   console.log(`University: ${university.name}`);
   console.log(`School: ${school.name}`);
+  console.log(`Department: ${department.name}`);
   console.log(`Programme: ${programme.name}`);
   console.log(`Programme years: ${programmeYearCount}`);
   console.log(`Courses: ${courseCount}`);
   console.log(`Programme-course mappings: ${programmeCourseCount}`);
   console.log(`Elective groups: ${electiveGroupCount}`);
   console.log("");
+
   console.log(
     "No student, tutor, booking, payment, or authentication records were created.",
   );

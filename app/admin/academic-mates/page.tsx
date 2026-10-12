@@ -41,6 +41,11 @@ type VerificationProfile = {
       id: string;
       code: string;
       name: string;
+      department: {
+        id: string;
+        code: string;
+        name: string;
+      } | null;
     };
     programmeYear: {
       id: string;
@@ -304,6 +309,15 @@ function ProfileCard({ profile }: { profile: VerificationProfile }) {
               <span className="truncate">{profile.university.name}</span>
             </div>
 
+            {profile.studentProfile?.programme.department && (
+              <div className="flex items-center gap-2">
+                <Icon name="book" className="h-3.5 w-3.5 shrink-0 text-[#7d1f2a]" />
+                <span className="truncate">
+                  {profile.studentProfile.programme.department.name}
+                </span>
+              </div>
+            )}
+
             {profile.studentProfile ? (
               <div className="flex items-center gap-2">
                 <Icon
@@ -447,8 +461,11 @@ export default function AdminAcademicMatesPage() {
       profile.university.name,
       profile.university.code,
       profile.headline ?? "",
+      profile.studentProfile?.programme.department?.name ?? "",
+      profile.studentProfile?.programme.department?.code ?? "",
       profile.studentProfile?.programme.name ?? "",
       profile.studentProfile?.programme.code ?? "",
+      
     ].some((value) => value.toLowerCase().includes(query));
   });
 
@@ -540,7 +557,7 @@ export default function AdminAcademicMatesPage() {
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name, email, university or programme"
+              placeholder="Search by name, email, university, department or programme"
               className="w-full rounded-lg border border-[#d8cec6] bg-white py-2.5 pl-10 pr-4 text-sm text-[#282321] outline-none placeholder:text-[#a39892] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10"
             />
           </div>

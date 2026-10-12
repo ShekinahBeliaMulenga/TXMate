@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import ImageCropModal from "@/components/ImageCropModal"; // adjust the path to where you put the file
+import ImageCropModal from "@/components/ImageCropModal"; 
+import Link from "next/link";
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 
@@ -275,8 +276,8 @@ export default function StudentSettingsPage() {
       setImageError("Please choose a JPEG, PNG, or WebP image.");
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setImageError("The selected image is too large. Maximum size is 8 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError("The selected image is too large. Maximum size is 10 MB.");
       return;
     }
     setPendingFile(file);
@@ -540,6 +541,14 @@ export default function StudentSettingsPage() {
                 <Icon name="lock" className="mt-0.5 h-4 w-4 shrink-0 text-[#7d1f2a]" />
                 Your email, university, programme, year of study and enrolled courses can’t be changed from settings.
               </p>
+              <div className="mt-4">
+                <Link
+                  href="/student/repeating-courses"
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
+                >
+                  Manage courses
+                </Link>
+              </div>
             </Card>
           </form>
         </div>

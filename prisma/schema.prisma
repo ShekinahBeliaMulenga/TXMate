@@ -173,24 +173,24 @@ enum AdminRole {
 }
 
 model User {
-  id                String               @id
-  name              String
-  email             String               @unique
-  emailVerified     Boolean
-  image             String?
-  createdAt         DateTime
-  updatedAt         DateTime
-  username          String?              @unique
-  sessions          Session[]
-  accounts          Account[]
-  studentProfile    StudentProfile?      @relation("UserStudentProfile")
-  academicMate      AcademicMateProfile? @relation("UserAcademicMateProfile")
-  adminProfile      AdminProfile?        @relation("UserAdminProfile")
-  notifications     Notification[]       @relation("UserNotifications")
-  sentMessages      Message[]            @relation("UserSentMessages")
-  reviewsWritten    Review[]             @relation("UserReviewsWritten")
-  paymentsMade      Payment[]            @relation("UserPaymentsMade")
-  subscriptions     UserSubscription[]
+  id             String               @id
+  name           String
+  email          String               @unique
+  emailVerified  Boolean
+  image          String?
+  createdAt      DateTime
+  updatedAt      DateTime
+  username       String?              @unique
+  sessions       Session[]
+  accounts       Account[]
+  studentProfile StudentProfile?      @relation("UserStudentProfile")
+  academicMate   AcademicMateProfile? @relation("UserAcademicMateProfile")
+  adminProfile   AdminProfile?        @relation("UserAdminProfile")
+  notifications  Notification[]       @relation("UserNotifications")
+  sentMessages   Message[]            @relation("UserSentMessages")
+  reviewsWritten Review[]             @relation("UserReviewsWritten")
+  paymentsMade   Payment[]            @relation("UserPaymentsMade")
+  subscriptions  UserSubscription[]
 }
 
 model Session {
@@ -254,7 +254,7 @@ model University {
   academicMateProfiles AcademicMateProfile[]
   mateOfferings        MateOffering[]
   mateRequests         MateRequest[]
-  adminAccess           AdminUniversityAccess[]
+  adminAccess          AdminUniversityAccess[]
 }
 
 model UniversitySettings {
@@ -273,32 +273,51 @@ model UniversitySettings {
 }
 
 model School {
-  id           String     @id @default(uuid())
+  id           String       @id @default(uuid())
   universityId String
   code         String
   name         String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  university   University @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  university   University   @relation(fields: [universityId], references: [id], onDelete: Restrict)
   programmes   Programme[]
+  departments  Department[]
 
   @@unique([universityId, code])
   @@unique([id, universityId])
   @@index([universityId])
 }
 
+model Department {
+  id        String   @id @default(uuid())
+  schoolId  String
+  code      String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school     School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  programmes Programme[]
+
+  @@unique([schoolId, code])
+  @@unique([id, schoolId])
+  @@index([schoolId])
+}
+
 model Programme {
-  id              String          @id @default(uuid())
+  id              String           @id @default(uuid())
   universityId    String
   schoolId        String
+  departmentId    String?
   code            String
   name            String
-  level           ProgrammeLevel  @default(BACHELOR)
+  level           ProgrammeLevel   @default(BACHELOR)
   durationYears   Int?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  university      University      @relation(fields: [universityId], references: [id], onDelete: Restrict)
-  school          School          @relation(fields: [schoolId, universityId], references: [id, universityId], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  university      University       @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  school          School           @relation(fields: [schoolId, universityId], references: [id, universityId], onDelete: Cascade)
+  department      Department?      @relation(fields: [departmentId, schoolId], references: [id, schoolId], onDelete: NoAction)
   years           ProgrammeYear[]
   studentProfiles StudentProfile[]
 
@@ -362,33 +381,32 @@ model Course {
 }
 
 model ProgrammeCourse {
-  id               String                  @id @default(uuid())
-  programmeYearId  String
-  courseId         String
-  semester         Int?
-  isCompulsory     Boolean                 @default(true)
-  electiveGroupId  String?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  programmeYear    ProgrammeYear           @relation(fields: [programmeYearId], references: [id], onDelete: Cascade)
-  course           Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
-  electiveGroup    ProgrammeElectiveGroup? @relation(fields: [electiveGroupId], references: [id], onDelete: SetNull)
+  id              String                  @id @default(uuid())
+  programmeYearId String
+  courseId        String
+  semester        Int?
+  isCompulsory    Boolean                 @default(true)
+  electiveGroupId String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  programmeYear   ProgrammeYear           @relation(fields: [programmeYearId], references: [id], onDelete: Cascade)
+  course          Course                  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  electiveGroup   ProgrammeElectiveGroup? @relation(fields: [electiveGroupId], references: [id], onDelete: SetNull)
 
   @@unique([programmeYearId, courseId])
   @@index([courseId])
   @@index([electiveGroupId])
 }
 
-
 model ProgrammeElectiveGroup {
-  id             String            @id @default(uuid())
-  programmeYearId String
-  name           String
-  minSelections  Int              @default(1)
-  maxSelections  Int              @default(1)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  programmeYear  ProgrammeYear    @relation(fields: [programmeYearId], references: [id], onDelete: Cascade)
+  id               String            @id @default(uuid())
+  programmeYearId  String
+  name             String
+  minSelections    Int               @default(1)
+  maxSelections    Int               @default(1)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  programmeYear    ProgrammeYear     @relation(fields: [programmeYearId], references: [id], onDelete: Cascade)
   programmeCourses ProgrammeCourse[]
 
   @@unique([programmeYearId, name])
@@ -434,7 +452,7 @@ model StudentCourse {
   status           StudentCourseStatus @default(ENROLLED)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  studentProfile   StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile      @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   course           Course              @relation(fields: [courseId], references: [id], onDelete: Restrict)
   academicYear     AcademicYear        @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
 
@@ -458,33 +476,33 @@ model CourseTopic {
 }
 
 model AcademicMateProfile {
-  id                    String                        @id @default(uuid())
-  userId                String                        @unique
-  universityId          String
-  studentProfileId      String?                       @unique
-  status                AcademicMateStatus            @default(ACTIVE)
-  verificationStatus    VerificationStatus            @default(UNVERIFIED)
-  headline              String?
-  bio                   String?
-  teachingExperience    String?
-  yearsExperience       Int?
-  profileVisibility     ProfileVisibility             @default(PUBLIC)
-  verifiedAt            DateTime?
-  verifiedByAdminId     String?
-  createdAt             DateTime                      @default(now())
-  updatedAt             DateTime                      @updatedAt
-  user                  User                          @relation("UserAcademicMateProfile", fields: [userId], references: [id], onDelete: Cascade)
-  university            University                    @relation(fields: [universityId], references: [id], onDelete: Restrict)
-  studentProfile        StudentProfile?               @relation("StudentProfileAcademicMate", fields: [studentProfileId], references: [id], onDelete: SetNull)
-  verifiedByAdmin       AdminProfile?                 @relation("AdminVerifiedAcademicMates", fields: [verifiedByAdminId], references: [id], onDelete: SetNull)
-  offerings             MateOffering[]
-  availabilities        MateAvailability[]
-  experiences           AcademicMateExperience[]
-  qualifications        AcademicMateQualification[]
-  reviews               Review[]                      @relation("ReviewsReceived")
-  verificationHistory   AcademicMateVerification[]
-  payments              Payment[]
-  payouts               Payout[]
+  id                  String                      @id @default(uuid())
+  userId              String                      @unique
+  universityId        String
+  studentProfileId    String?                     @unique
+  status              AcademicMateStatus          @default(ACTIVE)
+  verificationStatus  VerificationStatus          @default(UNVERIFIED)
+  headline            String?
+  bio                 String?
+  teachingExperience  String?
+  yearsExperience     Int?
+  profileVisibility   ProfileVisibility           @default(PUBLIC)
+  verifiedAt          DateTime?
+  verifiedByAdminId   String?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  user                User                        @relation("UserAcademicMateProfile", fields: [userId], references: [id], onDelete: Cascade)
+  university          University                  @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  studentProfile      StudentProfile?             @relation("StudentProfileAcademicMate", fields: [studentProfileId], references: [id], onDelete: SetNull)
+  verifiedByAdmin     AdminProfile?               @relation("AdminVerifiedAcademicMates", fields: [verifiedByAdminId], references: [id], onDelete: SetNull)
+  offerings           MateOffering[]
+  availabilities      MateAvailability[]
+  experiences         AcademicMateExperience[]
+  qualifications      AcademicMateQualification[]
+  reviews             Review[]                    @relation("ReviewsReceived")
+  verificationHistory AcademicMateVerification[]
+  payments            Payment[]
+  payouts             Payout[]
 
   @@unique([id, universityId])
   @@index([universityId, status])
@@ -492,18 +510,18 @@ model AcademicMateProfile {
 }
 
 model AcademicMateVerification {
-  id                   String              @id @default(uuid())
+  id                    String             @id @default(uuid())
   academicMateProfileId String
-  status               VerificationStatus
-  notes                String?
-  reviewedByAdminId    String?
-  reviewedAt           DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  status                VerificationStatus
+  notes                 String?
+  reviewedByAdminId     String?
+  reviewedAt            DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  academicMateProfile  AcademicMateProfile @relation( fields: [academicMateProfileId],references: [id], onDelete: Cascade)
+  academicMateProfile AcademicMateProfile @relation(fields: [academicMateProfileId], references: [id], onDelete: Cascade)
 
-  reviewedByAdmin      AdminProfile?       @relation("AdminReviewedAcademicMateVerifications", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedByAdmin AdminProfile? @relation("AdminReviewedAcademicMateVerifications", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([academicMateProfileId, createdAt])
   @@index([status, createdAt])
@@ -511,35 +529,34 @@ model AcademicMateVerification {
 }
 
 model MateOffering {
-  id                      String                   @id @default(uuid())
-  academicMateProfileId   String
-  universityId            String
-  courseId                String
-  title                   String?
-  description             String?
-  rate                    Decimal                 @db.Decimal(12, 2)
-  currency                String                  @default("ZMW")
-  sessionDurationMinutes  Int                     @default(60)
-  status                  MateOfferingStatus      @default(ACTIVE)
-  verificationStatus      VerificationStatus      @default(UNVERIFIED)
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  academicMateProfile     AcademicMateProfile     @relation(fields: [academicMateProfileId, universityId], references: [id, universityId], onDelete: Cascade)
-  university              University              @relation(fields: [universityId], references: [id], onDelete: Restrict)
-  course                  Course                  @relation(fields: [courseId, universityId], references: [id, universityId], onDelete: Restrict)
-  topics                  MateOfferingTopic[]
-  verifications           MateOfferingVerification[]
-  requests                MateRequest[]
-  rateType                MateOfferingRateType @default(PER_SESSION)
-  rateDetails             String?
-  availability            MateAvailability[]
+  id                     String                     @id @default(uuid())
+  academicMateProfileId  String
+  universityId           String
+  courseId               String
+  title                  String?
+  description            String?
+  rate                   Decimal                    @db.Decimal(12, 2)
+  currency               String                     @default("ZMW")
+  sessionDurationMinutes Int                        @default(60)
+  status                 MateOfferingStatus         @default(ACTIVE)
+  verificationStatus     VerificationStatus         @default(UNVERIFIED)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  academicMateProfile    AcademicMateProfile        @relation(fields: [academicMateProfileId, universityId], references: [id, universityId], onDelete: Cascade)
+  university             University                 @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  course                 Course                     @relation(fields: [courseId, universityId], references: [id, universityId], onDelete: Restrict)
+  topics                 MateOfferingTopic[]
+  verifications          MateOfferingVerification[]
+  requests               MateRequest[]
+  rateType               MateOfferingRateType       @default(PER_SESSION)
+  rateDetails            String?
+  availability           MateAvailability[]
 
   @@unique([id, universityId])
   @@unique([academicMateProfileId, courseId])
   @@index([universityId, courseId, status])
   @@index([universityId, verificationStatus])
 }
-
 
 enum MateOfferingRateType {
   PER_SESSION
@@ -561,35 +578,35 @@ model MateOfferingTopic {
 }
 
 model MateOfferingVerification {
-  id               String             @id @default(uuid())
-  offeringId       String
-  status           VerificationStatus
-  notes            String?
-  evidenceUrl      String?
-  reviewedAt       DateTime?
+  id                String             @id @default(uuid())
+  offeringId        String
+  status            VerificationStatus
+  notes             String?
+  evidenceUrl       String?
+  reviewedAt        DateTime?
   reviewedByAdminId String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  offering         MateOffering       @relation(fields: [offeringId], references: [id], onDelete: Cascade)
-  reviewedByAdmin  AdminProfile?      @relation("AdminVerifiedMateOfferings", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  offering          MateOffering       @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   AdminProfile?      @relation("AdminVerifiedMateOfferings", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([offeringId, status])
 }
 
 model MateAvailability {
-  id                    String              @id @default(uuid())
+  id                    String   @id @default(uuid())
   academicMateProfileId String
   mateOfferingId        String
   day                   Weekday
   startMinute           Int
   endMinute             Int
   timezone              String
-  isActive              Boolean             @default(true)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  academicMateProfile   AcademicMateProfile @relation(fields: [academicMateProfileId], references: [id], onDelete: Cascade)
-  mateOffering           MateOffering        @relation(fields: [mateOfferingId], references: [id], onDelete: Cascade)
+  academicMateProfile AcademicMateProfile @relation(fields: [academicMateProfileId], references: [id], onDelete: Cascade)
+  mateOffering        MateOffering        @relation(fields: [mateOfferingId], references: [id], onDelete: Cascade)
 
   @@unique([mateOfferingId, day, startMinute, endMinute])
   @@index([academicMateProfileId, day])
@@ -626,20 +643,20 @@ model AcademicMateQualification {
 }
 
 model MateRequest {
-  id               String             @id @default(uuid())
+  id               String            @id @default(uuid())
   studentProfileId String
   offeringId       String
   universityId     String
   message          String?
   requestedStart   DateTime?
   requestedEnd     DateTime?
-  status           MateRequestStatus  @default(REQUESTED)
+  status           MateRequestStatus @default(REQUESTED)
   respondedAt      DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  studentProfile   StudentProfile      @relation(fields: [studentProfileId, universityId], references: [id, universityId], onDelete: Restrict)
-  offering         MateOffering        @relation(fields: [offeringId, universityId], references: [id, universityId], onDelete: Restrict)
-  university       University          @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  studentProfile   StudentProfile    @relation(fields: [studentProfileId, universityId], references: [id, universityId], onDelete: Restrict)
+  offering         MateOffering      @relation(fields: [offeringId, universityId], references: [id, universityId], onDelete: Restrict)
+  university       University        @relation(fields: [universityId], references: [id], onDelete: Restrict)
   tutoringSession  TutoringSession?
   conversation     Conversation?
   payments         Payment[]
@@ -650,39 +667,39 @@ model MateRequest {
 }
 
 model TutoringSession {
-  id                  String                @id @default(uuid())
-  requestId           String                @unique
-  scheduledStart      DateTime
-  scheduledEnd        DateTime
-  meetingLocation     String
-  status              TutoringSessionStatus @default(SCHEDULED)
-  completedAt         DateTime?
-  cancelledAt         DateTime?
-  cancellationReason  String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  request             MateRequest            @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  attendance           Attendance?
-  review               Review?
-  payments             Payment[]
+  id                 String                @id @default(uuid())
+  requestId          String                @unique
+  scheduledStart     DateTime
+  scheduledEnd       DateTime
+  meetingLocation    String
+  status             TutoringSessionStatus @default(SCHEDULED)
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  request            MateRequest           @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  attendance         Attendance?
+  review             Review?
+  payments           Payment[]
 
   @@index([scheduledStart, status])
 }
 
 model Attendance {
-  id                  String           @id @default(uuid())
-  sessionId           String           @unique
-  status              AttendanceStatus @default(PENDING)
-  studentCheckedInAt  DateTime?
-  mateConfirmedAt     DateTime?
-  disputedAt          DateTime?
-  disputeReason       String?
-  resolvedAt          DateTime?
-  resolvedByAdminId   String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  session             TutoringSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  resolvedByAdmin     AdminProfile?    @relation("AdminResolvedAttendance", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
+  id                 String           @id @default(uuid())
+  sessionId          String           @unique
+  status             AttendanceStatus @default(PENDING)
+  studentCheckedInAt DateTime?
+  mateConfirmedAt    DateTime?
+  disputedAt         DateTime?
+  disputeReason      String?
+  resolvedAt         DateTime?
+  resolvedByAdminId  String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  session            TutoringSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  resolvedByAdmin    AdminProfile?    @relation("AdminResolvedAttendance", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
 }
 
 model Review {
@@ -703,12 +720,12 @@ model Review {
 }
 
 model Conversation {
-  id         String      @id @default(uuid())
-  requestId  String      @unique
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  request    MateRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  messages   Message[]
+  id        String      @id @default(uuid())
+  requestId String      @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  request   MateRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  messages  Message[]
 }
 
 model Message {
@@ -726,34 +743,34 @@ model Message {
 }
 
 model Notification {
-  id          String                  @id @default(uuid())
-  userId      String
-  type        NotificationType
-  title       String
-  body        String
-  data        Json?
-  readAt      DateTime?
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
-  user        User                    @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  deliveries  NotificationDelivery[]
+  id         String                 @id @default(uuid())
+  userId     String
+  type       NotificationType
+  title      String
+  body       String
+  data       Json?
+  readAt     DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  user       User                   @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
 
   @@index([userId, readAt, createdAt])
 }
 
 model NotificationDelivery {
-  id                String               @id @default(uuid())
+  id                String              @id @default(uuid())
   notificationId    String
   channel           NotificationChannel
-  status            DeliveryStatus       @default(PENDING)
+  status            DeliveryStatus      @default(PENDING)
   attemptedAt       DateTime?
   sentAt            DateTime?
   deliveredAt       DateTime?
   failureReason     String?
   providerReference String?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  notification      Notification         @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  notification      Notification        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, channel])
   @@index([channel, status])
@@ -816,16 +833,16 @@ model PlatformSettings {
 }
 
 model SubscriptionPlan {
-  id              String               @id @default(uuid())
-  name            String               @unique
-  description     String?
-  price           Decimal              @db.Decimal(12, 2)
-  currency        String               @default("ZMW")
-  interval        SubscriptionInterval
-  isActive        Boolean              @default(true)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  subscriptions   UserSubscription[]
+  id            String               @id @default(uuid())
+  name          String               @unique
+  description   String?
+  price         Decimal              @db.Decimal(12, 2)
+  currency      String               @default("ZMW")
+  interval      SubscriptionInterval
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  subscriptions UserSubscription[]
 }
 
 model UserSubscription {
@@ -846,16 +863,16 @@ model UserSubscription {
 }
 
 model AdminProfile {
-  id                      String                      @id @default(uuid())
-  userId                  String                      @unique
-  role                    AdminRole
-  createdAt               DateTime                    @default(now())
-  updatedAt               DateTime                    @updatedAt
-  user                    User                        @relation("UserAdminProfile", fields: [userId], references: [id], onDelete: Cascade)
-  universityAccess        AdminUniversityAccess[]
-  verifiedAcademicMates   AcademicMateProfile[]       @relation("AdminVerifiedAcademicMates")
-  verifiedMateOfferings   MateOfferingVerification[]  @relation("AdminVerifiedMateOfferings")
-  resolvedAttendances     Attendance[]                @relation("AdminResolvedAttendance")
+  id                                String                     @id @default(uuid())
+  userId                            String                     @unique
+  role                              AdminRole
+  createdAt                         DateTime                   @default(now())
+  updatedAt                         DateTime                   @updatedAt
+  user                              User                       @relation("UserAdminProfile", fields: [userId], references: [id], onDelete: Cascade)
+  universityAccess                  AdminUniversityAccess[]
+  verifiedAcademicMates             AcademicMateProfile[]      @relation("AdminVerifiedAcademicMates")
+  verifiedMateOfferings             MateOfferingVerification[] @relation("AdminVerifiedMateOfferings")
+  resolvedAttendances               Attendance[]               @relation("AdminResolvedAttendance")
   reviewedAcademicMateVerifications AcademicMateVerification[] @relation("AdminReviewedAcademicMateVerifications")
 }
 

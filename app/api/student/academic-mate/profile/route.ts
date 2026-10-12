@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -7,47 +6,29 @@ async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
     headers: await import("next/headers").then(({ headers }) => headers()),
   });
-
   return session?.user ?? null;
 }
 
 /**
  * GET /api/student/academic-mate/profile
- *
- * Returns the complete Academic Mate profile for the
- * authenticated user, including the linked StudentProfile.
+ * Returns the authenticated Academic Mate profile, including the linked StudentProfile.
  */
 export async function GET() {
   try {
     const user = await getAuthenticatedUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized." },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const academicMate = await prisma.academicMateProfile.findUnique({
-      where: {
-        userId: user.id,
-      },
+      where: { userId: user.id },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
+          select: { id: true, name: true, email: true, image: true },
         },
         university: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            slug: true,
-          },
+          select: { id: true, code: true, name: true, slug: true },
         },
         studentProfile: {
           select: {
@@ -68,38 +49,24 @@ export async function GET() {
                 level: true,
                 durationYears: true,
                 school: {
-                  select: {
-                    id: true,
-                    code: true,
-                    name: true,
-                  },
+                  select: { id: true, code: true, name: true },
+                },
+                department: {
+                  select: { id: true, code: true, name: true },
                 },
               },
             },
             programmeYear: {
-              select: {
-                id: true,
-                yearNumber: true,
-              },
+              select: { id: true, yearNumber: true },
             },
             courses: {
-              orderBy: [
-                {
-                  course: {
-                    code: "asc",
-                  },
-                },
-              ],
+              orderBy: [{ course: { code: "asc" } }],
               select: {
                 id: true,
                 semester: true,
                 status: true,
                 academicYear: {
-                  select: {
-                    id: true,
-                    name: true,
-                    isCurrent: true,
-                  },
+                  select: { id: true, name: true, isCurrent: true },
                 },
                 course: {
                   select: {
@@ -115,9 +82,7 @@ export async function GET() {
           },
         },
         offerings: {
-          orderBy: {
-            createdAt: "desc",
-          },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             courseId: true,
@@ -143,28 +108,15 @@ export async function GET() {
             topics: {
               select: {
                 topic: {
-                  select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                  },
+                  select: { id: true, name: true, description: true },
                 },
               },
             },
           },
         },
         availabilities: {
-          where: {
-            isActive: true,
-          },
-          orderBy: [
-            {
-              day: "asc",
-            },
-            {
-              startMinute: "asc",
-            },
-          ],
+          where: { isActive: true },
+          orderBy: [{ day: "asc" }, { startMinute: "asc" }],
           select: {
             id: true,
             mateOfferingId: true,
@@ -176,14 +128,7 @@ export async function GET() {
           },
         },
         experiences: {
-          orderBy: [
-            {
-              startYear: "desc",
-            },
-            {
-              createdAt: "desc",
-            },
-          ],
+          orderBy: [{ startYear: "desc" }, { createdAt: "desc" }],
           select: {
             id: true,
             title: true,
@@ -196,14 +141,7 @@ export async function GET() {
           },
         },
         qualifications: {
-          orderBy: [
-            {
-              year: "desc",
-            },
-            {
-              createdAt: "desc",
-            },
-          ],
+          orderBy: [{ year: "desc" }, { createdAt: "desc" }],
           select: {
             id: true,
             name: true,
@@ -215,20 +153,14 @@ export async function GET() {
           },
         },
         reviews: {
-          orderBy: {
-            createdAt: "desc",
-          },
+          orderBy: { createdAt: "desc" },
           select: {
             id: true,
             rating: true,
             comment: true,
             createdAt: true,
             reviewerUser: {
-              select: {
-                id: true,
-                name: true,
-                image: true,
-              },
+              select: { id: true, name: true, image: true },
             },
           },
         },
@@ -237,7 +169,10 @@ export async function GET() {
 
     if (!academicMate) {
       return NextResponse.json(
-        { error: "Academic Mate profile not found. Become an Academic Mate first." },
+        {
+          error:
+            "Academic Mate profile not found. Become an Academic Mate first.",
+        },
         { status: 404 },
       );
     }
@@ -247,12 +182,8 @@ export async function GET() {
 
     const currentCurriculumCourses = currentProgrammeYearId
       ? await prisma.programmeCourse.findMany({
-          where: {
-            programmeYearId: currentProgrammeYearId,
-          },
-          select: {
-            courseId: true,
-          },
+          where: { programmeYearId: currentProgrammeYearId },
+          select: { courseId: true },
         })
       : [];
 
@@ -275,14 +206,14 @@ export async function GET() {
       status: offering.status,
       verificationStatus: offering.verificationStatus,
       topics: offering.topics.map(({ topic }) => topic),
-      isOutsideCurrentCurriculum:
-        !currentCurriculumCourseIds.has(offering.courseId),
+      isOutsideCurrentCurriculum: !currentCurriculumCourseIds.has(
+        offering.courseId,
+      ),
       createdAt: offering.createdAt,
       updatedAt: offering.updatedAt,
     }));
 
     const totalReviews = academicMate.reviews.length;
-
     const averageRating =
       totalReviews > 0
         ? Number(
@@ -309,9 +240,7 @@ export async function GET() {
         createdAt: academicMate.createdAt,
         updatedAt: academicMate.updatedAt,
       },
-
       user: academicMate.user,
-
       student: academicMate.studentProfile
         ? {
             id: academicMate.studentProfile.id,
@@ -324,10 +253,10 @@ export async function GET() {
               ? academicMate.studentProfile.phoneNumber
               : null,
             bio: academicMate.studentProfile.bio,
-            profileVisibility:
-              academicMate.studentProfile.profileVisibility,
+            profileVisibility: academicMate.studentProfile.profileVisibility,
             university: academicMate.university,
             school: academicMate.studentProfile.programme.school,
+            department: academicMate.studentProfile.programme.department,
             programme: {
               id: academicMate.studentProfile.programme.id,
               code: academicMate.studentProfile.programme.code,
@@ -340,17 +269,11 @@ export async function GET() {
             courses: academicMate.studentProfile.courses,
           }
         : null,
-
       offerings,
-
       availability: academicMate.availabilities,
-
       experiences: academicMate.experiences,
-
       qualifications: academicMate.qualifications,
-
       reviews: academicMate.reviews,
-
       statistics: {
         totalOfferings: offerings.length,
         totalAvailabilitySlots: academicMate.availabilities.length,
@@ -361,11 +284,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error(
-      "GET /api/student/academic-mate/profile failed:",
-      error,
-    );
-
+    console.error("GET /api/student/academic-mate/profile failed:", error);
     return NextResponse.json(
       { error: "An unexpected error occurred." },
       { status: 500 },

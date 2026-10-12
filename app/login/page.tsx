@@ -96,7 +96,7 @@ export default function LoginPage() {
 
         {/* Auth Card */}
         <div className="rounded-3xl border border-gray-200/80 bg-white/90 p-8 shadow-xl shadow-gray-200/50 backdrop-blur-md">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form method = "POST" onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div>
               <label

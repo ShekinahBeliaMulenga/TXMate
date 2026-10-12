@@ -102,16 +102,6 @@ export async function POST(request: Request) {
         id: true,
         universityId: true,
         status: true,
-        courses: {
-          where: {
-            status: {
-              in: ["ENROLLED", "REPEATING"],
-            },
-          },
-          select: {
-            courseId: true,
-          },
-        },
       },
     });
 
@@ -131,27 +121,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const courseIds = student.courses.map(
-      (studentCourse) => studentCourse.courseId,
-    );
-
-    if (courseIds.length === 0) {
-      return NextResponse.json(
-        {
-          error: "You need an enrolled course before requesting academic support.",
-        },
-        { status: 400 },
-      );
-    }
-
     const offering = await prisma.mateOffering.findFirst({
       where: {
         id: offeringId,
         universityId: student.universityId,
-        courseId: {
-          in: courseIds,
-        },
         status: "ACTIVE",
+        course: {
+          isActive: true,
+        },
         academicMateProfile: {
           status: "ACTIVE",
           verificationStatus: "VERIFIED",
@@ -192,7 +169,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "This offering is unavailable or does not match your university and enrolled courses.",
+            "This offering is unavailable or does not belong to your university.",
         },
         { status: 404 },
       );

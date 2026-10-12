@@ -36,6 +36,7 @@ type AcademicMateProfileResponse = {
     profileVisibility: ProfileVisibility;
     university: { id: string; code: string; name: string; slug: string };
     school: { id: string; code: string; name: string };
+    department: { id: string; code: string; name: string } | null;
     programme: { id: string; code: string; name: string; level: string; durationYears: number };
     programmeYear: { id: string; yearNumber: number };
     courses: Array<{
@@ -491,6 +492,13 @@ export default function AcademicMateProfilePage() {
                     <Icon name="university" className="h-4 w-4 text-[#7d1f2a]" />
                     {student.university.name}
                   </li>
+
+                    {student.department && (
+                      <li className="inline-flex items-center gap-1.5">
+                        <Icon name="briefcase" className="h-4 w-4 text-[#7d1f2a]" />
+                        {student.department.name}
+                      </li>
+                    )}
                 </ul>
               ) : null}
             </div>

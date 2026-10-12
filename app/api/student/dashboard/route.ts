@@ -39,6 +39,13 @@ export async function GET() {
             id: true,
             name: true,
             code: true,
+            department: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
           },
         },
         programmeYear: {
