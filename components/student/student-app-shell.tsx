@@ -99,7 +99,7 @@ const NAVIGATION_GROUPS: {
         icon: "layers",
       },
       {
-        label: "Incoming requests",
+        label: "Mate requests",
         href: "/student/academic-mate/requests",
         icon: "list",
         showPendingBadge: true,
