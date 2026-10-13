@@ -19,6 +19,7 @@ type IconName =
   | "settings"
   | "academic"
   | "inbox"
+  | "messages"
   | "book"
   | "calendar"
   | "shield"
@@ -46,7 +47,7 @@ const NAVIGATION_GROUPS: {
   items: NavigationItem[];
 }[] = [
   {
-    title: "Study",
+    title: "Student Actions",
     items: [
       {
         label: "Dashboard",
@@ -63,15 +64,22 @@ const NAVIGATION_GROUPS: {
         href: "/student/requests",
         icon: "inbox",
       },
+
       {
-        label: "Repeating courses",
+        label: "Messages",
+        href: "/student/messages",
+        icon: "messages",
+      },
+      
+      {
+        label: "Your courses",
         href: "/student/repeating-courses",
         icon: "book",
       },
     ],
   },
   {
-    title: "Academic Mate",
+    title: "Academic Mate Profile",
     items: [
       {
         label: "Profile overview",
@@ -281,6 +289,13 @@ function Icon({
           <polyline points="12 6 12 12 16 14" />
         </svg>
       );
+
+    case "messages":
+      return (
+    <svg {...props}>
+      <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
+    </svg>
+  );
   }
 }
 

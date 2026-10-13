@@ -244,7 +244,7 @@ export async function GET(request: Request) {
             studentProfile: {
               select: {
                 user: {
-                  select: { name: true },
+                  select: { name: true, image: true,},
                 },
                 university: {
                   select: {
@@ -368,6 +368,7 @@ export async function GET(request: Request) {
 
       student: {
         name: record.studentProfile.user.name,
+        image: record.studentProfile.user.image,
         university: record.studentProfile.university,
         programme: record.studentProfile.programme,
         yearNumber: record.studentProfile.programmeYear.yearNumber,

@@ -190,15 +190,6 @@ function ZambiaFlag({ className = "" }: { className?: string }) {
 /* ---------- icons ---------- */
 
 type IconName =
-  | "building"
-  | "school"
-  | "layers"
-  | "cap"
-  | "calendar"
-  | "id"
-  | "user"
-  | "phone"
-  | "book"
   | "check"
   | "arrow"
   | "login"
@@ -227,65 +218,6 @@ function Icon({
   };
 
   switch (name) {
-    case "building":
-      return (
-        <svg {...props}>
-          <path d="M4 21V5l8-2v18M12 9h8v12M3 21h18M8 8h.01M8 12h.01M8 16h.01M16 13h.01M16 17h.01" />
-        </svg>
-      );
-    case "school":
-      return (
-        <svg {...props}>
-          <path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5" />
-        </svg>
-      );
-    case "layers":
-      return (
-        <svg {...props}>
-          <path d="m12 3 9 5-9 5-9-5 9-5ZM3 13l9 5 9-5" />
-        </svg>
-      );
-    case "cap":
-      return (
-        <svg {...props}>
-          <path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5ZM6.5 11.2v5.2c3.6 2.7 7.4 2.7 11 0v-5.2" />
-        </svg>
-      );
-    case "calendar":
-      return (
-        <svg {...props}>
-          <rect x="3" y="5" width="18" height="16" rx="2" />
-          <path d="M16 3v4M8 3v4M3 10h18" />
-        </svg>
-      );
-    case "id":
-      return (
-        <svg {...props}>
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <circle cx="9" cy="11" r="2" />
-          <path d="M6 16c.6-1.6 2-2 3-2s2.4.4 3 2M15 10h3M15 14h3" />
-        </svg>
-      );
-    case "user":
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21a8 8 0 0 1 16 0" />
-        </svg>
-      );
-    case "phone":
-      return (
-        <svg {...props}>
-          <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2Z" />
-        </svg>
-      );
-    case "book":
-      return (
-        <svg {...props}>
-          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22Z" />
-          <path d="M4 5.5v14A2.5 2.5 0 0 1 6.5 17H20" />
-        </svg>
-      );
     case "check":
       return (
         <svg {...props}>
@@ -342,49 +274,157 @@ function Icon({
   }
 }
 
-/* ---------- animations (respects reduced motion) ---------- */
+/* ---------- motion (subtle, and disabled for reduced-motion users) ---------- */
 
 const ANIMATIONS = `
-@keyframes ob-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes ob-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes ob-fade{from{opacity:0}to{opacity:1}}
 @keyframes ob-draw{to{stroke-dashoffset:0}}
-@keyframes ob-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
-@keyframes ob-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
 @keyframes ob-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-.ob-rise{opacity:0;animation:ob-rise .55s cubic-bezier(.2,.8,.2,1) forwards}
-.ob-fade{animation:ob-fade .5s ease both}
-.ob-draw{stroke-dasharray:1;stroke-dashoffset:1;animation:ob-draw .7s ease forwards}
-.ob-pop{animation:ob-pop .5s cubic-bezier(.2,.8,.2,1) both}
-.ob-shake{animation:ob-shake .4s ease}
-.ob-skeleton{background:linear-gradient(90deg,#f3eee8 25%,#faf7f3 50%,#f3eee8 75%);background-size:200% 100%;animation:ob-shimmer 1.4s linear infinite}
-@media (prefers-reduced-motion:reduce){.ob-rise,.ob-fade,.ob-draw,.ob-pop,.ob-shake,.ob-skeleton{animation:none!important;opacity:1;stroke-dashoffset:0}}
+.ob-rise{opacity:0;animation:ob-rise .4s cubic-bezier(.2,.8,.2,1) forwards}
+.ob-fade{animation:ob-fade .35s ease both}
+.ob-draw{stroke-dasharray:1;stroke-dashoffset:1;animation:ob-draw .6s ease forwards}
+.ob-skeleton{background:linear-gradient(90deg,#f5f5f4 25%,#fafaf9 50%,#f5f5f4 75%);background-size:200% 100%;animation:ob-shimmer 1.4s linear infinite}
+@media (prefers-reduced-motion:reduce){.ob-rise,.ob-fade,.ob-draw,.ob-skeleton{animation:none!important;opacity:1;stroke-dashoffset:0}}
 `;
 
-/* ---------- shared actions (plain text with icons) ---------- */
+/* ---------- shared pieces ---------- */
+
+const primaryButtonClass =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#651822] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#7d1f2a]/20 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none";
+
+const secondaryButtonClass =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-stone-300/50";
+
+const inputClassName =
+  "h-12 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-base text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 md:h-11 md:text-sm";
 
 function AccountActions() {
   return (
-    <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-[#eee7df] pt-6">
-      <Link
-        href="/student/dashboard"
-        className="group inline-flex items-center gap-2 text-sm font-semibold text-[#7d1f2a] transition-colors hover:text-[#4f1019] focus:outline-none focus-visible:underline"
-      >
-        <Icon name="dashboard" />
-        Continue to dashboard
-        <Icon
-          name="arrow"
-          className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1"
-        />
-      </Link>
-
-      <Link
-        href="/login"
-        className="group inline-flex items-center gap-2 text-sm font-medium text-[#625954] transition-colors hover:text-[#7d1f2a] focus:outline-none focus-visible:underline"
-      >
+    <div className="flex flex-col-reverse gap-3 border-t border-stone-200 bg-stone-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
+      <Link href="/login" className={secondaryButtonClass}>
         <Icon name="login" />
         Go to login
       </Link>
+      <Link href="/student/dashboard" className={primaryButtonClass}>
+        <Icon name="dashboard" />
+        Continue to dashboard
+        <Icon name="arrow" />
+      </Link>
     </div>
+  );
+}
+
+function FormSection({
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`grid gap-6 px-5 py-8 sm:px-8 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-10 ${className}`}
+    >
+      <div>
+        <h2 className="text-base font-semibold text-stone-900">{title}</h2>
+        <p className="mt-1.5 text-sm leading-6 text-stone-500">
+          {description}
+        </p>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
+function Field({
+  label,
+  required,
+  hint,
+  error,
+  reserveHint,
+  className = "",
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  /** Reserve two lines for the hint so the layout never shifts. */
+  reserveHint?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="text-sm font-medium text-stone-800">
+        {label}
+        {required ? (
+          <span className="ml-0.5 text-[#7d1f2a]" aria-hidden="true">
+            *
+          </span>
+        ) : (
+          <span className="ml-1.5 text-xs font-normal text-stone-400">
+            Optional
+          </span>
+        )}
+      </span>
+      <span className="mt-1.5 block">{children}</span>
+      {hint !== undefined || error ? (
+        <span
+          className={`mt-1.5 block text-xs leading-5 ${
+            reserveHint ? "min-h-10" : "min-h-5"
+          } ${error ? "text-red-700" : "text-stone-500"}`}
+        >
+          {error || hint}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+function Select({
+  children,
+  className = "",
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="relative block">
+      <select
+        {...props}
+        className={`h-12 w-full appearance-none rounded-lg border border-stone-300 bg-white pl-3.5 pr-10 text-base text-stone-900 outline-none transition focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 md:h-11 md:text-sm ${className}`}
+      >
+        {children}
+      </select>
+      <Icon
+        name="chevron"
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+      />
+    </span>
+  );
+}
+
+function Badge({
+  tone,
+  children,
+}: {
+  tone: "accent" | "neutral";
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+        tone === "accent"
+          ? "bg-[#7d1f2a]/[0.07] text-[#7d1f2a]"
+          : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -461,13 +501,13 @@ export default function StudentOnboardingForm({ userName }: Props) {
     return () => controller.abort();
   }, []);
 
+  /*
+   * The dependent lists below are cleared by the change handlers
+   * (handleUniversityChange, handleSchoolChange, ...), so these effects only
+   * need to fetch. Resetting state inside an effect is not needed.
+   */
   useEffect(() => {
-    if (!universityId) {
-      setSettings(null);
-      setSchools([]);
-
-      return;
-    }
+    if (!universityId) return;
 
     const controller = new AbortController();
 
@@ -513,12 +553,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   }, [universityId]);
 
   useEffect(() => {
-    if (!schoolId) {
-      setDepartments([]);
-      setDepartmentId("");
-      setProgrammes([]);
-      return;
-    }
+    if (!schoolId) return;
 
     const controller = new AbortController();
 
@@ -554,10 +589,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   }, [schoolId]);
 
   useEffect(() => {
-    if (!departmentId) {
-      setProgrammes([]);
-      return;
-    }
+    if (!departmentId) return;
 
     const controller = new AbortController();
 
@@ -593,11 +625,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   }, [departmentId]);
 
   useEffect(() => {
-    if (!programmeId) {
-      setYears([]);
-
-      return;
-    }
+    if (!programmeId) return;
 
     const controller = new AbortController();
 
@@ -636,12 +664,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   }, [programmeId]);
 
   useEffect(() => {
-    if (!programmeYearId) {
-      setProgrammeCourses([]);
-      setSelectedElectiveCourseIds([]);
-
-      return;
-    }
+    if (!programmeYearId) return;
 
     const controller = new AbortController();
 
@@ -993,22 +1016,24 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
   if (alreadyOnboarded) {
     return (
-      <section className="ob-rise rounded-xl border border-[#ded6cb] bg-white p-6 shadow-sm sm:p-8">
+      <section className="ob-rise overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <style>{ANIMATIONS}</style>
-        <div className="flex items-start gap-4">
-          <span className="ob-pop flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#f4e9ea] text-[#7d1f2a]">
+
+        <div className="flex items-start gap-4 px-5 py-8 sm:px-8">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a]/[0.07] text-[#7d1f2a]">
             <Icon name="shield" className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-2xl font-semibold text-[#2d1b1b]">
-              Your profile is already set up.
+            <h2 className="text-lg font-semibold text-stone-900">
+              Your profile is already set up
             </h2>
-            <p className="mt-2 text-[#6d6260]">
+            <p className="mt-1.5 text-sm leading-6 text-stone-600">
               This account has already completed onboarding, so there is
               nothing more to fill in.
             </p>
           </div>
         </div>
+
         <AccountActions />
       </section>
     );
@@ -1016,14 +1041,14 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
   if (success) {
     return (
-      <section className="rounded-xl border border-[#ded6cb] bg-white p-6 shadow-sm sm:p-8">
+      <section className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <style>{ANIMATIONS}</style>
 
-        <div className="flex flex-col gap-5 border-b border-[#eee7df] pb-6 sm:flex-row sm:items-center">
+        <div className="flex items-start gap-4 border-b border-stone-200 px-5 py-8 sm:px-8">
           <svg
             viewBox="0 0 52 52"
             aria-hidden="true"
-            className="h-14 w-14 shrink-0"
+            className="h-11 w-11 shrink-0"
           >
             <circle
               cx="26"
@@ -1044,54 +1069,57 @@ export default function StudentOnboardingForm({ userName }: Props) {
               strokeLinejoin="round"
               pathLength={1}
               className="ob-draw"
-              style={{ animationDelay: "0.5s" }}
+              style={{ animationDelay: "0.4s" }}
             />
           </svg>
 
-          <div className="ob-rise" style={{ animationDelay: "0.6s" }}>
-            <p className="text-sm font-semibold text-[#7d1f2a]">
+          <div className="ob-rise" style={{ animationDelay: "0.5s" }}>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#7d1f2a]">
               Profile completed
             </p>
-            <h2 className="mt-1 text-2xl font-semibold text-[#2d1b1b]">
+            <h2 className="mt-1 text-xl font-semibold text-stone-900">
               You&apos;re ready to use TXMate, {userName.split(" ")[0]}.
             </h2>
-            <p className="mt-2 text-[#6d6260]">
-              Your academic profile has been created and your selected
-              programme courses have been assigned for {success.academicYear}.
+            <p className="mt-1.5 text-sm leading-6 text-stone-600">
+              Your academic profile has been created and your programme
+              courses have been assigned for {success.academicYear}.
             </p>
           </div>
         </div>
 
-        <div className="pt-6">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-[#2d1b1b]">
-            <Icon name="book" className="h-5 w-5 text-[#7d1f2a]" />
-            Your courses
-          </h3>
+        <div className="px-5 py-6 sm:px-8">
+          <div className="mb-3 flex items-baseline justify-between gap-4">
+            <h3 className="text-sm font-semibold text-stone-900">
+              Your courses
+            </h3>
+            <span className="text-xs tabular-nums text-stone-500">
+              {success.courses.length}{" "}
+              {success.courses.length === 1 ? "course" : "courses"}
+            </span>
+          </div>
 
-          <div className="mt-4 divide-y divide-[#eee7df] border-y border-[#eee7df]">
+          <ul className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200">
             {success.courses.map((item, index) => (
-              <div
-                className="ob-rise flex items-center justify-between gap-4 py-4"
-                style={{ animationDelay: `${0.8 + index * 0.06}s` }}
+              <li
+                className="ob-rise flex items-center justify-between gap-4 px-4 py-3"
+                style={{ animationDelay: `${0.6 + index * 0.04}s` }}
                 key={item.id}
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-[#2d1b1b]">
+                  <p className="text-sm font-semibold text-stone-900">
                     {item.course.code}
                   </p>
-                  <p className="text-sm text-[#6d6260]">{item.course.name}</p>
+                  <p className="truncate text-sm text-stone-500">
+                    {item.course.name}
+                  </p>
                 </div>
 
-                <span
-                  className={`shrink-0 text-xs font-medium ${
-                    item.isCompulsory ? "text-[#7d1f2a]" : "text-[#8b807d]"
-                  }`}
-                >
+                <Badge tone={item.isCompulsory ? "accent" : "neutral"}>
                   {item.isCompulsory ? "Compulsory" : "Elective"}
-                </span>
-              </div>
+                </Badge>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
 
         <AccountActions />
@@ -1111,75 +1139,87 @@ export default function StudentOnboardingForm({ userName }: Props) {
     programmeCourses.length > 0 &&
     validateElectiveSelections() === null;
 
-  const steps: { label: string; icon: IconName; done: boolean }[] = [
-    { label: "Academic", icon: "cap", done: academicDone },
-    { label: "Personal", icon: "id", done: personalDone },
-    { label: "Courses", icon: "book", done: coursesDone },
-    { label: "Confirm", icon: "shield", done: informationConfirmed },
+  const steps: { label: string; done: boolean }[] = [
+    { label: "Academic", done: academicDone },
+    { label: "Personal", done: personalDone },
+    { label: "Courses", done: coursesDone },
+    { label: "Confirm", done: informationConfirmed },
   ];
   const completedSteps = steps.filter((step) => step.done).length;
+  const currentStep = steps.findIndex((step) => !step.done);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <style>{ANIMATIONS}</style>
 
-      <div className="ob-fade rounded-xl border border-[#ded6cb] bg-white p-4 shadow-sm sm:p-5">
-        <ol className="grid grid-cols-4 gap-2">
-          {steps.map((step) => (
-            <li
-              key={step.label}
-              className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3"
-            >
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-all duration-500 ${
-                  step.done
-                    ? "border-[#7d1f2a] bg-[#7d1f2a] text-white"
-                    : "border-[#ded6cb] text-[#9b918d]"
-                }`}
-              >
-                <Icon name={step.done ? "check" : step.icon} />
-              </span>
-              <span
-                className={`text-xs font-semibold transition-colors duration-500 ${
-                  step.done ? "text-[#2d1b1b]" : "text-[#9b918d]"
-                }`}
-              >
-                {step.label}
-              </span>
-            </li>
-          ))}
-        </ol>
+      <nav
+        aria-label="Onboarding progress"
+        className="ob-fade rounded-xl border border-stone-200 bg-white px-5 py-4 shadow-sm sm:px-8"
+      >
+        <ol className="flex items-center">
+          {steps.map((step, index) => {
+            const isCurrent = index === currentStep;
+            const isLast = index === steps.length - 1;
 
-        <div
-          className="mt-4 h-1 overflow-hidden rounded bg-[#f0ebe5]"
-          role="progressbar"
-          aria-label="Onboarding progress"
-          aria-valuemin={0}
-          aria-valuemax={steps.length}
-          aria-valuenow={completedSteps}
-        >
-          <div
-            className="h-full bg-gradient-to-r from-[#7d1f2a] to-[#f5b324] transition-all duration-700 ease-out"
-            style={{ width: `${(completedSteps / steps.length) * 100}%` }}
-          />
-        </div>
-      </div>
+            return (
+              <li
+                key={step.label}
+                aria-current={isCurrent ? "step" : undefined}
+                className={`flex items-center ${isLast ? "" : "flex-1"}`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-colors duration-300 ${
+                      step.done
+                        ? "border-[#7d1f2a] bg-[#7d1f2a] text-white"
+                        : isCurrent
+                          ? "border-[#7d1f2a] bg-white text-[#7d1f2a]"
+                          : "border-stone-300 bg-white text-stone-400"
+                    }`}
+                  >
+                    {step.done ? (
+                      <Icon name="check" className="h-3.5 w-3.5" />
+                    ) : (
+                      index + 1
+                    )}
+                  </span>
+                  <span
+                    className={`hidden text-sm font-medium transition-colors duration-300 sm:inline ${
+                      step.done || isCurrent
+                        ? "text-stone-900"
+                        : "text-stone-400"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </span>
+
+                {!isLast && (
+                  <span
+                    aria-hidden="true"
+                    className={`mx-3 h-px flex-1 transition-colors duration-500 sm:mx-4 ${
+                      step.done ? "bg-[#7d1f2a]" : "bg-stone-200"
+                    }`}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
 
       <form
         onSubmit={handleSubmit}
-        className="ob-rise overflow-hidden rounded-xl border border-[#ded6cb] bg-white shadow-sm"
-        style={{ animationDelay: "0.08s" }}
+        className="ob-rise overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+        style={{ animationDelay: "0.05s" }}
       >
-        <div className="space-y-8 p-4 sm:p-8">
-          <section>
-            <SectionHeader
-              icon="cap"
-              title="Academic details"
-              subtitle="Select the academic structure that matches your current enrolment."
-            />
-
-            <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
-              <Field label="University" icon="building" required>
+        <div className="divide-y divide-stone-200">
+          <FormSection
+            title="Academic details"
+            description="Select the academic structure that matches your current enrolment."
+          >
+            <div className="grid grid-cols-1 items-start gap-x-5 gap-y-5 sm:grid-cols-2">
+              <Field label="University" required className="sm:col-span-2">
                 <Select
                   value={universityId}
                   onChange={(event) =>
@@ -1200,7 +1240,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                 </Select>
               </Field>
 
-              <Field label="School" icon="school" required>
+              <Field label="School" required>
                 <Select
                   value={schoolId}
                   onChange={(event) => handleSchoolChange(event.target.value)}
@@ -1221,7 +1261,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                 </Select>
               </Field>
 
-              <Field label="Department" icon="layers" required>
+              <Field label="Department" required>
                 <Select
                   value={departmentId}
                   onChange={(event) =>
@@ -1245,7 +1285,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                 </Select>
               </Field>
 
-              <Field label="Programme" icon="cap" required>
+              <Field label="Programme" required className="sm:col-span-2">
                 <Select
                   value={programmeId}
                   onChange={(event) =>
@@ -1268,7 +1308,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                 </Select>
               </Field>
 
-              <Field label="Year of study" icon="calendar" required>
+              <Field label="Year of study" required>
                 <Select
                   value={programmeYearId}
                   onChange={(event) => handleYearChange(event.target.value)}
@@ -1289,26 +1329,22 @@ export default function StudentOnboardingForm({ userName }: Props) {
                 </Select>
               </Field>
             </div>
-          </section>
+          </FormSection>
 
-          <section className="border-t border-[#eee7df] pt-8">
-            <SectionHeader
-              icon="id"
-              title="Personal details"
-              subtitle="Only the information needed to establish your academic profile is required."
-            />
-
+          <FormSection
+            title="Personal details"
+            description="Only the information needed to establish your academic profile is required."
+          >
             {/*
-              Fields are stacked one after the other. The Student ID hint changes
-              length once a university is chosen, so it reserves two lines to keep
-              the fields below it from moving.
+              The Student ID hint changes length once a university is chosen,
+              so it reserves two lines to keep the fields below it in place.
             */}
-            <div className="grid grid-cols-1 gap-5">
+            <div className="grid grid-cols-1 items-start gap-x-5 gap-y-5 sm:grid-cols-2">
               <Field
                 label="Student ID"
-                icon="id"
                 required
                 reserveHint
+                className="sm:col-span-2"
                 hint={
                   studentIdHint || "Select your university to see the ID format."
                 }
@@ -1335,7 +1371,6 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
               <Field
                 label="Gender"
-                icon="user"
                 required
                 hint="Select the option that applies to you."
               >
@@ -1352,13 +1387,12 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
               <Field
                 label="Phone number"
-                icon="phone"
-                hint="Optional. Zambian mobile number, kept private by default."
+                hint="Zambian mobile number. Kept private by default."
                 error={showPhoneError ? phoneError : undefined}
               >
                 <div className="flex w-full min-w-0">
-                  <span className="inline-flex h-12 shrink-0 items-center gap-2 rounded-l-lg border border-r-0 border-[#d9d0c8] bg-[#fcfaf7] px-2.5 text-base font-medium sm:px-3 md:h-11 md:text-sm text-[#2d1b1b]">
-                    <ZambiaFlag className="h-4 w-6 shrink-0 rounded-[3px] shadow-sm ring-1 ring-black/10" />
+                  <span className="inline-flex h-12 shrink-0 items-center gap-2 rounded-l-lg border border-r-0 border-stone-300 bg-stone-50 px-3 text-base font-medium text-stone-700 md:h-11 md:text-sm">
+                    <ZambiaFlag className="h-3.5 w-5 shrink-0 rounded-[2px] ring-1 ring-black/10" />
                     +260
                   </span>
                   <input
@@ -1373,25 +1407,23 @@ export default function StudentOnboardingForm({ userName }: Props) {
                     aria-invalid={showPhoneError}
                     disabled={submitting}
                     placeholder="97 123 4567"
-                    className={`h-12 min-w-0 flex-1 rounded-r-lg border bg-white px-3 text-base text-[#2d1b1b] sm:px-4 md:h-11 md:text-sm placeholder:text-[#9b918d] outline-none transition disabled:cursor-not-allowed disabled:bg-[#f5f2ee] ${
+                    className={`h-12 min-w-0 flex-1 rounded-r-lg border bg-white px-3.5 text-base text-stone-900 outline-none transition placeholder:text-stone-400 disabled:cursor-not-allowed disabled:bg-stone-100 md:h-11 md:text-sm ${
                       showPhoneError
-                        ? "border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/10"
-                        : "border-[#d9d0c8] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10"
+                        ? "border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
+                        : "border-stone-300 focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10"
                     }`}
                   />
                 </div>
               </Field>
             </div>
-          </section>
+          </FormSection>
 
           {programmeYearId && (
-            <section className="ob-rise border-t border-[#eee7df] pt-8">
-              <SectionHeader
-                icon="book"
-                title="Programme courses"
-                subtitle="Compulsory courses are included automatically. Select the electives that you actually take."
-              />
-
+            <FormSection
+              title="Programme courses"
+              description="Compulsory courses are included automatically. Select the electives you actually take."
+              className="ob-rise"
+            >
               {loadingCourses ? (
                 <div className="space-y-3" aria-busy="true">
                   <p className="sr-only">Loading courses...</p>
@@ -1404,7 +1436,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                   ))}
                 </div>
               ) : programmeCourses.length === 0 ? (
-                <p className="text-sm text-[#6d6260]">
+                <p className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center text-sm text-stone-500">
                   No courses are configured for this programme year.
                 </p>
               ) : (
@@ -1412,53 +1444,50 @@ export default function StudentOnboardingForm({ userName }: Props) {
                   {compulsoryCourses.length > 0 && (
                     <div>
                       <div className="mb-3">
-                        <h3 className="font-semibold text-[#2d1b1b]">
+                        <h3 className="text-sm font-semibold text-stone-900">
                           Compulsory courses
                         </h3>
-                        <p className="mt-1 text-sm text-[#8b807d]">
-                          These courses are automatically assigned to students
-                          in this programme year.
+                        <p className="mt-0.5 text-sm text-stone-500">
+                          Automatically assigned to students in this programme
+                          year.
                         </p>
                       </div>
 
-                      <div className="divide-y divide-[#eee7df] border-y border-[#eee7df]">
+                      <ul className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200">
                         {compulsoryCourses.map((item, index) => (
-                          <div
+                          <li
                             key={item.id}
-                            className="ob-rise flex items-center justify-between gap-4 py-4"
-                            style={{ animationDelay: `${index * 0.05}s` }}
+                            className="ob-rise flex items-center justify-between gap-4 px-4 py-3"
+                            style={{ animationDelay: `${index * 0.03}s` }}
                           >
                             <div className="min-w-0">
-                              <p className="font-semibold text-[#2d1b1b]">
+                              <p className="text-sm font-semibold text-stone-900">
                                 {item.course.code}
                               </p>
-                              <p className="text-sm text-[#6d6260]">
+                              <p className="truncate text-sm text-stone-500">
                                 {item.course.name}
                               </p>
                             </div>
 
-                            <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[#7d1f2a]">
-                              <Icon name="check" className="h-3.5 w-3.5" />
-                              Included
-                            </span>
-                          </div>
+                            <Badge tone="accent">Included</Badge>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     </div>
                   )}
 
                   {electiveGroups.length > 0 && (
                     <div>
-                      <div className="mb-4">
-                        <h3 className="font-semibold text-[#2d1b1b]">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-stone-900">
                           Electives
                         </h3>
-                        <p className="mt-1 text-sm text-[#8b807d]">
+                        <p className="mt-0.5 text-sm text-stone-500">
                           Select the courses you are actually taking.
                         </p>
                       </div>
 
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         {electiveGroups.map((group) => {
                           const groupCourses = electiveCourses.filter(
                             (course) => course.electiveGroup?.id === group.id
@@ -1466,39 +1495,43 @@ export default function StudentOnboardingForm({ userName }: Props) {
                           const selectedCount = getGroupSelectedCount(group.id);
                           const maxReached =
                             selectedCount >= group.maxSelections;
+                          const minMet = selectedCount >= group.minSelections;
 
                           return (
                             <div
                               key={group.id}
-                              className="overflow-hidden rounded-lg border border-[#ded6cb]"
+                              className="overflow-hidden rounded-lg border border-stone-200"
                             >
-                              <div className="border-b border-[#eee7df] bg-[#fcfaf7] px-5 py-4">
-                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                  <div>
-                                    <h4 className="font-semibold text-[#2d1b1b]">
-                                      {group.name}
-                                    </h4>
-                                    <p className="text-sm text-[#6d6260]">
-                                      Choose{" "}
-                                      {group.minSelections ===
-                                      group.maxSelections
-                                        ? group.minSelections
-                                        : `${group.minSelections} to ${group.maxSelections}`}{" "}
-                                      {group.maxSelections === 1
-                                        ? "course"
-                                        : "courses"}
-                                      .
-                                    </p>
-                                  </div>
-
-                                  <span className="text-sm font-medium tabular-nums text-[#7d1f2a]">
-                                    {selectedCount} / {group.maxSelections}{" "}
-                                    selected
-                                  </span>
+                              <div className="flex flex-col gap-1.5 border-b border-stone-200 bg-stone-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <h4 className="text-sm font-semibold text-stone-900">
+                                    {group.name}
+                                  </h4>
+                                  <p className="text-xs text-stone-500">
+                                    Choose{" "}
+                                    {group.minSelections === group.maxSelections
+                                      ? group.minSelections
+                                      : `${group.minSelections} to ${group.maxSelections}`}{" "}
+                                    {group.maxSelections === 1
+                                      ? "course"
+                                      : "courses"}
+                                    .
+                                  </p>
                                 </div>
+
+                                <span
+                                  className={`inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums ${
+                                    minMet
+                                      ? "border-[#7d1f2a]/20 bg-[#7d1f2a]/[0.05] text-[#7d1f2a]"
+                                      : "border-stone-300 bg-white text-stone-600"
+                                  }`}
+                                >
+                                  {selectedCount} of {group.maxSelections}{" "}
+                                  selected
+                                </span>
                               </div>
 
-                              <div className="divide-y divide-[#eee7df]">
+                              <div className="divide-y divide-stone-200">
                                 {groupCourses.map((item) => {
                                   const selected =
                                     selectedElectiveCourseIds.includes(
@@ -1509,14 +1542,12 @@ export default function StudentOnboardingForm({ userName }: Props) {
                                   return (
                                     <label
                                       key={item.id}
-                                      className={`flex items-start gap-4 px-5 py-4 transition-all duration-200 ${
+                                      className={`flex items-start gap-3.5 px-4 py-3 transition-colors duration-150 ${
                                         disabled
                                           ? "cursor-not-allowed opacity-50"
-                                          : "cursor-pointer hover:bg-[#fcfaf7]"
+                                          : "cursor-pointer hover:bg-stone-50"
                                       } ${
-                                        selected
-                                          ? "bg-[#fbf4f4] shadow-[inset_3px_0_0_#7d1f2a]"
-                                          : ""
+                                        selected ? "bg-[#7d1f2a]/[0.04]" : ""
                                       }`}
                                     >
                                       <input
@@ -1526,14 +1557,14 @@ export default function StudentOnboardingForm({ userName }: Props) {
                                           toggleElectiveCourse(item)
                                         }
                                         disabled={submitting || disabled}
-                                        className="mt-1 h-4 w-4 accent-[#7d1f2a]"
+                                        className="mt-0.5 h-4 w-4 shrink-0 accent-[#7d1f2a]"
                                       />
 
                                       <span className="min-w-0">
-                                        <span className="block font-semibold text-[#2d1b1b]">
+                                        <span className="block text-sm font-semibold text-stone-900">
                                           {item.course.code}
                                         </span>
-                                        <span className="mt-1 block text-sm text-[#6d6260]">
+                                        <span className="block text-sm text-stone-500">
                                           {item.course.name}
                                         </span>
                                       </span>
@@ -1550,60 +1581,60 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
                   {electiveCourses.length === 0 &&
                     compulsoryCourses.length > 0 && (
-                      <p className="text-sm text-[#6d6260]">
+                      <p className="text-sm text-stone-500">
                         There are no elective courses configured for this
                         programme year.
                       </p>
                     )}
                 </div>
               )}
-            </section>
+            </FormSection>
           )}
 
-          <section className="border-t border-[#eee7df] pt-8">
-            <SectionHeader
-              icon="shield"
-              title="Confirmation"
-              subtitle="One last check before your profile is created."
-            />
+          <FormSection
+            title="Confirmation"
+            description="One last check before your profile is created."
+          >
+            <label className="flex cursor-pointer items-start gap-3.5 rounded-lg border border-stone-200 bg-stone-50 px-4 py-4 transition-colors hover:border-stone-300">
+              <input
+                type="checkbox"
+                checked={informationConfirmed}
+                onChange={(event) => {
+                  setInformationConfirmed(event.target.checked);
+                  setError("");
+                }}
+                disabled={submitting}
+                className="mt-1 h-4 w-4 shrink-0 accent-[#7d1f2a]"
+              />
+              <span className="text-sm leading-6 text-stone-700">
+                I confirm that the information I have provided is accurate and
+                belongs to me. I understand that providing false or misleading
+                information may result in my TXMate account being restricted or
+                deactivated.
+              </span>
+            </label>
+          </FormSection>
+        </div>
 
-            <div className="rounded-lg border border-[#ded6cb] bg-[#fcfaf7] px-5 py-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={informationConfirmed}
-                  onChange={(event) => {
-                    setInformationConfirmed(event.target.checked);
-                    setError("");
-                  }}
-                  disabled={submitting}
-                  className="mt-1 h-4 w-4 shrink-0 accent-[#7d1f2a]"
-                />
-                <span className="text-sm leading-6 text-[#4f4441]">
-                  I confirm that the information I have provided is accurate
-                  and belongs to me. I understand that providing false or
-                  misleading information may result in my TXMate account being
-                  restricted or deactivated.
-                </span>
-              </label>
-            </div>
-          </section>
-
-          {error && (
+        {error && (
+          <div className="border-t border-stone-200 px-5 py-4 sm:px-8">
             <div
               key={error}
               role="alert"
-              className="ob-shake flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              className="ob-fade flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
             >
               <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="flex items-center justify-between gap-4 border-t border-[#eee7df] bg-[#fcfaf7] px-4 py-5 sm:px-8">
-          <p className="text-xs text-[#8b807d]">
-            {completedSteps} of {steps.length} steps complete
+        <div className="flex items-center justify-between gap-4 border-t border-stone-200 bg-stone-50 px-5 py-4 sm:px-8">
+          <p className="text-sm tabular-nums text-stone-500">
+            <span className="font-semibold text-stone-800">
+              {completedSteps}
+            </span>{" "}
+            of {steps.length} steps complete
           </p>
 
           <button
@@ -1621,7 +1652,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
               !programmeYearId ||
               !informationConfirmed
             }
-            className="group inline-flex items-center gap-2 text-sm font-semibold text-[#7d1f2a] transition-colors hover:text-[#4f1019] focus:outline-none focus-visible:underline disabled:cursor-not-allowed disabled:text-[#b3a8a3]"
+            className={primaryButtonClass}
           >
             {submitting ? (
               <>
@@ -1631,10 +1662,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
             ) : (
               <>
                 Complete onboarding
-                <Icon
-                  name="arrow"
-                  className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 group-disabled:translate-x-0"
-                />
+                <Icon name="arrow" />
               </>
             )}
           </button>
@@ -1643,92 +1671,3 @@ export default function StudentOnboardingForm({ userName }: Props) {
     </div>
   );
 }
-
-function SectionHeader({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: IconName;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-5 flex items-start gap-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#f4e9ea] text-[#7d1f2a]">
-        <Icon name={icon} />
-      </span>
-      <div>
-        <h2 className="text-xl font-semibold text-[#2d1b1b]">{title}</h2>
-        <p className="mt-1 text-sm text-[#6d6260]">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  icon,
-  required,
-  hint,
-  error,
-  reserveHint,
-  children,
-}: {
-  label: string;
-  icon?: IconName;
-  required?: boolean;
-  hint?: string;
-  error?: string;
-  /** Always reserve two lines for the hint so the row never changes height. */
-  reserveHint?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="flex items-center gap-2 text-sm font-semibold text-[#392a29]">
-        {icon ? <Icon name={icon} className="h-4 w-4 text-[#9a2a38]" /> : null}
-        {label}
-        {required ? (
-          <span className="text-[#7d1f2a]" aria-hidden="true">
-            *
-          </span>
-        ) : null}
-      </span>
-      <span className="mt-2 block">{children}</span>
-      {hint !== undefined ? (
-        <span
-          className={`mt-1.5 block text-xs leading-5 ${
-            reserveHint ? "min-h-10" : "min-h-5"
-          } ${error ? "text-red-700" : "text-[#8b807d]"}`}
-        >
-          {error || hint}
-        </span>
-      ) : null}
-    </label>
-  );
-}
-
-function Select({
-  children,
-  className = "",
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <span className="relative block">
-      <select
-        {...props}
-        className={`h-12 w-full appearance-none rounded-lg border border-[#d9d0c8] bg-white pl-4 pr-10 text-base text-[#2d1b1b] md:h-11 md:text-sm outline-none transition focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-[#f5f2ee] ${className}`}
-      >
-        {children}
-      </select>
-      <Icon
-        name="chevron"
-        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9b918d]"
-      />
-    </span>
-  );
-}
-
-const inputClassName =
-  "h-12 w-full rounded-lg border border-[#d9d0c8] bg-white px-4 text-base text-[#2d1b1b] md:h-11 md:text-sm placeholder:text-[#9b918d] outline-none transition focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-[#f5f2ee]";

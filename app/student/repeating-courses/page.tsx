@@ -566,7 +566,7 @@ export default function RepeatingCoursesPage() {
             <div
               role="group"
               aria-label="Filter by course status"
-              className="flex w-full gap-1 overflow-x-auto rounded-xl bg-[#f3efeb] p-1 sm:w-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              className="flex w-full gap-1 rounded-xl bg-[#f3efeb] p-1 sm:w-auto"
             >
               {FILTERS.map((item) => {
                 const active = filter === item.value;
@@ -577,7 +577,7 @@ export default function RepeatingCoursesPage() {
                     type="button"
                     aria-pressed={active}
                     onClick={() => setFilter(item.value)}
-                    className={`inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30 sm:flex-none ${
+                    className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30 sm:flex-none sm:gap-2 sm:px-3.5 ${
                       active
                         ? "bg-white text-[#7d1f2a] shadow-sm"
                         : "text-[#6b615b] hover:text-[#1f1a17]"

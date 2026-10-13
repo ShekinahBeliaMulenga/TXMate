@@ -345,8 +345,9 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-[#efe8e1]/80 bg-[#f9f8f6]/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5">
           <Link href="/" className="text-xl font-extrabold tracking-tight">TX<span className="text-[#7d1f2a]">Mate</span></Link>
-          <nav className="flex items-center gap-3 text-sm font-semibold">
-            <a href="#about" className="rounded-full px-4 py-2 text-[#6d6260] hover:text-[#282321]">About</a>
+          <nav className="flex items-center gap-1 text-sm font-semibold sm:gap-3">
+            <a href="#about" className="hidden rounded-full px-4 py-2 text-[#6d6260] hover:text-[#282321] sm:inline-block">About</a>
+            <Link href="/login" className="rounded-full border border-[#7d1f2a]/25 px-4 py-2 text-[#7d1f2a] transition hover:bg-[#7d1f2a]/5">Log in</Link>
             <Link href="/register" className="rounded-full bg-[#7d1f2a] px-5 py-2 text-white shadow-sm transition hover:bg-[#651922]">Get started</Link>
           </nav>
         </div>

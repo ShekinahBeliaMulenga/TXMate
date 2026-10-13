@@ -19,6 +19,7 @@ const ALLOWED_FIELDS = new Set([
     "sessionDurationMinutes",
     "rateType",
     "rateDetails",
+    "status",
 ]);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -275,6 +276,69 @@ export async function PATCH(
                 { error: "Request contains unsupported fields." },
                 { status: 400 },
             );
+        }
+
+        /* Reactivation: a mate can switch their own INACTIVE offering back to ACTIVE.
+           This is handled on its own and cannot be combined with other edits. */
+        if ("status" in body) {
+            if (Object.keys(body).length !== 1) {
+                return NextResponse.json(
+                    { error: "Status must be updated on its own." },
+                    { status: 400 },
+                );
+            }
+
+            if (body.status !== "ACTIVE") {
+                return NextResponse.json(
+                    { error: "Only reactivating an offering is supported." },
+                    { status: 400 },
+                );
+            }
+
+            // Suspended offerings are controlled by admins, so a mate cannot reactivate them.
+            if (
+                existingOffering.status !== "INACTIVE" &&
+                existingOffering.status !== "ACTIVE"
+            ) {
+                return NextResponse.json(
+                    { error: "This offering cannot be reactivated." },
+                    { status: 403 },
+                );
+            }
+
+            const reactivatedOffering =
+                existingOffering.status === "ACTIVE"
+                    ? existingOffering
+                    : await prisma.mateOffering.update({
+                        where: {
+                            id: existingOffering.id,
+                        },
+                        data: {
+                            status: "ACTIVE",
+                        },
+                        include: {
+                            course: {
+                                select: {
+                                    id: true,
+                                    code: true,
+                                    name: true,
+                                },
+                            },
+                        },
+                    });
+
+            const reactivationCurriculumCourseIds =
+                await getCurrentCurriculumCourseIds(
+                    academicMate.studentProfile?.programmeYearId ?? null,
+                );
+
+            return NextResponse.json({
+                message: "Offering reactivated successfully.",
+                offering: serializeOffering(
+                    reactivatedOffering,
+                    reactivationCurriculumCourseIds,
+                ),
+            });
         }
 
         const {
@@ -619,21 +683,28 @@ export async function DELETE(
             );
         }
 
-        const requestCount =
-            await prisma.mateRequest.count({
+        const requestCount = await prisma.mateRequest.count({
+            where: {
+                offeringId: offering.id,
+            },
+        });
+
+        // Offerings that already have requests or bookings are kept, but hidden from students.
+        if (requestCount > 0) {
+            await prisma.mateOffering.update({
                 where: {
-                    offeringId: offering.id,
+                    id: offering.id,
+                },
+                data: {
+                    status: "INACTIVE",
                 },
             });
 
-        if (requestCount > 0) {
-            return NextResponse.json(
-                {
-                    error:
-                        "This offering cannot be deleted because it already has associated support requests. Deactivate it instead.",
-                },
-                { status: 409 },
-            );
+            return NextResponse.json({
+                message:
+                    "Offering deactivated. Existing requests and bookings have been preserved.",
+                deactivated: true,
+            });
         }
 
         await prisma.mateOffering.delete({
@@ -643,8 +714,8 @@ export async function DELETE(
         });
 
         return NextResponse.json({
-            message:
-                "Academic Mate offering deleted successfully.",
+            message: "Offering deleted successfully.",
+            deactivated: false,
         });
     } catch (error) {
         console.error(

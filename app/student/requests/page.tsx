@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import SessionBookingDialog from "@/components/student/session-booking-dialog";
 
 type RequestStatus = "REQUESTED" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED";
 type StatusFilter = "ALL" | RequestStatus;
@@ -114,6 +115,7 @@ export default function StudentRequestsPage() {
   const [page, setPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<RequestItem | null>(null);
+  const [bookingTarget, setBookingTarget] = useState<RequestItem | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadRequests = useCallback(async (signal?: AbortSignal) => {
@@ -314,6 +316,28 @@ export default function StudentRequestsPage() {
                         <td className="px-3 py-3 sm:px-4">
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={() => setSelectedRequest(item)} className="rounded-md border border-[#d8cec5] px-2.5 py-1.5 text-xs font-medium text-[#625954] hover:bg-[#f7f4f0]">Details</button>
+                            {item.status === "ACCEPTED" && !item.tutoringSession && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRequest(null);
+                                  setBookingTarget(item);
+                                }}
+                                className="rounded-md bg-[#7d1f2a] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#681923]"
+                              >
+                                Book session
+                              </button>
+                            )}
+
+                            {item.tutoringSession && (
+                              <Link
+                                href={`/student/sessions/${encodeURIComponent(item.tutoringSession.id)}/conversation`}
+                                className="whitespace-nowrap rounded-md border border-[#d8cec5] px-2.5 py-1.5 text-xs font-medium text-[#7d1f2a] hover:bg-[#f7f4f0]"
+                              >
+                                Open conversation
+                              </Link>
+                            )}
+
                             {canCancel(item) && <button type="button" onClick={() => setCancelTarget(item)} className="rounded-md px-2.5 py-1.5 text-xs font-medium text-[#8b3335] hover:bg-red-50">Cancel</button>}
                           </div>
                         </td>
@@ -361,7 +385,21 @@ export default function StudentRequestsPage() {
         </div>
       )}
 
-      {cancelTarget && (
+      {bookingTarget && (
+          <SessionBookingDialog
+            requestId={bookingTarget.id}
+            courseLabel={`${bookingTarget.offering.course.code} · ${bookingTarget.offering.course.name}`}
+            onClose={() => setBookingTarget(null)}
+            onBooked={async () => {
+              await loadRequests();
+              setNotice("Session booked successfully.");
+            }}
+          />
+        )}
+
+        
+        
+        {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancellingId) setCancelTarget(null); }}>
           <section role="dialog" aria-modal="true" aria-labelledby="cancel-request-title" className="my-auto w-full max-w-md rounded-lg border border-[#e2d9d0] bg-white p-4 shadow-xl sm:p-5">
             <h2 id="cancel-request-title" className="text-base font-semibold">Cancel this request?</h2>

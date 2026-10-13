@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 type RateType =
   | "PER_SESSION"
@@ -309,6 +310,8 @@ export default function AcademicMateOfferingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "save" } | { type: "delete"; offering: Offering } | null>(null);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -553,8 +556,8 @@ export default function AcademicMateOfferingsPage() {
     }, 50);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleSubmit(event: FormEvent<HTMLFormElement> | null, confirmed = false) {
+    event?.preventDefault();
 
     setError("");
     setSuccess("");
@@ -578,6 +581,11 @@ export default function AcademicMateOfferingsPage() {
 
     if (!Number.isInteger(duration) || duration < 1 || duration > 1440) {
       setError("Typical session length must be between 1 and 1440 minutes.");
+      return;
+    }
+
+    if (editingOfferingId && !confirmed) {
+      setConfirmAction({ type: "save" });
       return;
     }
 
@@ -649,22 +657,14 @@ export default function AcademicMateOfferingsPage() {
       );
     } finally {
       setSaving(false);
+      setConfirmAction(null);
     }
   }
 
   async function handleDelete(offering: Offering) {
-    const confirmed = window.confirm(
-      `Delete your ${offering.course.code} offering? This cannot be undone.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setDeletingId(offering.id);
     setError("");
     setSuccess("");
-
     try {
       const response = await fetch(
         `/api/student/academic-mate/offerings/${offering.id}`,
@@ -675,9 +675,7 @@ export default function AcademicMateOfferingsPage() {
           },
         },
       );
-
       const body = await readJson(response);
-
       if (!response.ok) {
         throw new Error(
           typeof body.error === "string"
@@ -685,24 +683,82 @@ export default function AcademicMateOfferingsPage() {
             : "Unable to delete the offering.",
         );
       }
+      const deactivated = body.deactivated === true;
 
-      setOfferings((current) =>
-        current.filter((item) => item.id !== offering.id),
-      );
-
-      if (editingOfferingId === offering.id) {
-        resetForm();
+      if (deactivated) {
+        setOfferings((current) =>
+          current.map((item) =>
+            item.id === offering.id
+              ? { ...item, status: "INACTIVE" }
+              : item,
+          ),
+        );
+      
+        setSuccess(
+          `${offering.course.code} is now inactive. Existing requests and bookings are preserved.`,
+        );
+      } else {
+        setOfferings((current) =>
+          current.filter((item) => item.id !== offering.id),
+        );
+      
+        setSuccess(`${offering.course.code} has been removed from your offerings.`);
       }
-
-      setSuccess(
-        `${offering.course.code} has been removed from your offerings.`,
-      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to delete the offering.",
       );
     } finally {
       setDeletingId(null);
+      setConfirmAction(null);
+    }
+  }
+
+  async function handleReactivate(offering: Offering) {
+    if (reactivatingId) return;
+  
+    setReactivatingId(offering.id);
+    setError("");
+    setSuccess("");
+  
+    try {
+      const response = await fetch(
+        `/api/student/academic-mate/offerings/${offering.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: "ACTIVE" }),
+        },
+      );
+  
+      const body = await readJson(response);
+  
+      if (!response.ok) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Unable to reactivate the offering.",
+        );
+      }
+  
+      const updated =
+        body.offering && typeof body.offering === "object"
+          ? (body.offering as Offering)
+          : { ...offering, status: "ACTIVE" as const };
+  
+      setOfferings((current) =>
+        current.map((item) => (item.id === offering.id ? updated : item)),
+      );
+      setSuccess(`${offering.course.code} is active again and visible to students.`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to reactivate the offering.",
+      );
+    } finally {
+      setReactivatingId(null);
     }
   }
 
@@ -1340,20 +1396,33 @@ export default function AcademicMateOfferingsPage() {
                               <PencilIcon className="h-4 w-4" />
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(offering)}
-                              disabled={deleting}
-                              aria-label={
-                                deleting
-                                  ? `Deleting ${offering.course.code} offering`
-                                  : `Delete ${offering.course.code} offering`
-                              }
-                              title={deleting ? "Deleting..." : "Delete"}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6b625c] transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
+                            {offering.status !== "INACTIVE" && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmAction({ type: "delete", offering })}
+                                disabled={deleting}
+                                aria-label={
+                                  deleting
+                                    ? `Deleting ${offering.course.code} offering`
+                                    : `Delete ${offering.course.code} offering`
+                                }
+                                title={deleting ? "Deleting..." : "Delete"}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6b625c] transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            
+                            {offering.status === "INACTIVE" && (
+                              <button
+                                type="button"
+                                onClick={() => void handleReactivate(offering)}
+                                disabled={reactivatingId === offering.id}
+                                className="ml-1 inline-flex h-8 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {reactivatingId === offering.id ? "Activating..." : "Reactivate"}
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1418,6 +1487,24 @@ export default function AcademicMateOfferingsPage() {
           </section>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmAction !== null}
+        tone={confirmAction?.type === "delete" ? "danger" : "warning"}
+        title={confirmAction?.type === "delete" ? "Delete this course?" : "Save changes to this offering?"}
+        message={
+          confirmAction?.type === "delete"
+            ? `Are you sure you want to delete your ${confirmAction.offering.course.code} offering? If students have already booked or requested it, it will be marked inactive instead so their records are kept. Otherwise it will be permanently removed.`
+            : "Editing this course affects what students see, including students who have already booked. Are you sure you want to save these changes?"
+        }
+        confirmLabel={confirmAction?.type === "delete" ? "Delete" : "Save changes"}
+        busyLabel={confirmAction?.type === "delete" ? "Deleting..." : "Saving..."}
+        busy={saving || deletingId !== null}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (confirmAction?.type === "delete") void handleDelete(confirmAction.offering);
+          else if (confirmAction?.type === "save") void handleSubmit(null, true);
+        }}
+      />
     </main>
   );
 }
