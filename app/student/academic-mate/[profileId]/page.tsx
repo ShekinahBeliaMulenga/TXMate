@@ -321,7 +321,7 @@ export default function PublicAcademicMateProfilePage() {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">{user.name}</h1>
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${verificationStyle[profile.verificationStatus]}`}><Icon name={profile.verificationStatus === "VERIFIED" ? "check" : "shield"} className="h-3.5 w-3.5" />{verificationLabel[profile.verificationStatus]}</span>
             </div>
-            <p className="mt-1.5 max-w-2xl text-[15px] text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
+            <p className="mt-1.5 max-w-2xl text-s text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
             {student ? <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#6d6260]">
               <li className="inline-flex items-center gap-1.5"><Icon name="book" className="h-4 w-4 text-[#7d1f2a]" />{student.programme.name}, Year {student.programmeYear.yearNumber}</li>
               <li className="inline-flex items-center gap-1.5"><Icon name="university" className="h-4 w-4 text-[#7d1f2a]" />{student.university.name}</li>

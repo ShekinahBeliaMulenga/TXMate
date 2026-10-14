@@ -275,7 +275,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
           </div>
 
           {profile.headline && (
-            <p className="mt-1.5 max-w-2xl text-[15px] text-[#3d3631]">{profile.headline}</p>
+            <p className="mt-1.5 max-w-2xl text-s text-[#3d3631]">{profile.headline}</p>
           )}
 
           <ul className={`mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm ${MUTED}`}>

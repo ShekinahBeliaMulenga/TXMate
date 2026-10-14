@@ -653,6 +653,7 @@ model MateRequest {
   requestedEnd     DateTime?
   status           MateRequestStatus @default(REQUESTED)
   respondedAt      DateTime?
+  studentSeenAt    DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   studentProfile   StudentProfile    @relation(fields: [studentProfileId, universityId], references: [id, universityId], onDelete: Restrict)

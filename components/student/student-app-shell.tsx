@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { usePendingRequestCount } from "./use-pending-requests";
 import { useUnreadMessageCount } from "./use-unread-messages";
+import { useAcceptedRequestCount } from "./use-accepted-requests";
 
 type IconName =
   | "dashboard"
@@ -43,6 +44,8 @@ type NavigationItem = {
   showPendingBadge?: boolean;
   /** Shows the unread-messages count next to this item. */
   showUnreadBadge?: boolean;
+  /** Shows a green count of newly accepted requests (not yet opened) next to this item. */
+  showAcceptedBadge?: boolean;
 };
 
 const NAVIGATION_GROUPS: {
@@ -66,6 +69,7 @@ const NAVIGATION_GROUPS: {
         label: "My Requests",
         href: "/student/requests",
         icon: "inbox",
+        showAcceptedBadge: true,
       },
 
       {
@@ -313,19 +317,25 @@ function CountBadge({
   active,
   singular,
   plural,
+  tone = "brand",
 }: {
   count: number;
   active: boolean;
   singular: string;
   plural: string;
+  tone?: "brand" | "green";
 }) {
   const label = count > 99 ? "99+" : String(count);
+  const colors =
+    tone === "green"
+      ? "bg-emerald-600 text-white"
+      : active
+        ? "bg-[#7d1f2a] text-white"
+        : "bg-[#f4eceb] text-[#7d1f2a]";
 
   return (
     <span
-      className={`ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none tabular-nums ${
-        active ? "bg-[#7d1f2a] text-white" : "bg-[#f4eceb] text-[#7d1f2a]"
-      }`}
+      className={`ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none tabular-nums ${colors}`}
     >
       <span aria-hidden="true">{label}</span>
       <span className="sr-only">
@@ -340,11 +350,13 @@ function NavigationGroups({
   onNavigate,
   pendingCount = 0,
   unreadCount = 0,
+  acceptedCount = 0,
 }: {
   pathname: string;
   onNavigate?: () => void;
   pendingCount?: number;
   unreadCount?: number;
+  acceptedCount?: number;
 }) {
   return (
     <nav aria-label="TXMate navigation" className="space-y-6">
@@ -357,11 +369,28 @@ function NavigationGroups({
           <ul className="mt-2 space-y-1">
             {group.items.map((item) => {
               const active = isActivePath(pathname, item.href);
-              const badgeCount = item.showPendingBadge
-                ? pendingCount
+              const badge = item.showPendingBadge
+                ? {
+                    count: pendingCount,
+                    singular: "pending request",
+                    plural: "pending requests",
+                    tone: "brand" as const,
+                  }
                 : item.showUnreadBadge
-                  ? unreadCount
-                  : 0;
+                  ? {
+                      count: unreadCount,
+                      singular: "unread message",
+                      plural: "unread messages",
+                      tone: "brand" as const,
+                    }
+                  : item.showAcceptedBadge
+                    ? {
+                        count: acceptedCount,
+                        singular: "newly accepted request",
+                        plural: "newly accepted requests",
+                        tone: "green" as const,
+                      }
+                    : null;
 
               return (
                 <li key={item.href}>
@@ -391,16 +420,13 @@ function NavigationGroups({
                       {item.label}
                     </span>
 
-                    {badgeCount > 0 && (
+                    {badge && badge.count > 0 && (
                       <CountBadge
-                        count={badgeCount}
+                        count={badge.count}
                         active={active}
-                        singular={
-                          item.showUnreadBadge ? "unread message" : "pending request"
-                        }
-                        plural={
-                          item.showUnreadBadge ? "unread messages" : "pending requests"
-                        }
+                        singular={badge.singular}
+                        plural={badge.plural}
+                        tone={badge.tone}
                       />
                     )}
                   </Link>
@@ -437,6 +463,7 @@ function SidebarContents({
   onClose,
   pendingCount = 0,
   unreadCount = 0,
+  acceptedCount = 0,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -447,6 +474,7 @@ function SidebarContents({
   onClose?: () => void;
   pendingCount?: number;
   unreadCount?: number;
+  acceptedCount?: number;
 }) {
   return (
     <>
@@ -472,6 +500,7 @@ function SidebarContents({
           onNavigate={onNavigate}
           pendingCount={pendingCount}
           unreadCount={unreadCount}
+          acceptedCount={acceptedCount}
         />
       </div>
 
@@ -514,6 +543,20 @@ export default function StudentAppShell({
 
   const pendingCount = usePendingRequestCount();
   const unreadCount = useUnreadMessageCount();
+  const acceptedCount = useAcceptedRequestCount();
+
+  // Everything that needs the student's attention, for the mobile menu button's label and dot.
+  const attention = [
+    pendingCount > 0
+      ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
+      : "",
+    unreadCount > 0
+      ? `${unreadCount} unread ${unreadCount === 1 ? "message" : "messages"}`
+      : "",
+    acceptedCount > 0
+      ? `${acceptedCount} newly accepted ${acceptedCount === 1 ? "request" : "requests"}`
+      : "",
+  ].filter(Boolean);
 
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileDrawerRef = useRef<HTMLElement>(null);
@@ -614,7 +657,7 @@ export default function StudentAppShell({
       </a>
 
       {/* Persistent desktop sidebar (with entrance fade-in & slide-in) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
         <SidebarContents
           pathname={pathname}
           onSignOut={handleSignOut}
@@ -622,6 +665,7 @@ export default function StudentAppShell({
           signOutError={signOutError}
           pendingCount={pendingCount}
           unreadCount={unreadCount}
+          acceptedCount={acceptedCount}
         />
       </aside>
 
@@ -632,17 +676,8 @@ export default function StudentAppShell({
             ref={menuButtonRef}
             type="button"
             aria-label={
-              pendingCount > 0 || unreadCount > 0
-                ? `Open navigation, ${[
-                    pendingCount > 0
-                      ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
-                      : "",
-                    unreadCount > 0
-                      ? `${unreadCount} unread ${unreadCount === 1 ? "message" : "messages"}`
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}`
+              attention.length > 0
+                ? `Open navigation, ${attention.join(", ")}`
                 : "Open navigation"
             }
             aria-controls="student-mobile-navigation"
@@ -653,7 +688,7 @@ export default function StudentAppShell({
             <Icon name="menu" className="h-5 w-5" />
 
             {/* Dot so phone users can see there is something pending without opening the drawer */}
-            {(pendingCount > 0 || unreadCount > 0) && (
+            {attention.length > 0 && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"
@@ -699,12 +734,13 @@ export default function StudentAppShell({
             onClose={closeMobileDrawer}
             pendingCount={pendingCount}
             unreadCount={unreadCount}
+            acceptedCount={acceptedCount}
           />
         </aside>
       </div>
 
       {/* Every student page is rendered inside this shared content area. */}
-      <div id="main-content" className="min-w-0 lg:pl-60">
+      <div id="main-content" className="min-w-0 lg:pl-64">
         {children}
       </div>
     </div>

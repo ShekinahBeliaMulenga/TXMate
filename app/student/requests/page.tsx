@@ -104,6 +104,16 @@ function initials(name: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+// Tells the sidebar to clear its green "newly accepted" badge (same event name as use-accepted-requests.ts).
+async function markAcceptedRequestsSeen() {
+  try {
+    const response = await fetch("/api/student/my-requests/seen", { method: "POST", cache: "no-store" });
+    if (response.ok) window.dispatchEvent(new Event("txmate:accepted-requests-seen"));
+  } catch {
+    // The badge will clear the next time the page is opened.
+  }
+}
+
 export default function StudentRequestsPage() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +141,7 @@ export default function StudentRequestsPage() {
       const body = (await response.json()) as RequestsResponse;
       if (!response.ok) throw new Error(body.error || "Unable to load your requests.");
       setRequests(body.requests);
+      void markAcceptedRequestsSeen();
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       setPageError(error instanceof Error ? error.message : "Unable to load your requests.");

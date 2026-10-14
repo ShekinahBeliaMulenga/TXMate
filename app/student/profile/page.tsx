@@ -253,25 +253,24 @@ export default function StudentProfilePage() {
       return a.course.code.localeCompare(b.course.code);
     });
   }, [data]);
-
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f8f6f3] px-4 py-5 sm:px-6 sm:py-7 lg:px-8" aria-busy="true">
+      <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 pb-16 sm:px-6 lg:px-8" aria-busy="true">
         <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
           <section role="status" aria-live="polite" aria-label="Loading student profile" className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
             <span className="sr-only">Loading your student profile...</span>
-            <div className="relative h-28 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-36">
-              <div aria-hidden="true" className="absolute -right-7 -top-12 h-40 w-40 rounded-full border-[18px] border-white/[0.07] sm:-right-3 sm:-top-16 sm:h-52 sm:w-52 sm:border-[24px]" />
-              <div aria-hidden="true" className="absolute -bottom-16 left-1/3 h-36 w-36 rounded-full border-[16px] border-white/[0.06] sm:h-44 sm:w-44" />
-              <div className="absolute right-4 top-4 h-6 w-24 rounded-full bg-white/20 sm:right-5 sm:top-5 sm:w-28" />
+            <div className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
+              <div aria-hidden="true" className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
+              <div aria-hidden="true" className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
+              <div className="absolute right-4 top-4 h-6 w-28 rounded-full bg-white/20 sm:right-5 sm:top-5" />
             </div>
-            <div className="px-4 pb-5 sm:px-7 sm:pb-6">
-              <div className="relative z-10 -mt-10 flex flex-wrap items-end justify-between gap-3 sm:-mt-12">
-                <div className="h-20 w-20 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-24 sm:w-24" />
+            <div className="px-5 pb-6 sm:px-8">
+              <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+                <div className="h-24 w-24 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-28 sm:w-28" />
                 <div className="mb-1 h-6 w-20 rounded-full bg-[#eee8e2]" />
               </div>
               <div className="mt-4">
-                <div className="h-7 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-8 sm:w-60" />
+                <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
                 <div className="mt-2 h-4 w-60 max-w-full rounded bg-[#eee8e2]" />
                 <div className="mt-2 h-3.5 w-52 max-w-full rounded bg-[#f0ebe5]" />
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -279,7 +278,7 @@ export default function StudentProfilePage() {
                   <div className="h-7 w-36 rounded-full bg-[#f0ebe5]" />
                 </div>
                 <div className="mt-5 max-w-2xl">
-                  <div className="h-2.5 w-12 rounded bg-[#e8e0d8]" />
+                  <div className="mb-1.5 h-2.5 w-12 rounded bg-[#e8e0d8]" />
                   <div className="mt-2 h-3 w-full max-w-xl rounded bg-[#eee8e2]" />
                   <div className="mt-2 h-3 w-4/5 max-w-lg rounded bg-[#f0ebe5]" />
                 </div>
@@ -290,23 +289,23 @@ export default function StudentProfilePage() {
               </div>
             </div>
           </section>
-          <div className="mt-5 flex justify-center">
-            <div className="flex w-full max-w-sm items-center justify-between gap-1 rounded-xl border border-[#e2d9d0] bg-white p-1.5 sm:w-auto sm:justify-center sm:gap-2">
+          <div className="mt-6 mb-5 flex justify-center">
+            <div className="flex w-full max-w-sm items-center justify-between gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5 sm:w-auto sm:justify-center sm:gap-2">
               <div className="h-8 flex-1 rounded-lg bg-[#f1e7e5] sm:w-24 sm:flex-none" />
               <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
               <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
             </div>
           </div>
-          <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-2 sm:mt-5">
+          <div className="grid min-w-0 gap-5 md:grid-cols-2">
             <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
               <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] bg-[#faf8f6]/70 px-4 py-3.5 sm:px-5">
                 <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
                 <div className="h-3.5 w-36 rounded bg-[#e8e0d8]" />
               </div>
               <div className="px-4 py-2 sm:px-5">
-                {[0, 1, 2, 3, 4].map((item) => (
-                  <div key={item} className="flex items-center gap-3 border-b border-[#f0ebe5] py-3 last:border-0">
-                    <div className="h-8 w-8 shrink-0 rounded-lg bg-[#f1eae5]" />
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="flex items-center gap-3 border-b border-[#f0ebe5] py-3 last:border-0">
+                    <div className="h-4 w-4 shrink-0 rounded bg-[#e8e0d8]" />
                     <div className="min-w-0 flex-1">
                       <div className="h-2.5 w-20 rounded bg-[#eee8e2]" />
                       <div className="mt-2 h-3 w-3/4 max-w-56 rounded bg-[#f0ebe5]" />
@@ -320,11 +319,9 @@ export default function StudentProfilePage() {
                 <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
                 <div className="h-3.5 w-32 rounded bg-[#e8e0d8]" />
               </div>
-              <div className="flex min-h-[230px] flex-col items-center justify-center px-5 py-8">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#eadfda] bg-[#faf5f2]">
-                  <div className="h-5 w-5 rounded-full bg-[#ead7d9]" />
-                </div>
-                <div className="mt-4 h-3.5 w-28 rounded bg-[#e8e0d8]" />
+              <div className="flex min-h-[200px] flex-col items-center justify-center border-dashed px-5 py-8">
+                <div className="h-7 w-7 rounded bg-[#e8e0d8]" />
+                <div className="mt-3.5 h-3.5 w-28 rounded bg-[#e8e0d8]" />
                 <div className="mt-2 h-6 w-32 rounded-full bg-[#f3e8e9]" />
                 <div className="mt-4 h-2.5 w-36 rounded bg-[#eee8e2]" />
               </div>

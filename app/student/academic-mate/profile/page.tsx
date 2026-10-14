@@ -484,7 +484,7 @@ export default function AcademicMateProfilePage() {
                 </span>
               </div>
 
-              <p className="mt-1.5 max-w-2xl text-[15px] text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
+              <p className="mt-1.5 max-w-2xl text-s text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
 
               {student ? (
                 <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#6d6260]">

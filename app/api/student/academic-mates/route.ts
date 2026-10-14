@@ -99,6 +99,7 @@ export async function GET(request: Request) {
         status: "ACTIVE",
         course: { isActive: true },
         academicMateProfile: {
+          userId: { not: session.user.id },
           status: "ACTIVE",
           verificationStatus: "VERIFIED",
           profileVisibility: { in: ["PUBLIC", "MEMBERS_ONLY"] },

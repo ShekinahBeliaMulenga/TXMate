@@ -76,7 +76,7 @@ body {
 }
 
 html {
-  font-size: 14px; /* default is 16px */
+  font-size: 14px; 
 }
 
 @media (min-width: 640px) {
