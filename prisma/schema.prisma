@@ -188,6 +188,7 @@ model User {
   adminProfile   AdminProfile?        @relation("UserAdminProfile")
   notifications  Notification[]       @relation("UserNotifications")
   sentMessages   Message[]            @relation("UserSentMessages")
+  conversationReads ConversationRead[]
   reviewsWritten Review[]             @relation("UserReviewsWritten")
   paymentsMade   Payment[]            @relation("UserPaymentsMade")
   subscriptions  UserSubscription[]
@@ -726,7 +727,21 @@ model Conversation {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   request   MateRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  reads ConversationRead[]
   messages  Message[]
+}
+
+model ConversationRead {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model Message {
@@ -741,6 +756,7 @@ model Message {
 
   @@index([conversationId, createdAt])
   @@index([senderUserId])
+  @@index([body(ops: raw("gin_trgm_ops"))], type: Gin, map: "Message_body_trgm_idx")
 }
 
 model Notification {

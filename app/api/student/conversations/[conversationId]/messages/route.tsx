@@ -23,6 +23,13 @@ function isPlainObject(
   );
 }
 
+/** Message shown when someone tries to send while the conversation is paused. */
+function pausedMessage(isStudent: boolean) {
+  return isStudent
+    ? "Messaging is paused by the Academic Mate. You can still read the conversation."
+    : "Messaging is paused. Reopen messaging to send messages.";
+}
+
 async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -128,28 +135,28 @@ export async function GET(
     });
 
     return NextResponse.json({
-        currentUserId: user.id,
-        conversation: {
-          id: conversation.id,
-          studentMessagingEnabled: conversation.studentMessagingEnabled,
-          session: conversation.request.tutoringSession
-            ? {
-                id: conversation.request.tutoringSession.id,
-                scheduledStart:
-                  conversation.request.tutoringSession.scheduledStart.toISOString(),
-                scheduledEnd:
-                  conversation.request.tutoringSession.scheduledEnd.toISOString(),
-              }
-            : null,
-        },
-        participantRole:
-          user.id === studentUserId ? "STUDENT" : "ACADEMIC_MATE",
-        messages: messages.map((message) => ({
-          ...message,
-          createdAt: message.createdAt.toISOString(),
-          readAt: message.readAt?.toISOString() ?? null,
-        })),
-      });
+      currentUserId: user.id,
+      conversation: {
+        id: conversation.id,
+        studentMessagingEnabled: conversation.studentMessagingEnabled,
+        session: conversation.request.tutoringSession
+          ? {
+              id: conversation.request.tutoringSession.id,
+              scheduledStart:
+                conversation.request.tutoringSession.scheduledStart.toISOString(),
+              scheduledEnd:
+                conversation.request.tutoringSession.scheduledEnd.toISOString(),
+            }
+          : null,
+      },
+      participantRole:
+        user.id === studentUserId ? "STUDENT" : "ACADEMIC_MATE",
+      messages: messages.map((message) => ({
+        ...message,
+        createdAt: message.createdAt.toISOString(),
+        readAt: message.readAt?.toISOString() ?? null,
+      })),
+    });
   } catch (error) {
     console.error(
       "GET /api/student/conversations/[conversationId]/messages failed:",
@@ -249,12 +256,10 @@ export async function POST(
       );
     }
 
-    if (isStudent && !conversation.studentMessagingEnabled) {
+    // A paused conversation blocks both participants. Either side can still read the history.
+    if (!conversation.studentMessagingEnabled) {
       return NextResponse.json(
-        {
-          error:
-            "Student messaging is paused by the Academic Mate. You can still read the conversation.",
-        },
+        { error: pausedMessage(isStudent) },
         { status: 403 },
       );
     }
@@ -280,7 +285,7 @@ export async function POST(
         return { kind: "not-found" as const };
       }
 
-      if (isStudent && !currentConversation.studentMessagingEnabled) {
+      if (!currentConversation.studentMessagingEnabled) {
         return { kind: "messaging-paused" as const };
       }
 
@@ -330,10 +335,7 @@ export async function POST(
 
     if (result.kind === "messaging-paused") {
       return NextResponse.json(
-        {
-          error:
-            "Student messaging is paused by the Academic Mate. You can still read the conversation.",
-        },
+        { error: pausedMessage(isStudent) },
         { status: 403 },
       );
     }

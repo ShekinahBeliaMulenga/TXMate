@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { usePendingRequestCount } from "./use-pending-requests";
+import { useUnreadMessageCount } from "./use-unread-messages";
 
 type IconName =
   | "dashboard"
@@ -40,6 +41,8 @@ type NavigationItem = {
   icon: IconName;
   /** Shows the pending-requests count next to this item. */
   showPendingBadge?: boolean;
+  /** Shows the unread-messages count next to this item. */
+  showUnreadBadge?: boolean;
 };
 
 const NAVIGATION_GROUPS: {
@@ -69,8 +72,9 @@ const NAVIGATION_GROUPS: {
         label: "Messages",
         href: "/student/messages",
         icon: "messages",
+        showUnreadBadge: true,
       },
-      
+
       {
         label: "Your courses",
         href: "/student/repeating-courses",
@@ -289,13 +293,12 @@ function Icon({
           <polyline points="12 6 12 12 16 14" />
         </svg>
       );
-
     case "messages":
       return (
-    <svg {...props}>
-      <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
-    </svg>
-  );
+        <svg {...props}>
+          <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
+        </svg>
+      );
   }
 }
 
@@ -305,7 +308,17 @@ function isActivePath(pathname: string, href: string) {
   return pathname.startsWith(`${href}/`);
 }
 
-function CountBadge({ count, active }: { count: number; active: boolean }) {
+function CountBadge({
+  count,
+  active,
+  singular,
+  plural,
+}: {
+  count: number;
+  active: boolean;
+  singular: string;
+  plural: string;
+}) {
   const label = count > 99 ? "99+" : String(count);
 
   return (
@@ -316,7 +329,7 @@ function CountBadge({ count, active }: { count: number; active: boolean }) {
     >
       <span aria-hidden="true">{label}</span>
       <span className="sr-only">
-        {count} pending {count === 1 ? "request" : "requests"}
+        {count} {count === 1 ? singular : plural}
       </span>
     </span>
   );
@@ -326,10 +339,12 @@ function NavigationGroups({
   pathname,
   onNavigate,
   pendingCount = 0,
+  unreadCount = 0,
 }: {
   pathname: string;
   onNavigate?: () => void;
   pendingCount?: number;
+  unreadCount?: number;
 }) {
   return (
     <nav aria-label="TXMate navigation" className="space-y-6">
@@ -342,7 +357,11 @@ function NavigationGroups({
           <ul className="mt-2 space-y-1">
             {group.items.map((item) => {
               const active = isActivePath(pathname, item.href);
-              const badgeCount = item.showPendingBadge ? pendingCount : 0;
+              const badgeCount = item.showPendingBadge
+                ? pendingCount
+                : item.showUnreadBadge
+                  ? unreadCount
+                  : 0;
 
               return (
                 <li key={item.href}>
@@ -373,7 +392,16 @@ function NavigationGroups({
                     </span>
 
                     {badgeCount > 0 && (
-                      <CountBadge count={badgeCount} active={active} />
+                      <CountBadge
+                        count={badgeCount}
+                        active={active}
+                        singular={
+                          item.showUnreadBadge ? "unread message" : "pending request"
+                        }
+                        plural={
+                          item.showUnreadBadge ? "unread messages" : "pending requests"
+                        }
+                      />
                     )}
                   </Link>
                 </li>
@@ -408,6 +436,7 @@ function SidebarContents({
   mobile = false,
   onClose,
   pendingCount = 0,
+  unreadCount = 0,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -417,6 +446,7 @@ function SidebarContents({
   mobile?: boolean;
   onClose?: () => void;
   pendingCount?: number;
+  unreadCount?: number;
 }) {
   return (
     <>
@@ -441,6 +471,7 @@ function SidebarContents({
           pathname={pathname}
           onNavigate={onNavigate}
           pendingCount={pendingCount}
+          unreadCount={unreadCount}
         />
       </div>
 
@@ -482,6 +513,7 @@ export default function StudentAppShell({
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const pendingCount = usePendingRequestCount();
+  const unreadCount = useUnreadMessageCount();
 
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileDrawerRef = useRef<HTMLElement>(null);
@@ -582,13 +614,14 @@ export default function StudentAppShell({
       </a>
 
       {/* Persistent desktop sidebar (with entrance fade-in & slide-in) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
         <SidebarContents
           pathname={pathname}
           onSignOut={handleSignOut}
           signingOut={signingOut}
           signOutError={signOutError}
           pendingCount={pendingCount}
+          unreadCount={unreadCount}
         />
       </aside>
 
@@ -599,10 +632,17 @@ export default function StudentAppShell({
             ref={menuButtonRef}
             type="button"
             aria-label={
-              pendingCount > 0
-                ? `Open navigation, ${pendingCount} pending ${
-                    pendingCount === 1 ? "request" : "requests"
-                  }`
+              pendingCount > 0 || unreadCount > 0
+                ? `Open navigation, ${[
+                    pendingCount > 0
+                      ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
+                      : "",
+                    unreadCount > 0
+                      ? `${unreadCount} unread ${unreadCount === 1 ? "message" : "messages"}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}`
                 : "Open navigation"
             }
             aria-controls="student-mobile-navigation"
@@ -613,7 +653,7 @@ export default function StudentAppShell({
             <Icon name="menu" className="h-5 w-5" />
 
             {/* Dot so phone users can see there is something pending without opening the drawer */}
-            {pendingCount > 0 && (
+            {(pendingCount > 0 || unreadCount > 0) && (
               <span
                 aria-hidden="true"
                 className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"
@@ -645,7 +685,7 @@ export default function StudentAppShell({
           id="student-mobile-navigation"
           ref={mobileDrawerRef}
           aria-label="Mobile navigation"
-          className={`absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-[#e2d9d0] bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+          className={`absolute inset-y-0 left-0 flex w-[min(86vw,280px)] flex-col border-r border-[#e2d9d0] bg-white shadow-xl transition-transform duration-300 ease-in-out ${
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -658,12 +698,13 @@ export default function StudentAppShell({
             mobile
             onClose={closeMobileDrawer}
             pendingCount={pendingCount}
+            unreadCount={unreadCount}
           />
         </aside>
       </div>
 
       {/* Every student page is rendered inside this shared content area. */}
-      <div id="main-content" className="min-w-0 lg:pl-64">
+      <div id="main-content" className="min-w-0 lg:pl-60">
         {children}
       </div>
     </div>

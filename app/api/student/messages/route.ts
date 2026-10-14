@@ -68,6 +68,35 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
     });
 
+    // Unread = messages sent by the other person after this user last opened the conversation.
+    // If the user has never opened it (no read row), every message from the other person counts.
+    const conversationIds = conversations.map((conversation) => conversation.id);
+
+    const readRows = conversationIds.length
+      ? await prisma.conversationRead.findMany({
+          where: { userId, conversationId: { in: conversationIds } },
+          select: { conversationId: true, lastReadAt: true },
+        })
+      : [];
+    const lastReadByConversation = new Map(
+      readRows.map((row) => [row.conversationId, row.lastReadAt]),
+    );
+
+    const unreadEntries = await Promise.all(
+      conversations.map(async (conversation) => {
+        const lastReadAt = lastReadByConversation.get(conversation.id);
+        const count = await prisma.message.count({
+          where: {
+            conversationId: conversation.id,
+            senderUserId: { not: userId },
+            ...(lastReadAt ? { createdAt: { gt: lastReadAt } } : {}),
+          },
+        });
+        return [conversation.id, count] as const;
+      }),
+    );
+    const unreadByConversation = new Map(unreadEntries);
+
     const items = conversations.map((conversation) => {
       const request = conversation.request;
       const isStudent = request.studentProfile.userId === userId;
@@ -85,6 +114,7 @@ export async function GET() {
         otherUserImage: otherUser.image,
         courseName: request.offering.course.name,
         studentMessagingEnabled: conversation.studentMessagingEnabled,
+        unreadCount: unreadByConversation.get(conversation.id) ?? 0,
         lastMessage: conversation.messages[0] ?? null,
         session: tutoringSession
           ? {

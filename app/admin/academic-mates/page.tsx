@@ -19,6 +19,7 @@ type VerificationProfile = {
   yearsExperience: number | null;
   createdAt: string;
   updatedAt: string;
+  verificationSubmittedAt: string
 
   user: {
     id: string;
@@ -353,7 +354,7 @@ function ProfileCard({ profile }: { profile: VerificationProfile }) {
             </span>
 
             <span className="ml-auto">
-              {formatRelativeDate(profile.updatedAt)}
+              {formatRelativeDate(profile.verificationSubmittedAt)}
             </span>
           </div>
         </div>

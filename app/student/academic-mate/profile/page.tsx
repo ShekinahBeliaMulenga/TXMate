@@ -456,7 +456,8 @@ export default function AcademicMateProfilePage() {
           </div>
 
           <div className="px-5 pb-6 sm:px-8">
-            <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+          <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+            <div className="relative inline-block">
               {user.image ? (
                 <img src={user.image} alt={user.name} className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
               ) : (
@@ -465,11 +466,14 @@ export default function AcademicMateProfilePage() {
                 </div>
               )}
 
-              <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-[#e2d9d0] bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
-                <span className={`h-2 w-2 rounded-full ${statusDot[profile.status]}`} />
-                {academicMateStatusLabel[profile.status]}
-              </span>
+              {/* Facebook-style status dot positioned at the bottom-right */}
+              <span 
+                className={`absolute bottom-1.5 right-1.5 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[profile.status]}`} 
+                title={academicMateStatusLabel[profile.status]}
+                aria-label={academicMateStatusLabel[profile.status]}
+              />
             </div>
+          </div>
 
             <div className="mt-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

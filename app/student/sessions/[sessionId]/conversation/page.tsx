@@ -186,7 +186,7 @@ function BackIcon() {
 
 function PaperJetIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 -mr-0.5">
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 -mr-0.5">
       <path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.843 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904l-18-8.5Z" />
       <path d="M6 12h15" />
     </svg>
@@ -238,6 +238,8 @@ export default function SessionConversationPage() {
   // Adaptive polling state: when anything last happened in this chat, and the newest message we've seen.
   const lastActivityRef = useRef(Date.now());
   const lastSeenIdRef = useRef("");
+  // The newest message id we have told the server is read, so we only call the read endpoint when something new arrives.
+  const lastMarkedIdRef = useRef("");
 
   const viewport = useChatViewport(rootRef);
 
@@ -256,6 +258,26 @@ export default function SessionConversationPage() {
       lastSeenIdRef.current = newestId;
       lastActivityRef.current = Date.now();
     }
+
+    // Mark the conversation as read once the person can actually see the newest message
+    // (tab is visible). This clears the unread badge in the inbox and sidebar.
+    if (newestId && newestId !== lastMarkedIdRef.current && document.visibilityState === "visible") {
+      lastMarkedIdRef.current = newestId;
+      void fetch(`/api/student/messages/${encodeURIComponent(conversationId)}/read`, { method: "POST" })
+        .then((readResponse) => {
+          // Allow a retry on the next poll if the server rejected it.
+          if (!readResponse.ok) {
+            lastMarkedIdRef.current = "";
+            return;
+          }
+          // Tell the sidebar to refresh its unread count immediately.
+          window.dispatchEvent(new Event("txmate:messages-read"));
+        })
+        .catch(() => {
+          lastMarkedIdRef.current = "";
+        });
+    }
+
     setMessages((current) => (current.length === next.length && current[current.length - 1]?.id === next[next.length - 1]?.id ? current : next));
   }, []);
 
@@ -379,7 +401,7 @@ export default function SessionConversationPage() {
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push("/student/dashboard");
+      router.push("/student/messages");
     }
   }
 
@@ -392,7 +414,7 @@ export default function SessionConversationPage() {
   }
 
   async function sendMessage() {
-    if (!conversation || !draft.trim() || sending) return;
+    if (!conversation || !conversation.studentMessagingEnabled || !draft.trim() || sending) return;
     setSending(true);
     lastActivityRef.current = Date.now();
     setError("");
@@ -457,7 +479,7 @@ export default function SessionConversationPage() {
     }
   }
 
-  const studentCannotSend = role === "STUDENT" && conversation !== null && !conversation.studentMessagingEnabled;
+  const messagingPaused = conversation !== null && !conversation.studentMessagingEnabled;
   const fallbackCounterpart = role === "STUDENT" ? "Academic Mate" : role === "ACADEMIC_MATE" ? "Student" : "Session conversation";
   const displayName = conversation?.otherUserName || fallbackCounterpart;
   const avatarText = role === "STUDENT" ? "AM" : role === "ACADEMIC_MATE" ? "ST" : "TX";
@@ -630,10 +652,14 @@ export default function SessionConversationPage() {
 
         {/* ---------- composer ---------- */}
         <form onSubmit={handleSubmit} className="shrink-0 border-t border-[#eee5e0] bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-3 sm:pt-3">
-          {studentCannotSend ? (
+          {messagingPaused ? (
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900 sm:text-sm">
               <span className="mt-0.5 text-amber-600"><LockIcon /></span>
-              <p>Messaging has been paused by the Academic Mate. You can still read the history.</p>
+              <p>
+                {role === "ACADEMIC_MATE"
+                  ? "You've paused messaging. Tap Reopen at the top to send messages again. You can still read the history."
+                  : "Messaging has been paused by the Academic Mate. You can still read the history."}
+              </p>
             </div>
           ) : (
             <>
@@ -656,7 +682,7 @@ export default function SessionConversationPage() {
                     lastActivityRef.current = Date.now();
                     const el = event.target;
                     el.style.height = "auto";
-                    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+                    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
                   }}
                   onKeyDown={handleKeyDown}
                   maxLength={MAX_LENGTH}
@@ -669,7 +695,7 @@ export default function SessionConversationPage() {
                   enterKeyHint="send"
                   autoComplete="off"
                   // text-base (16px) on mobile stops iOS Safari zooming the page when the input is focused.
-                  className="max-h-24 min-h-9 w-full resize-none rounded-2xl border border-stone-300 bg-[#faf8f7] px-3.5 py-2 text-base leading-5 text-stone-900 outline-none transition [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-stone-400 focus:border-[#7d1f2a] focus:bg-white focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-stone-100 sm:py-1.5 sm:text-[13px] [&::-webkit-scrollbar]:hidden"
+                  className="max-h-32 min-h-11 w-full resize-none rounded-2xl border border-stone-300 bg-[#faf8f7] px-3.5 py-2.5 text-base leading-5 text-stone-900 outline-none transition [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-stone-400 focus:border-[#7d1f2a] focus:bg-white focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:cursor-not-allowed disabled:bg-stone-100 sm:py-2.5 sm:text-sm [&::-webkit-scrollbar]:hidden"
                 />
                 <button
                   type="submit"
@@ -677,10 +703,10 @@ export default function SessionConversationPage() {
                   onMouseDown={(event) => event.preventDefault()}
                   disabled={sending || loading || !conversation || !draft.trim()}
                   aria-label={sending ? "Sending" : "Send message"}
-                  className="flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-full bg-[#7d1f2a] text-white shadow-sm transition-colors hover:bg-[#651822] active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7d1f2a] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full bg-[#7d1f2a] text-white shadow-sm transition-colors hover:bg-[#651822] active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7d1f2a] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
                 >
                   {sending ? (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4 animate-spin"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5 animate-spin"><path d="M12 3a9 9 0 1 0 9 9"/></svg>
                   ) : (
                     <PaperJetIcon />
                   )}

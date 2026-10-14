@@ -155,18 +155,18 @@ function Avatar({ name, image, className = "h-10 w-10" }: { name: string; image:
 
 function SpecRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 border-b border-[#efe8e1] py-2.5">
+    <div className="flex items-baseline justify-between gap-6 border-b border-[#efe8e1] py-1.5">
       <dt className="shrink-0 text-xs text-[#8a7f7a]">{label}</dt>
-      <dd className="min-w-0 text-right text-sm leading-5 text-[#282321]">{children}</dd>
+      <dd className="min-w-0 text-right text-xs leading-5 text-[#282321]">{children}</dd>
     </div>
   );
 }
 
 function ProseBlock({ title, text }: { title: string; text: string }) {
   return (
-    <section className="border-b border-[#efe8e1] py-4">
+    <section className="border-b border-[#efe8e1] py-3">
       <h3 className="text-xs font-semibold text-[#8a7f7a]">{title}</h3>
-      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#4b423e]">{text}</p>
+      <p className="mt-1 whitespace-pre-line text-xs leading-6 text-[#4b423e]">{text}</p>
     </section>
   );
 }
@@ -192,183 +192,183 @@ function SkeletonCard() {
  * (Details / Cancel / Request) sits on `relative z-10` so it keeps working on its own.
  */
 function OfferingRow({
-  offering,
-  index,
-  requestSent,
-  canCancel,
-  cancelling,
-  cancelError,
-  onOpenDetails,
-  onOpenRequest,
-  onCancelRequest,
-}: {
-  offering: AcademicMateOffering;
-  index: number;
-  requestSent: boolean;
-  canCancel: boolean;
-  cancelling: boolean;
-  cancelError: string | null;
-  onOpenDetails: (offering: AcademicMateOffering) => void;
-  onOpenRequest: (offering: AcademicMateOffering) => void;
-  onCancelRequest: (offering: AcademicMateOffering) => void;
-}) {
-  const mate = offering.academicMate;
-  const years = mate.yearsExperience;
-  const preview = previewText(offering);
-  const showYears = years !== null && years > 0;
-  const topics = offering.topics.slice(0, 3);
-  const extraTopics = offering.topics.length - topics.length;
-
-  return (
-    <article
-      className="mc-rise relative overflow-hidden rounded-xl border border-[#e4dbd3] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(40,35,33,0.05),0_10px_24px_-14px_rgba(125,31,42,0.25)] sm:px-5 sm:py-5"
-      style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}
-    >
-
-      <div className="flex items-start gap-3.5">
-        <span className="mc-ring mt-0.5 shrink-0 rounded-full p-[2px] shadow-sm">
-          <Avatar name={mate.user.name} image={mate.user.image} className="h-12 w-12 ring-2 ring-white" />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <h2 className="text-[15px] font-semibold text-[#282321]">
-                  {/* Stretched link: the ::after covers the entire card so a click anywhere opens the profile. */}
-                  <Link
-                    href={profileHref(mate.id)}
-                    aria-label={`View ${mate.user.name}'s profile, ${offering.course.code}`}
-                    className="rounded-sm after:absolute after:inset-0 after:z-0 after:rounded-xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-[#7d1f2a]/50"
-                  >
-                    {mate.user.name}
-                  </Link>
-                </h2>
-                {mate.verificationStatus && (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
-                    <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="mc-tick" />
-                    </svg>
-                    Verified
-                  </span>
+    offering,
+    index,
+    requestSent,
+    canCancel,
+    cancelling,
+    cancelError,
+    onOpenDetails,
+    onOpenRequest,
+    onCancelRequest,
+  }: {
+    offering: AcademicMateOffering;
+    index: number;
+    requestSent: boolean;
+    canCancel: boolean;
+    cancelling: boolean;
+    cancelError: string | null;
+    onOpenDetails: (offering: AcademicMateOffering) => void;
+    onOpenRequest: (offering: AcademicMateOffering) => void;
+    onCancelRequest: (offering: AcademicMateOffering) => void;
+  }) {
+    const mate = offering.academicMate;
+    const years = mate.yearsExperience;
+    const preview = previewText(offering);
+    const showYears = years !== null && years > 0;
+    const topics = offering.topics.slice(0, 3);
+    const extraTopics = offering.topics.length - topics.length;
+  
+    return (
+      <article
+        // Reduced outer padding from px-4 py-4 sm:px-5 sm:py-5 to p-3.5
+        className="mc-rise relative overflow-hidden rounded-xl border border-[#e4dbd3] bg-white p-3.5 shadow-[0_1px_2px_rgba(40,35,33,0.05),0_10px_24px_-14px_rgba(125,31,42,0.25)]"
+        style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="mc-ring mt-0.5 shrink-0 rounded-full p-[2px] shadow-sm">
+            {/* Reduced avatar size from h-12 w-12 to h-10 w-10 */}
+            <Avatar name={mate.user.name} image={mate.user.image} className="h-10 w-10 ring-2 ring-white" />
+          </span>
+  
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {/* Reduced font size from [15px] to sm */}
+                  <h2 className="text-sm font-semibold text-[#282321]">
+                    <Link
+                      href={profileHref(mate.id)}
+                      aria-label={`View ${mate.user.name}'s profile, ${offering.course.code}`}
+                      className="rounded-sm after:absolute after:inset-0 after:z-0 after:rounded-xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-[#7d1f2a]/50"
+                    >
+                      {mate.user.name}
+                    </Link>
+                  </h2>
+                  {mate.verificationStatus && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+                      <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="mc-tick" />
+                      </svg>
+                      Verified
+                    </span>
+                  )}
+                </div>
+                {mate.headline && <p className="mt-0.5 text-xs font-medium leading-4 text-[#7d1f2a]">{mate.headline}</p>}
+                {mate.studentProfile?.programme?.department && (
+                  <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#6d6260]">
+                    <Icon name="building" className="h-3 w-3 shrink-0 text-[#9a8f89]" />
+                    <span>{mate.studentProfile.programme.department.name}</span>
+                  </p>
                 )}
               </div>
-              {mate.headline && <p className="mt-0.5 text-[13px] font-medium leading-5 text-[#7d1f2a]">{mate.headline}</p>}
-              {mate.studentProfile?.programme?.department && (
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-[#6d6260]">
-                  <Icon name="building" className="h-3.5 w-3.5 shrink-0 text-[#9a8f89]" />
-                  <span>{mate.studentProfile.programme.department.name}</span>
-                </p>
+  
+              <div className="shrink-0 text-right">
+                {/* Reduced price text size slightly */}
+                <p className="text-sm font-bold tabular-nums tracking-tight text-[#7d1f2a]">{formatRate(offering.rate, offering.currency)}</p>
+                <p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatRateType(offering.rateType)}</p>
+              </div>
+            </div>
+  
+            <p className="mt-2 text-xs leading-4 text-[#282321]">
+              <span className="rounded bg-[#f3ece7] px-1.5 py-0.5 font-semibold text-[#7d1f2a]">{offering.course.code}</span>
+              <span className="text-[#6d6260]"> · {offering.course.name}</span>
+            </p>
+  
+            {offering.title && <p className="mt-1 text-xs font-medium leading-4 text-[#4b423e]">{offering.title}</p>}
+  
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-4 text-[#6d6260]">
+              <span className="inline-flex items-center gap-1">
+                <Icon name="clock" className="h-3 w-3 text-[#9a8f89]" />
+                {formatDuration(offering.sessionDurationMinutes)} session
+              </span>
+              {showYears && (
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="award" className="h-3 w-3 text-[#9a8f89]" />
+                  {years} {years === 1 ? "yr" : "yrs"} exp
+                </span>
               )}
             </div>
-
-            <div className="shrink-0 text-right">
-              <p className="text-base font-bold tabular-nums tracking-tight text-[#7d1f2a]">{formatRate(offering.rate, offering.currency)}</p>
-              <p className="mt-0.5 text-[11px] text-[#8a7f7a]">{formatRateType(offering.rateType)}</p>
-            </div>
-          </div>
-
-          <p className="mt-3 text-[13px] leading-5 text-[#282321]">
-            <span className="rounded bg-[#f3ece7] px-1.5 py-0.5 font-semibold text-[#7d1f2a]">{offering.course.code}</span>
-            <span className="text-[#6d6260]"> · {offering.course.name}</span>
-          </p>
-
-          {offering.title && <p className="mt-1.5 text-sm font-medium leading-5 text-[#4b423e]">{offering.title}</p>}
-
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs leading-5 text-[#6d6260]">
-            <span className="inline-flex items-center gap-1.5">
-              <Icon name="clock" className="h-3.5 w-3.5 text-[#9a8f89]" />
-              {formatDuration(offering.sessionDurationMinutes)} session
-            </span>
-            {showYears && (
-              <span className="inline-flex items-center gap-1.5">
-                <Icon name="award" className="h-3.5 w-3.5 text-[#9a8f89]" />
-                {years} {years === 1 ? "year" : "years"} experience
-              </span>
+  
+            {preview && <p className="mt-1.5 line-clamp-1 text-xs leading-4 text-[#5c534f]">{preview}</p>}
+  
+            {topics.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-1" aria-label="Topics covered">
+                {topics.map((topic) => (
+                  <li key={topic.id} className="rounded-full border border-[#eadfd9] bg-[#fbf8f6] px-2 py-0.5 text-[10px] font-medium text-[#6d6260]">
+                    {topic.name}
+                  </li>
+                ))}
+                {extraTopics > 0 && <li className="px-1 py-0.5 text-[10px] font-medium text-[#8a7f7a]">+{extraTopics} more</li>}
+              </ul>
             )}
-          </div>
-
-          {preview && <p className="mt-2.5 line-clamp-2 text-[13px] leading-5 text-[#5c534f]">{preview}</p>}
-
-          {topics.length > 0 && (
-            <ul className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Topics covered">
-              {topics.map((topic) => (
-                <li key={topic.id} className="rounded-full border border-[#eadfd9] bg-[#fbf8f6] px-2.5 py-0.5 text-[11px] font-medium text-[#6d6260]">
-                  {topic.name}
-                </li>
-              ))}
-              {extraTopics > 0 && <li className="px-1 py-0.5 text-[11px] font-medium text-[#8a7f7a]">+{extraTopics} more</li>}
-            </ul>
-          )}
-
-          {offering.rateType === "CUSTOM" && offering.rateDetails && (
-            <p className="mt-1.5 truncate text-xs leading-5 text-[#6d6260]" title={offering.rateDetails}>
-              <span className="text-[#8a7f7a]">Pricing · </span>
-              {offering.rateDetails}
-            </p>
-          )}
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#f1ebe5] pt-3">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => onOpenDetails(offering)}
-                aria-haspopup="dialog"
-                aria-label={`Quick details for ${mate.user.name}, ${offering.course.code}`}
-                className="relative z-10 inline-flex min-h-9 items-center text-xs font-semibold text-[#7d1f2a] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
-              >
-                Quick details
-              </button>
-              <span aria-hidden="true" className="hidden items-center gap-1 text-xs text-[#a99d95] sm:inline-flex">
-                View profile
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {requestSent && canCancel && (
+  
+            {offering.rateType === "CUSTOM" && offering.rateDetails && (
+              <p className="mt-1 truncate text-[11px] leading-4 text-[#6d6260]" title={offering.rateDetails}>
+                <span className="text-[#8a7f7a]">Pricing · </span>
+                {offering.rateDetails}
+              </p>
+            )}
+  
+            {/* Compact Footer Actions */}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#f1ebe5] pt-2.5">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  disabled={cancelling}
-                  onClick={() => onCancelRequest(offering)}
-                  aria-label={`Cancel your request to ${mate.user.name} for ${offering.course.code}`}
-                  className="relative z-10 inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#d8cec5] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => onOpenDetails(offering)}
+                  aria-haspopup="dialog"
+                  aria-label={`Quick details for ${mate.user.name}, ${offering.course.code}`}
+                  className="relative z-10 inline-flex min-h-7 items-center text-xs font-semibold text-[#7d1f2a] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
                 >
-                  {cancelling && <Spinner />}
-                  {cancelling ? "Cancelling..." : "Cancel request"}
+                  Quick details
                 </button>
-              )}
-
-              <button
-                type="button"
-                disabled={requestSent}
-                onClick={() => onOpenRequest(offering)}
-                aria-label={requestSent ? `Request sent to ${mate.user.name}` : `Request academic support from ${mate.user.name}`}
-                className={`relative z-10 inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-                  requestSent
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:shadow-md active:scale-95 motion-reduce:active:scale-100"
-                }`}
-              >
-                {requestSent ? (
-                  <>
-                    <Icon name="check" className="h-4 w-4" />
-                    Request sent
-                  </>
-                ) : (
-                  "Request"
+              </div>
+  
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {requestSent && canCancel && (
+                  <button
+                    type="button"
+                    disabled={cancelling}
+                    onClick={() => onCancelRequest(offering)}
+                    aria-label={`Cancel your request to ${mate.user.name} for ${offering.course.code}`}
+                    className="relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cancelling && <Spinner className="h-3 w-3" />}
+                    {cancelling ? "Cancelling..." : "Cancel"}
+                  </button>
                 )}
-              </button>
+  
+                <button
+                  type="button"
+                  disabled={requestSent}
+                  onClick={() => onOpenRequest(offering)}
+                  aria-label={requestSent ? `Request sent to ${mate.user.name}` : `Request academic support from ${mate.user.name}`}
+                  className={`relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed ${
+                    requestSent
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:shadow-md active:scale-95 motion-reduce:active:scale-100"
+                  }`}
+                >
+                  {requestSent ? (
+                    <>
+                      <Icon name="check" className="h-3.5 w-3.5" />
+                      Sent
+                    </>
+                  ) : (
+                    "Request"
+                  )}
+                </button>
+              </div>
             </div>
+  
+            {cancelError && (
+              <p role="alert" className="relative z-10 mt-1.5 text-right text-[11px] leading-4 text-red-700">{cancelError}</p>
+            )}
           </div>
-
-          {cancelError && (
-            <p role="alert" className="relative z-10 mt-2 text-right text-xs leading-5 text-red-700">{cancelError}</p>
-          )}
         </div>
-      </div>
-    </article>
-  );
-}
+      </article>
+    );
+  }
 
 export default function FindAcademicMatePage() {
   const [data, setData] = useState<MatchingResponse | null>(null);
@@ -761,7 +761,7 @@ export default function FindAcademicMatePage() {
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-[#282321]">
-                    {search.trim() ? `Search results for “${search.trim()}”` : "Suggested for your current courses"}
+                    {search.trim() ? `Search results for “${search.trim()}”` : "Suggested"}
                   </h2>
                   <p className="mt-1 text-xs leading-5 text-[#6d6260]">
                     {search.trim()
@@ -834,21 +834,28 @@ export default function FindAcademicMatePage() {
         aria-labelledby="details-dialog-title"
         onClose={handleDetailsDialogClose}
         onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}
-        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-[#e4dbd3] bg-white p-0 text-[#282321] shadow-xl backdrop:bg-black/50"
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-xl border border-[#e4dbd3] bg-white p-0 text-[#282321] shadow-xl backdrop:bg-black/50"
       >
         {detailsOffering && (
           <>
             <div className="flex items-start justify-between gap-4 border-b border-[#efe8e1] px-5 py-4 sm:px-6">
               <div className="flex min-w-0 items-start gap-3">
-                <Avatar name={detailsOffering.academicMate.user.name} image={detailsOffering.academicMate.user.image} className="h-11 w-11" />
+                <Avatar name={detailsOffering.academicMate.user.name} image={detailsOffering.academicMate.user.image} className="h-10 w-10" />
                 <div className="min-w-0">
-                  <h2 id="details-dialog-title" className="text-lg font-semibold tracking-tight text-[#282321]">{detailsOffering.academicMate.user.name}</h2>
-                  {detailsOffering.academicMate.headline && <p className="mt-1 text-sm leading-5 text-[#7d1f2a]">{detailsOffering.academicMate.headline}</p>}
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6d6260]">
-                    <span className="inline-flex items-center gap-1 font-medium text-emerald-700">
-                      <Icon name="check" className="h-3 w-3" />
-                      Verified
+                <div className="flex flex-wrap items-center gap-2">
+                <h2 id="details-dialog-title" className="text-base font-semibold tracking-tight text-[#282321]">
+                    {detailsOffering.academicMate.user.name}
+                </h2>
+                {detailsOffering.academicMate.verificationStatus && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                    <Icon name="check" className="h-3 w-3" />
+                    Verified
                     </span>
+                )}
+                </div>
+                  {detailsOffering.academicMate.headline && <p className="mt-1 text-xs leading-5 text-[#7d1f2a]">{detailsOffering.academicMate.headline}</p>}
+                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6d6260]">
+                    
                     {detailsOffering.academicMate.yearsExperience !== null && detailsOffering.academicMate.yearsExperience > 0 && (
                       <>
                         <span aria-hidden="true" className="h-3 w-px bg-[#e4dbd3]" />
@@ -866,7 +873,7 @@ export default function FindAcademicMatePage() {
             <div className="px-5 sm:px-6">
               <dl className="border-b border-[#efe8e1]">
                 <SpecRow label="Course">
-                  <span className="font-medium">{detailsOffering.course.code}</span>
+                  <span className="text-sm">{detailsOffering.course.code}</span>
                   <span className="text-[#6d6260]"> · {detailsOffering.course.name}</span>
                 </SpecRow>
                 {detailsOffering.academicMate.studentProfile?.programme?.department && (
@@ -889,7 +896,7 @@ export default function FindAcademicMatePage() {
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-[#efe8e1] px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-              <Link href={profileHref(detailsOffering.academicMate.id)} className="inline-flex min-h-10 items-center justify-center gap-1.5 text-sm font-semibold text-[#7d1f2a] hover:underline sm:mr-auto">
+              <Link href={profileHref(detailsOffering.academicMate.id)} className="inline-flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold text-[#7d1f2a] hover:underline sm:mr-auto">
                 View full profile
               </Link>
               <button type="button" onClick={() => detailsDialogRef.current?.close()} className="min-h-10 rounded-lg border border-[#d8cec5] bg-white px-4 py-2.5 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]">Close</button>
@@ -903,8 +910,8 @@ export default function FindAcademicMatePage() {
               >
                 {detailsRequestSent ? (
                   <>
-                    <Icon name="check" className="h-4 w-4" />
-                    Request sent
+                    <Icon name="check" className="h-3 w-3" />
+                   Request Sent
                   </>
                 ) : (
                   "Request academic support"
@@ -922,98 +929,145 @@ export default function FindAcademicMatePage() {
         onClose={handleRequestDialogClose}
         onCancel={(event) => { if (submittingRequest) event.preventDefault(); }}
         onClick={(event) => { if (event.target === event.currentTarget && !submittingRequest) event.currentTarget.close(); }}
-        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-xl border border-[#e2d9d0] bg-white p-0 text-[#282321] shadow-2xl backdrop:bg-black/50"
-      >
+        className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-xl border border-[#e2d9d0] bg-white p-0 text-[#282321] shadow-2xl backdrop:bg-black/50"
+        >
         {selectedOffering && (
-          <>
-            <div className="flex items-start justify-between gap-4 border-b border-[#eee7df] px-5 py-4 sm:px-6">
-              <div>
-                <h2 id="request-dialog-title" className="text-lg font-semibold tracking-tight text-[#282321]">Request academic support</h2>
-                <p className="mt-1 text-sm leading-5 text-[#6d6260]">Send an enquiry to <span className="font-semibold text-[#282321]">{selectedOffering.academicMate.user.name}</span>.</p>
-              </div>
-              <button type="button" aria-label="Close request form" disabled={submittingRequest} onClick={() => requestDialogRef.current?.close()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#6d6260] transition hover:bg-[#f6f1ec] hover:text-[#282321] disabled:opacity-50">
-                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" /></svg>
-              </button>
+            <>
+            {/* Compact Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[#eee7df] px-4 py-3">
+                <div>
+                <h2 id="request-dialog-title" className="text-base font-semibold tracking-tight text-[#282321]">Request academic support</h2>
+                <p className="mt-0.5 text-xs text-[#6d6260]">Send an enquiry to <span className="font-semibold text-[#282321]">{selectedOffering.academicMate.user.name}</span>.</p>
+                </div>
+                <button
+                type="button"
+                aria-label="Close request form"
+                disabled={submittingRequest}
+                onClick={() => requestDialogRef.current?.close()}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#6d6260] transition hover:bg-[#f6f1ec] hover:text-[#282321] disabled:opacity-50"
+                >
+                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" />
+                </svg>
+                </button>
             </div>
 
-            <div className="space-y-4 px-5 py-4 sm:px-6">
-              <section aria-label="Selected offering" className="border-y border-[#efe8e1] py-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold text-[#7d1f2a]">{selectedOffering.course.code}</p>
-                    <h3 className="mt-1 text-sm font-semibold text-[#282321]">{selectedOffering.course.name}</h3>
-                    {selectedOffering.title && <p className="mt-1 text-xs leading-5 text-[#6d6260]">{selectedOffering.title}</p>}
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-base font-semibold text-[#282321]">{formatRate(selectedOffering.rate, selectedOffering.currency)}</p>
-                    <p className="text-xs text-[#6d6260]">{formatRateType(selectedOffering.rateType)}</p>
-                  </div>
+            <div className="space-y-3 px-4 py-3">
+                {/* Compact Selected Offering Section */}
+                <section aria-label="Selected offering" className="rounded-lg border border-[#efe8e1] bg-[#fbf8f6] p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                    <div>
+                    <p className="text-[11px] font-semibold text-[#7d1f2a]">{selectedOffering.course.code}</p>
+                    <h3 className="text-xs font-semibold text-[#282321]">{selectedOffering.course.name}</h3>
+                    {selectedOffering.title && <p className="mt-0.5 text-[11px] text-[#6d6260]">{selectedOffering.title}</p>}
+                    </div>
+                    <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-[#282321]">{formatRate(selectedOffering.rate, selectedOffering.currency)}</p>
+                    <p className="text-[10px] text-[#6d6260]">{formatRateType(selectedOffering.rateType)}</p>
+                    </div>
                 </div>
-              </section>
+                </section>
 
-              {!requestSuccess ? (
-                <form onSubmit={(event) => void handleSubmitRequest(event)} className="space-y-4">
-                  <div>
-                    <label htmlFor="request-message" className="text-sm font-semibold text-[#282321]">Message <span className="font-normal text-[#8a7f7a]">(optional)</span></label>
-                    <p id="request-message-help" className="mt-1 text-xs leading-5 text-[#6d6260]">Describe the topics you need help with or include relevant details about your request.</p>
+                {!requestSuccess ? (
+                <form onSubmit={(event) => void handleSubmitRequest(event)} className="space-y-3">
+                    <div>
+                    <label htmlFor="request-message" className="text-xs font-semibold text-[#282321]">
+                        Message <span className="font-normal text-[#8a7f7a]">(optional)</span>
+                    </label>
+                    <p id="request-message-help" className="mt-0.5 text-[11px] text-[#6d6260]">
+                        Describe the topics you need help with or include relevant details.
+                    </p>
                     <textarea
-                      id="request-message"
-                      name="message"
-                      value={requestMessage}
-                      onChange={(event) => setRequestMessage(event.target.value)}
-                      maxLength={1000}
-                      rows={4}
-                      aria-describedby="request-message-help request-message-count"
-                      placeholder="Hello, I would like help understanding..."
-                      disabled={submittingRequest}
-                      className="mt-2 w-full resize-y rounded-lg border border-[#d8cec5] bg-white px-3 py-2.5 text-base leading-6 text-[#282321] outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:bg-[#faf8f6] sm:text-sm"
+                        id="request-message"
+                        name="message"
+                        value={requestMessage}
+                        onChange={(event) => setRequestMessage(event.target.value)}
+                        maxLength={1000}
+                        rows={3}
+                        aria-describedby="request-message-help request-message-count"
+                        placeholder="Hello, I would like help understanding..."
+                        disabled={submittingRequest}
+                        className="mt-1.5 w-full resize-y rounded-md border border-[#d8cec5] bg-white px-2.5 py-1.5 text-xs leading-5 text-[#282321] outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:bg-[#faf8f6]"
                     />
-                    <div className="mt-1 flex justify-end"><p id="request-message-count" className="text-[11px] text-[#8a7f7a]" aria-live="polite">{requestMessage.length}/1000</p></div>
-                  </div>
-
-                  {requestSubmitError && (
-                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
-                      <p className="text-sm font-semibold text-red-800">Request not submitted</p>
-                      <p className="mt-1 text-xs leading-5 text-red-700">{requestSubmitError}</p>
+                    <div className="mt-0.5 flex justify-end">
+                        <p id="request-message-count" className="text-[10px] text-[#8a7f7a]" aria-live="polite">
+                        {requestMessage.length}/1000
+                        </p>
                     </div>
-                  )}
+                    </div>
 
-                  <div className="border-y border-[#efe8e1] py-3">
-                    <p className="text-xs leading-5 text-[#6d6260]">Sending this request does not confirm a tutoring session. The Academic Mate must respond before arrangements can be finalised.</p>
-                  </div>
+                    {requestSubmitError && (
+                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-2.5">
+                        <p className="text-xs font-semibold text-red-800">Request not submitted</p>
+                        <p className="mt-0.5 text-[11px] leading-4 text-red-700">{requestSubmitError}</p>
+                    </div>
+                    )}
 
-                  <div className="flex flex-col-reverse gap-2 border-t border-[#eee7df] pt-4 sm:flex-row sm:justify-end">
-                    <button type="button" disabled={submittingRequest} onClick={() => requestDialogRef.current?.close()} className="min-h-10 rounded-lg border border-[#d8cec5] bg-white px-4 py-2.5 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6] disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
-                    <button type="submit" disabled={submittingRequest} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-60">
-                      {submittingRequest && <Spinner />}
-                      {submittingRequest ? "Sending request..." : "Send request"}
+                    <div className="border-t border-[#efe8e1] pt-2">
+                    <p className="text-[11px] leading-4 text-[#6d6260]">
+                        Sending this request does not confirm a session. The Academic Mate must respond first.
+                    </p>
+                    </div>
+
+                    {/* Compact Action Buttons */}
+                    <div className="flex flex-col-reverse gap-1.5 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        disabled={submittingRequest}
+                        onClick={() => requestDialogRef.current?.close()}
+                        className="min-h-8 rounded-md border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#4b423e] transition hover:bg-[#faf8f6] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Cancel
                     </button>
-                  </div>
-                </form>
-              ) : (
-                <div aria-live="polite" className="space-y-4">
-                  <div className="border-y border-emerald-200 bg-emerald-50 px-4 py-4">
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200">
-                        <Icon name="check" className="h-5 w-5" />
-                      </span>
-                      <div>
-                        <h3 className="text-sm font-semibold text-emerald-900">Request submitted</h3>
-                        <p className="mt-1 text-sm leading-6 text-emerald-800">{requestSuccess}</p>
-                        <p className="mt-2 text-xs leading-5 text-emerald-800">This is a request, not a confirmed session. You can check its status from your student dashboard.</p>
-                      </div>
+                    <button
+                        type="submit"
+                        disabled={submittingRequest}
+                        className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        {submittingRequest && <Spinner className="h-3 w-3" />}
+                        {submittingRequest ? "Sending..." : "Send request"}
+                    </button>
                     </div>
-                  </div>
-                  <div className="flex flex-col-reverse gap-2 border-t border-[#eee7df] pt-4 sm:flex-row sm:justify-end">
-                    <button type="button" onClick={() => requestDialogRef.current?.close()} className="min-h-10 rounded-lg border border-[#d8cec5] bg-white px-4 py-2.5 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]">Done</button>
-                    <Link href="/student/dashboard" className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#681923]">View dashboard</Link>
-                  </div>
+                </form>
+                ) : (
+                <div aria-live="polite" className="space-y-3">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="flex items-start gap-2.5">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200">
+                        <Icon name="check" className="h-3.5 w-3.5" />
+                        </span>
+                        <div>
+                        <h3 className="text-xs font-semibold text-emerald-900">Request submitted</h3>
+                        <p className="mt-0.5 text-xs leading-4 text-emerald-800">{requestSuccess}</p>
+                        <p className="mt-1.5 text-[11px] leading-4 text-emerald-800">
+                            You can check its status from your student dashboard.
+                        </p>
+                        </div>
+                    </div>
+                    </div>
+                    
+                    {/* Success Footer Buttons */}
+                    <div className="flex flex-col-reverse gap-1.5 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={() => requestDialogRef.current?.close()}
+                        className="min-h-8 rounded-md border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]"
+                    >
+                        Done
+                    </button>
+                    <Link
+                        href="/student/dashboard"
+                        className="inline-flex min-h-8 items-center justify-center rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923]"
+                    >
+                        View dashboard
+                    </Link>
+                    </div>
                 </div>
-              )}
+                )}
             </div>
-          </>
+            </>
         )}
-      </dialog>
+    </dialog>
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { MessageHits, useMessageSearch } from "./MessageHits";
 
 type ConversationItem = {
   id: string;
@@ -9,6 +10,7 @@ type ConversationItem = {
   otherUserImage: string | null;
   courseName: string;
   studentMessagingEnabled: boolean;
+  unreadCount: number;
   lastMessage: {
     body: string;
     createdAt: string;
@@ -24,6 +26,7 @@ type ConversationItem = {
 };
 
 const TZ = "Africa/Lusaka";
+const POLL_MS = 15_000;
 const dayKeyFmt = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ });
 const clockFmt = new Intl.DateTimeFormat("en-ZM", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
 const weekdayFmt = new Intl.DateTimeFormat("en-ZM", { weekday: "short", timeZone: TZ });
@@ -97,6 +100,7 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
 function Row({ item, nowMs }: { item: ConversationItem; nowMs: number }) {
   const state = item.session ? sessionState(item.session, nowMs) : null;
   const when = stamp(item.lastMessage?.createdAt ?? item.session?.scheduledStart, nowMs);
+  const unread = item.unreadCount ?? 0;
 
   const body = (
     <>
@@ -104,13 +108,31 @@ function Row({ item, nowMs }: { item: ConversationItem; nowMs: number }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="truncate text-[15px] font-semibold text-[#282321]">{item.otherUserName}</h2>
-          {when && <time className="shrink-0 text-xs tabular-nums text-[#94877e]">{when}</time>}
+          <h2 className={`truncate text-[15px] text-[#282321] ${unread > 0 ? "font-bold" : "font-semibold"}`}>{item.otherUserName}</h2>
+          {when && (
+            <time className={`shrink-0 text-xs tabular-nums ${unread > 0 ? "font-semibold text-[#7d1f2a]" : "text-[#94877e]"}`}>
+              {when}
+            </time>
+          )}
         </div>
 
-        <p className={`mt-0.5 truncate text-sm ${item.lastMessage ? "text-[#6d6260]" : "italic text-[#a99d95]"}`}>
-          {item.lastMessage?.body ?? "No messages yet. Say hello."}
-        </p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <p
+            className={`min-w-0 flex-1 truncate text-sm ${
+              unread > 0 ? "font-semibold text-[#282321]" : item.lastMessage ? "text-[#6d6260]" : "italic text-[#a99d95]"
+            }`}
+          >
+            {item.lastMessage?.body ?? "No messages yet. Say hello."}
+          </p>
+          {unread > 0 && (
+            <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] px-1.5 text-[11px] font-semibold leading-none tabular-nums text-white">
+              <span aria-hidden="true">{unread > 99 ? "99+" : unread}</span>
+              <span className="sr-only">
+                {unread} unread {unread === 1 ? "message" : "messages"}
+              </span>
+            </span>
+          )}
+        </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <span className="rounded-md bg-[#f4eceb] px-2 py-0.5 text-[11px] font-semibold text-[#7d1f2a]">{item.courseName}</span>
@@ -146,7 +168,9 @@ function Row({ item, nowMs }: { item: ConversationItem; nowMs: number }) {
   return item.conversationUrl ? (
     <Link
       href={item.conversationUrl}
-      aria-label={`Open conversation with ${item.otherUserName}, ${item.courseName}`}
+      aria-label={`Open conversation with ${item.otherUserName}, ${item.courseName}${
+        unread > 0 ? `, ${unread} unread ${unread === 1 ? "message" : "messages"}` : ""
+      }`}
       className={`group ${base} transition-colors hover:bg-[#fbf8f6] active:bg-[#f6f0ec] focus-visible:bg-[#fbf8f6] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#7d1f2a]`}
     >
       {body}
@@ -174,16 +198,30 @@ function SkeletonRows() {
   );
 }
 
+function chipClass(active: boolean) {
+  return `inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${
+    active ? "bg-[#7d1f2a] text-white" : "bg-white text-[#625954] ring-1 ring-[#e4dbd3] hover:bg-[#fbf8f6]"
+  }`;
+}
+
 export default function MessagesPage() {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [course, setCourse] = useState("");
   const [nowMs] = useState(() => Date.now());
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError("");
+  // Server-side search across every message (not just the last one in each chat).
+  const { hits, searching, failed } = useMessageSearch(query);
+
+  // `silent` refreshes happen in the background: no skeleton, no error banner.
+  const load = useCallback(async (signal?: AbortSignal, silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const response = await fetch("/api/student/messages", { cache: "no-store", signal });
       const data = await response.json();
@@ -191,9 +229,9 @@ export default function MessagesPage() {
       setConversations(data.conversations ?? []);
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Unable to load messages.");
+      if (!silent) setError(err instanceof Error ? err.message : "Unable to load messages.");
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!silent && !signal?.aborted) setLoading(false);
     }
   }, []);
 
@@ -203,14 +241,69 @@ export default function MessagesPage() {
     return () => controller.abort();
   }, [load]);
 
+  // Keep the unread badges fresh: poll while the tab is visible, and refresh as soon as the person comes back to it.
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load(controller.signal, true);
+    };
+
+    const timer = window.setInterval(refresh, POLL_MS);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [load]);
+
+  // Unique course names for the course filter.
+  const courses = useMemo(
+    () => Array.from(new Set(conversations.map((c) => c.courseName))).sort((a, b) => a.localeCompare(b)),
+    [conversations],
+  );
+  // If the selected course disappears after a refresh, fall back to "All courses".
+  const activeCourse = course && courses.includes(course) ? course : "";
+  const unreadChats = useMemo(() => conversations.filter((c) => (c.unreadCount ?? 0) > 0).length, [conversations]);
+  const filtersActive = query.trim() !== "" || unreadOnly || activeCourse !== "";
+
+  function clearFilters() {
+    setQuery("");
+    setUnreadOnly(false);
+    setCourse("");
+  }
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...conversations]
       .sort((a, b) => sortKey(b) - sortKey(a))
+      .filter((c) => !unreadOnly || (c.unreadCount ?? 0) > 0)
+      .filter((c) => !activeCourse || c.courseName === activeCourse)
       .filter((c) => !q || [c.otherUserName, c.courseName, c.lastMessage?.body ?? ""].some((s) => s.toLowerCase().includes(q)));
+  }, [conversations, query, unreadOnly, activeCourse]);
+
+  // While searching: conversations whose person, course or last message matches (ignores the chip filters).
+  const nameMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return [...conversations]
+      .sort((a, b) => sortKey(b) - sortKey(a))
+      .filter((c) => [c.otherUserName, c.courseName, c.lastMessage?.body ?? ""].some((s) => s.toLowerCase().includes(q)));
   }, [conversations, query]);
 
+  const emptyMessage = query.trim()
+    ? `No matches for \u201C${query.trim()}\u201D`
+    : unreadOnly
+      ? "No unread conversations"
+      : "No conversations for this course";
+
   const showSearch = !loading && !error && conversations.length > 0;
+  // Message search results replace the conversation list while a search (3+ characters) is active.
+  const searchActive = showSearch && (hits !== null || searching);
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-[#f9f8f6] px-4 pb-10 pt-6 sm:px-6 sm:pt-8 lg:px-8">
@@ -228,22 +321,92 @@ export default function MessagesPage() {
         </header>
 
         {showSearch && (
-          <div className="relative mb-4">
-            <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-[#94877e]"><SearchIcon /></span>
-            <label htmlFor="chat-search" className="sr-only">Search conversations</label>
-            <input
-              id="chat-search"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, course or message"
-              className="w-full rounded-xl border border-[#e4dbd3] bg-white py-3 pl-10 pr-4 text-base text-[#282321] outline-none transition placeholder:text-[#a99d95] focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 sm:text-sm"
-            />
+          <div className="mb-4 space-y-3">
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-[#94877e]"><SearchIcon /></span>
+              <label htmlFor="chat-search" className="sr-only">Search conversations</label>
+              <input
+                id="chat-search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search names, courses or messages"
+                className="w-full rounded-xl border border-[#e4dbd3] bg-white py-3 pl-10 pr-4 text-base text-[#282321] outline-none transition placeholder:text-[#a99d95] focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 sm:text-sm"
+              />
+            </div>
+
+            {!searchActive && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)} className={chipClass(!unreadOnly)}>
+                  All
+                </button>
+                <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)} className={chipClass(unreadOnly)}>
+                  Unread
+                  {unreadChats > 0 && (
+                    <span
+                      className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none tabular-nums ${
+                        unreadOnly ? "bg-white/20 text-white" : "bg-[#f4eceb] text-[#7d1f2a]"
+                      }`}
+                    >
+                      {unreadChats}
+                    </span>
+                  )}
+                </button>
+
+                {courses.length > 1 && (
+                  <>
+                    <label htmlFor="course-filter" className="sr-only">Filter by course</label>
+                    <select
+                      id="course-filter"
+                      value={activeCourse}
+                      onChange={(e) => setCourse(e.target.value)}
+                      className="max-w-[12rem] truncate rounded-full border border-[#e4dbd3] bg-white py-1.5 pl-2.5 pr-6 text-xs font-semibold text-[#625954] outline-none transition focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 sm:text-xs"
+                    >
+                      <option value="">All courses</option>
+                      {courses.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+
+                {filtersActive && (
+                  <button type="button" onClick={clearFilters} className="text-xs font-semibold text-[#7d1f2a] underline-offset-2 hover:underline">
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         <div className="overflow-hidden rounded-2xl border border-[#eee5df] bg-white shadow-sm">
-          {loading ? (
+          {searchActive ? (
+            <>
+              {nameMatches.length > 0 && (
+                <section>
+                  <p className="border-b border-[#f0eae5] px-5 py-2.5 text-xs font-semibold text-[#756a63]">Conversations</p>
+                  <ul className="divide-y divide-[#f0eae5]">
+                    {nameMatches.map((item) => (
+                      <li key={item.id}>
+                        <Row item={item} nowMs={nowMs} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              <div className={nameMatches.length > 0 ? "border-t border-[#f0eae5]" : undefined}>
+                <MessageHits
+                  hits={hits ?? []}
+                  query={query}
+                  conversations={conversations}
+                  searching={searching}
+                  failed={failed}
+                  showEmpty={nameMatches.length === 0}
+                />
+              </div>
+            </>
+          ) : loading ? (
             <SkeletonRows />
           ) : error ? (
             <div role="alert" className="px-6 py-10 text-center">
@@ -266,9 +429,9 @@ export default function MessagesPage() {
             </div>
           ) : visible.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <p className="text-sm font-semibold text-[#282321]">No matches for &ldquo;{query.trim()}&rdquo;</p>
-              <button type="button" onClick={() => setQuery("")} className="mt-2 text-sm font-semibold text-[#7d1f2a] underline-offset-2 hover:underline">
-                Clear search
+              <p className="text-sm font-semibold text-[#282321]">{emptyMessage}</p>
+              <button type="button" onClick={clearFilters} className="mt-2 text-sm font-semibold text-[#7d1f2a] underline-offset-2 hover:underline">
+                Clear filters
               </button>
             </div>
           ) : (

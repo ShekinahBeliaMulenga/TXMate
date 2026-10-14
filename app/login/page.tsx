@@ -293,7 +293,7 @@ export default function LoginPage() {
           </div>
 
           <div className={`mt-7 sm:rounded-3xl sm:border sm:border-gray-200/80 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-gray-200/50 ${shake ? "shake" : ""}`}>
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+            <form method = "post" onSubmit={handleSubmit} className="space-y-5" noValidate>
               {/* Email */}
               <div className="rise" style={{ "--i": 2 } as React.CSSProperties}>
                 <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-800">Email address</label>

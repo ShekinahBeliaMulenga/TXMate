@@ -1,54 +1,100 @@
+
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-type VerificationQueueStatus = "PENDING" | "VERIFIED" | "REJECTED" | "UNVERIFIED";
+type VerificationQueueStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "UNVERIFIED";
 
 async function getAuthenticatedAdmin() {
   const session = await auth.api.getSession({
     headers: await import("next/headers").then(({ headers }) => headers()),
   });
+
   if (!session?.user) return null;
+
   return prisma.adminProfile.findUnique({
     where: { userId: session.user.id },
     select: {
       id: true,
       role: true,
-      universityAccess: { select: { universityId: true } },
+      universityAccess: {
+        select: { universityId: true },
+      },
     },
   });
 }
 
 function canReviewVerification(role: string) {
-  return role === "PLATFORM_ADMIN" || role === "UNIVERSITY_ADMIN" || role === "MODERATOR";
+  return (
+    role === "PLATFORM_ADMIN" ||
+    role === "UNIVERSITY_ADMIN" ||
+    role === "MODERATOR"
+  );
 }
 
 /** GET /api/admin/academic-mates/verification */
 export async function GET(request: Request) {
   try {
     const admin = await getAuthenticatedAdmin();
+
     if (!admin) {
-      return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Admin access required." },
+        { status: 403 },
+      );
     }
+
     if (!canReviewVerification(admin.role)) {
-      return NextResponse.json({ error: "You do not have permission to review Academic Mate verification." }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            "You do not have permission to review Academic Mate verification.",
+        },
+        { status: 403 },
+      );
     }
 
     const url = new URL(request.url);
     const requestedStatus = url.searchParams.get("status") ?? "PENDING";
-    const allowedStatuses = new Set<VerificationQueueStatus>(["PENDING", "VERIFIED", "REJECTED", "UNVERIFIED"]);
-    if (!allowedStatuses.has(requestedStatus as VerificationQueueStatus)) {
-      return NextResponse.json({ error: "Invalid verification status." }, { status: 400 });
+
+    const allowedStatuses = new Set<VerificationQueueStatus>([
+      "PENDING",
+      "VERIFIED",
+      "REJECTED",
+      "UNVERIFIED",
+    ]);
+
+    if (
+      !allowedStatuses.has(
+        requestedStatus as VerificationQueueStatus,
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Invalid verification status." },
+        { status: 400 },
+      );
     }
 
-    const universityIds = admin.universityAccess.map((access) => access.universityId);
-    const universityFilter = admin.role === "PLATFORM_ADMIN" ? {} : { universityId: { in: universityIds } };
-    const profiles = await prisma.academicMateProfile.findMany({
+    const status = requestedStatus as VerificationQueueStatus;
+
+    const universityIds = admin.universityAccess.map(
+      (access) => access.universityId,
+    );
+
+    const universityFilter =
+      admin.role === "PLATFORM_ADMIN"
+        ? {}
+        : { universityId: { in: universityIds } };
+
+    const records = await prisma.academicMateProfile.findMany({
       where: {
-        verificationStatus: requestedStatus as VerificationQueueStatus,
+        verificationStatus: status,
         ...universityFilter,
       },
-      orderBy: { updatedAt: "asc" },
       select: {
         id: true,
         status: true,
@@ -59,8 +105,33 @@ export async function GET(request: Request) {
         yearsExperience: true,
         createdAt: true,
         updatedAt: true,
-        user: { select: { id: true, name: true, email: true, image: true } },
-        university: { select: { id: true, code: true, name: true } },
+
+        verificationHistory: {
+          where: { status },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            createdAt: true,
+          },
+        },
+
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+
+        university: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+        },
+
         studentProfile: {
           select: {
             id: true,
@@ -71,12 +142,24 @@ export async function GET(request: Request) {
                 id: true,
                 code: true,
                 name: true,
-                department: { select: { id: true, code: true, name: true } },
+                department: {
+                  select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                  },
+                },
               },
             },
-            programmeYear: { select: { id: true, yearNumber: true } },
+            programmeYear: {
+              select: {
+                id: true,
+                yearNumber: true,
+              },
+            },
           },
         },
+
         offerings: {
           where: { status: "ACTIVE" },
           select: {
@@ -89,9 +172,16 @@ export async function GET(request: Request) {
             sessionDurationMinutes: true,
             status: true,
             verificationStatus: true,
-            course: { select: { id: true, code: true, name: true } },
+            course: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
           },
         },
+
         experiences: {
           orderBy: { startYear: "desc" },
           select: {
@@ -103,21 +193,61 @@ export async function GET(request: Request) {
             endYear: true,
           },
         },
+
         qualifications: {
           orderBy: { year: "desc" },
-          select: { id: true, name: true, issuer: true, year: true, credentialUrl: true },
+          select: {
+            id: true,
+            name: true,
+            issuer: true,
+            year: true,
+            credentialUrl: true,
+          },
         },
+
         availabilities: {
           where: { isActive: true },
-          orderBy: [{ day: "asc" }, { startMinute: "asc" }],
-          select: { id: true, day: true, startMinute: true, endMinute: true, timezone: true },
+          orderBy: [
+            { day: "asc" },
+            { startMinute: "asc" },
+          ],
+          select: {
+            id: true,
+            day: true,
+            startMinute: true,
+            endMinute: true,
+            timezone: true,
+          },
         },
       },
     });
 
-    return NextResponse.json({ profiles, total: profiles.length });
+    const profiles = records
+      .map(({ verificationHistory, ...profile }) => ({
+        ...profile,
+        verificationSubmittedAt: (
+          verificationHistory[0]?.createdAt ?? profile.createdAt
+        ).toISOString(),
+      }))
+      .sort(
+        (a, b) =>
+          new Date(a.verificationSubmittedAt).getTime() -
+          new Date(b.verificationSubmittedAt).getTime(),
+      );
+
+    return NextResponse.json({
+      profiles,
+      total: profiles.length,
+    });
   } catch (error) {
-    console.error("GET /api/admin/academic-mates/verification failed:", error);
-    return NextResponse.json({ error: "An unexpected error occurred." }, { status: 500 });
+    console.error(
+      "GET /api/admin/academic-mates/verification failed:",
+      error,
+    );
+
+    return NextResponse.json(
+      { error: "An unexpected error occurred." },
+      { status: 500 },
+    );
   }
 }

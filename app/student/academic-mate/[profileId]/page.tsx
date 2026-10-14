@@ -298,10 +298,25 @@ export default function PublicAcademicMateProfilePage() {
         </div>
         <div className="px-5 pb-6 sm:px-8">
           <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
-            {user.image ? <img src={user.image} alt={user.name} className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" /> :
-              <div aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">{initials(user.name)}</div>}
-            <span className="mb-1 inline-flex items-center gap-2 rounded-full border border-[#e2d9d0] bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]"><span className={`h-2 w-2 rounded-full ${statusDot[profile.status]}`} />{statusLabel[profile.status]}</span>
+
+            <div className="relative inline-block">
+              {user.image ? (
+                <img src={user.image} alt={user.name} className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
+              ) : (
+                <div aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">
+                  {initials(user.name)}
+                </div>
+              )}
+              
+              {/* Facebook-style status dot positioned at bottom-right */}
+              <span 
+                className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[profile.status]}`} 
+                title={statusLabel[profile.status]}
+                aria-label={statusLabel[profile.status]}
+              />
+            </div> 
           </div>
+
           <div className="mt-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">{user.name}</h1>
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${verificationStyle[profile.verificationStatus]}`}><Icon name={profile.verificationStatus === "VERIFIED" ? "check" : "shield"} className="h-3.5 w-3.5" />{verificationLabel[profile.verificationStatus]}</span>
@@ -341,9 +356,9 @@ export default function PublicAcademicMateProfilePage() {
                   </div>
                   {offering.rateType === "CUSTOM" && offering.rateDetails && <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#6b625c]"><Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a817a]" /><span>{offering.rateDetails}</span></p>}
                   {viewer.canRequest && <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-[#ece5de] pt-3">
-                    {request && !request.hasSession && <button type="button" disabled={isBusy} onClick={() => handleCancel(offering)} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-[#d8cec5] bg-white px-3.5 py-2 text-[13px] font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{isBusy ? "Working..." : "Cancel request"}</button>}
-                    <button type="button" disabled={!!request || isBusy} onClick={() => handleRequest(offering)} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-4 py-2 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${request ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "bg-[#7d1f2a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:bg-[#681923]"} disabled:opacity-70`}>
-                      {request ? <><Icon name="check" className="h-4 w-4" />{request.status === "ACCEPTED" ? "Request accepted" : "Request sent"}</> : isBusy ? "Sending..." : "Request"}
+                    {request && !request.hasSession && <button type="button" disabled={isBusy} onClick={() => handleCancel(offering)} className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-[#d8cec5] bg-white px-3.5 py-2 text-xs font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{isBusy ? "Working..." : "Cancel request"}</button>}
+                    <button type="button" disabled={!!request || isBusy} onClick={() => handleRequest(offering)} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${request ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "bg-[#7d1f2a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:bg-[#681923]"} disabled:opacity-70`}>
+                      {request ? <><Icon name="check" className="h-3 w-3" />{request.status === "ACCEPTED" ? "Request accepted" : "Request sent"}</> : isBusy ? "Sending..." : "Request"}
                     </button>
                   </div>}
                   {request?.hasSession && <p className="mt-3 border-t border-[#ece5de] pt-3 text-xs leading-5 text-[#6d6260]">A session has been scheduled for this request. Manage any changes from your sessions page.</p>}

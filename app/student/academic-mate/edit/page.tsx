@@ -30,8 +30,9 @@ type AcademicMate = {
   updatedAt: string;
 };
 
-type AcademicMateResponse = {
-  academicMate: AcademicMate;
+type ApiBody = {
+  academicMate?: AcademicMate | null;
+  error?: string;
 };
 
 const visibilityOptions: {
@@ -75,6 +76,15 @@ const visibilityOptions: {
   },
 ];
 
+/* Reads a JSON body without throwing, so an HTML error page or empty body can't crash the page. */
+async function readBody(response: Response): Promise<ApiBody | null> {
+  try {
+    return (await response.json()) as ApiBody;
+  } catch {
+    return null;
+  }
+}
+
 export default function AcademicMatePage() {
   const [academicMate, setAcademicMate] = useState<AcademicMate | null>(null);
 
@@ -85,6 +95,8 @@ export default function AcademicMatePage() {
   const [profileVisibility, setProfileVisibility] = useState<ProfileVisibility>("PUBLIC");
 
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -96,41 +108,48 @@ export default function AcademicMatePage() {
     async function loadAcademicMate() {
       try {
         setLoading(true);
+        setLoadFailed(false);
         setError("");
 
         const response = await fetch("/api/student/academic-mate", {
           method: "GET",
+          headers: { Accept: "application/json" },
           cache: "no-store",
         });
 
-        const data = (await response.json()) as AcademicMateResponse | { error?: string };
+        const data = await readBody(response);
 
         if (cancelled) return;
 
+        // No profile yet: show the "Become an Academic Mate" form.
         if (response.status === 404) {
           setAcademicMate(null);
           return;
         }
 
         if (!response.ok) {
-          throw new Error(
-            "error" in data && data.error ? data.error : "Unable to load your Academic Mate profile.",
-          );
+          throw new Error(data?.error || "Unable to load your Academic Mate profile.");
         }
 
-        if ("academicMate" in data) {
-          const mate = data.academicMate;
+        const mate = data?.academicMate ?? null;
 
+        if (mate) {
+          // Profile exists: show the edit form with the saved values.
           setAcademicMate(mate);
           setHeadline(mate.headline ?? "");
           setBio(mate.bio ?? "");
           setTeachingExperience(mate.teachingExperience ?? "");
           setYearsExperience(mate.yearsExperience === null ? "" : String(mate.yearsExperience));
           setProfileVisibility(mate.profileVisibility);
+        } else {
+          // Request succeeded but there is no profile (for example `{ academicMate: null }`).
+          setAcademicMate(null);
         }
       } catch (err) {
         if (cancelled) return;
 
+        // A failed load is not the same as "no profile", so don't show the create form.
+        setLoadFailed(true);
         setError(
           err instanceof Error ? err.message : "Unable to load your Academic Mate profile.",
         );
@@ -146,7 +165,7 @@ export default function AcademicMatePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -159,6 +178,7 @@ export default function AcademicMatePage() {
       const response = await fetch("/api/student/academic-mate", {
         method: "POST",
         headers: {
+          Accept: "application/json",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -170,15 +190,19 @@ export default function AcademicMatePage() {
         }),
       });
 
-      const data = (await response.json()) as AcademicMateResponse | { error?: string };
+      const data = await readBody(response);
 
-      if (!response.ok) {
-        throw new Error(
-          "error" in data && data.error ? data.error : "Unable to create your Academic Mate profile.",
-        );
+      // The profile already exists (for example it was created in another tab): reload to show the edit form.
+      if (response.status === 409) {
+        setReloadKey((key) => key + 1);
+        return;
       }
 
-      if (!("academicMate" in data)) {
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to create your Academic Mate profile.");
+      }
+
+      if (!data?.academicMate) {
         throw new Error("The server returned an invalid response.");
       }
 
@@ -204,6 +228,7 @@ export default function AcademicMatePage() {
       const response = await fetch("/api/student/academic-mate", {
         method: "PATCH",
         headers: {
+          Accept: "application/json",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -215,15 +240,13 @@ export default function AcademicMatePage() {
         }),
       });
 
-      const data = (await response.json()) as AcademicMateResponse | { error?: string };
+      const data = await readBody(response);
 
       if (!response.ok) {
-        throw new Error(
-          "error" in data && data.error ? data.error : "Unable to save your Academic Mate profile.",
-        );
+        throw new Error(data?.error || "Unable to save your Academic Mate profile.");
       }
 
-      if (!("academicMate" in data)) {
+      if (!data?.academicMate) {
         throw new Error("The server returned an invalid response.");
       }
 
@@ -254,12 +277,32 @@ export default function AcademicMatePage() {
     );
   }
 
+  if (loadFailed) {
+    return (
+      <main className="min-h-screen bg-[#f4f1ed] antialiased">
+        <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+          <div role="alert" className="rounded-2xl border border-red-200 bg-white px-6 py-10 text-center shadow-sm">
+            <h1 className="text-lg font-bold text-[#241f1c]">We couldn&apos;t load your profile</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#625b55]">{error}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="mt-5 rounded-xl bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/40"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const isEditing = academicMate !== null;
 
   return (
     <main className="min-h-screen bg-[#f4f1ed] antialiased">
       <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6 lg:px-8">
-        
+
         {/* Header Section */}
         <div className="mb-8 border-b border-[#e2d9d0] pb-8">
 
@@ -305,7 +348,7 @@ export default function AcademicMatePage() {
 
         {/* Main Form */}
         <form onSubmit={isEditing ? handleSave : handleCreate} className="space-y-8">
-          
+
           {/* Card 1: Experience & Info */}
           <section className="overflow-hidden rounded-2xl border border-[#e2d9d0] bg-white shadow-sm transition hover:shadow-md">
             <div className="border-b border-[#e2d9d0]/70 bg-[#faf8f6] px-6 py-5 sm:px-8">
