@@ -342,6 +342,8 @@ function DashboardContent({
                 Open conversation
               </Link>
             </div>
+
+
           </div>
         </section>
       )}
@@ -359,8 +361,13 @@ function DashboardContent({
         <section className="min-w-0 overflow-hidden rounded-lg border border-[#e6ded6] bg-white shadow-[0_1px_2px_rgba(40,35,33,0.04)]">
           <PanelHeader
             title="Upcoming sessions"
-            description={nextSession ? "Everything scheduled after your next session." : "Your next scheduled tutoring sessions."}
+            description={
+              nextSession
+                ? "Everything scheduled after your next session."
+                : "Your next scheduled tutoring sessions."
+            }
             count={laterSessions.length}
+            href="/student/sessions"
           />
           {data.upcomingSessions.length === 0 ? (
             <EmptyState title="No upcoming sessions" description="Scheduled session times and locations will appear here." action={<ActionLink href="/student/find-academic-mate">Find an Academic Mate</ActionLink>} />

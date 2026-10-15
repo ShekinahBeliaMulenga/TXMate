@@ -73,6 +73,12 @@ const NAVIGATION_GROUPS: {
       },
 
       {
+        label: "Sessions",
+        href: "/student/sessions",
+        icon: "calendar",
+      },
+
+      {
         label: "Messages",
         href: "/student/messages",
         icon: "messages",
@@ -383,7 +389,8 @@ function NavigationGroups({
   pendingCount?: number;
   unreadCount?: number;
   acceptedCount?: number;
-  /** Items already shown elsewhere (the mobile bottom bar) and so hidden here. */
+
+  /* Items already shown elsewhere (the mobile bottom bar) and so hidden here. */
   excludeHrefs?: string[];
 }) {
   return (
