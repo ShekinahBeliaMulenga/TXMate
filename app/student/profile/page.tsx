@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 
 type StudentStatus = "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
+const statusDot: Record<StudentStatus, string> = { ACTIVE: "bg-emerald-500", GRADUATED: "bg-sky-500", SUSPENDED: "bg-amber-500", WITHDRAWN:"bg-stone-400" };
 
 type StudentCourseStatus = "ENROLLED" | "COMPLETED" | "DROPPED" | "REPEATING";
 
@@ -207,6 +208,152 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
+/* Skeleton pieces. They copy the real layout (same wrappers, spacing and row heights)
+   so nothing jumps when the content arrives. */
+
+function SkeletonRow() {
+  return (
+    <div className="border-b border-[#f0ebe5] py-3 last:border-0">
+      <div className="flex h-5 items-center gap-3">
+        <div className="h-4 w-4 shrink-0 rounded bg-[#e8e0d8]" />
+        <div className="w-28 shrink-0">
+          <div className="h-3 w-20 rounded bg-[#eee8e2]" />
+        </div>
+        <div className="h-3 w-40 max-w-full rounded bg-[#f0ebe5]" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonSection({ titleWidth, children, className = "" }: { titleWidth: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${className}`}>
+      <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] bg-[#faf8f6]/50 px-5 py-3.5">
+        <div className="flex h-5 items-center">
+          <div className={`h-3.5 rounded bg-[#e8e0d8] ${titleWidth}`} />
+        </div>
+      </div>
+      <div className="flex-1 px-5 py-4">{children}</div>
+    </section>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 pb-16 sm:px-6 lg:px-8" aria-busy="true">
+      <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
+        <span role="status" aria-live="polite" className="sr-only">Loading your student profile...</span>
+
+        {/* Hero */}
+        <section aria-hidden="true" className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
+          <div className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
+            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
+            <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
+            <div className="absolute right-4 top-4 sm:right-5 sm:top-5">
+              <div className="h-6 w-28 rounded-full bg-white/20" />
+            </div>
+          </div>
+          <div className="px-5 pb-6 sm:px-8">
+            <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+              <div className="h-24 w-24 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-28 sm:w-28" />
+              <div className="mb-1 h-6 w-20 rounded-full bg-[#eee8e2]" />
+            </div>
+            <div className="mt-4">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  {/* name */}
+                  <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
+                  {/* programme · year */}
+                  <div className="mt-1.5 flex h-[22px] items-center">
+                    <div className="h-4 w-64 max-w-full rounded bg-[#eee8e2]" />
+                  </div>
+                  {/* university · school · department */}
+                  <div className="mt-1 flex h-5 items-center">
+                    <div className="h-3.5 w-full max-w-md rounded bg-[#f0ebe5]" />
+                  </div>
+                  {/* chips */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="h-6 w-28 rounded-full bg-[#f0ebe5]" />
+                    <div className="h-6 w-40 rounded-full bg-[#f0ebe5]" />
+                  </div>
+                  {/* about */}
+                  <div className="mt-5">
+                    <div className="mb-1.5 flex h-[15px] items-center">
+                      <div className="h-2.5 w-12 rounded bg-[#e8e0d8]" />
+                    </div>
+                    <div className="max-w-2xl">
+                      <div className="flex h-[21px] items-center">
+                        <div className="h-3 w-full rounded bg-[#eee8e2]" />
+                      </div>
+                      <div className="flex h-[21px] items-center">
+                        <div className="h-3 w-4/5 rounded bg-[#f0ebe5]" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* action links (text links, not buttons) */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-end">
+                  <div className="flex h-5 items-center gap-2">
+                    <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
+                    <div className="h-3.5 w-20 rounded bg-[#eee8e2]" />
+                  </div>
+                  <div className="flex h-5 items-center gap-2">
+                    <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
+                    <div className="h-3.5 w-36 rounded bg-[#eee8e2]" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Tabs */}
+        <div aria-hidden="true" className="mb-5 mt-6 flex justify-center">
+          <div className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5">
+            <div className="flex h-9 w-[92px] items-center gap-1.5 rounded-lg bg-[#f4f1ed] px-3.5 sm:w-[108px]">
+              <div className="h-3.5 w-3.5 shrink-0 rounded bg-[#e2d4d0]" />
+              <div className="h-3 flex-1 rounded bg-[#e2d4d0]" />
+            </div>
+            <div className="flex h-9 w-[92px] items-center gap-1.5 rounded-lg px-3.5 sm:w-[150px]">
+              <div className="h-3.5 w-3.5 shrink-0 rounded bg-[#eee8e2]" />
+              <div className="h-3 flex-1 rounded bg-[#eee8e2]" />
+            </div>
+            <div className="flex h-9 w-[92px] items-center gap-1.5 rounded-lg px-3.5 sm:w-[160px]">
+              <div className="h-3.5 w-3.5 shrink-0 rounded bg-[#eee8e2]" />
+              <div className="h-3 flex-1 rounded bg-[#eee8e2]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Overview tab: Institutional Details + Academic Timeline */}
+        <div aria-hidden="true" className="grid items-stretch gap-5 md:grid-cols-2">
+          <SkeletonSection titleWidth="w-36" className="h-full">
+            <div>
+              {Array.from({ length: 6 }, (_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </div>
+          </SkeletonSection>
+
+          <SkeletonSection titleWidth="w-32" className="h-full">
+            <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
+              <div className="mb-2.5 h-7 w-7 rounded bg-[#e8e0d8]" />
+              <div className="h-3.5 w-24 rounded bg-[#e8e0d8]" />
+              <div className="mt-1 h-5 w-24 rounded-full bg-[#f3e8e9]" />
+              <div className="mt-3.5 h-2.5 w-28 rounded bg-[#eee8e2]" />
+            </div>
+          </SkeletonSection>
+        </div>
+
+        {/* Footer */}
+        <div aria-hidden="true" className="mt-12 flex justify-center">
+          <div className="h-2.5 w-56 rounded bg-[#e8e0d8]" />
+        </div>
+      </div>
+    </main>
+  );
+}
+
 // --- Main Page Component ---
 
 export default function StudentProfilePage() {
@@ -254,82 +401,7 @@ export default function StudentProfilePage() {
     });
   }, [data]);
   if (loading) {
-    return (
-      <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 pb-16 sm:px-6 lg:px-8" aria-busy="true">
-        <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
-          <section role="status" aria-live="polite" aria-label="Loading student profile" className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-            <span className="sr-only">Loading your student profile...</span>
-            <div className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
-              <div aria-hidden="true" className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
-              <div aria-hidden="true" className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
-              <div className="absolute right-4 top-4 h-6 w-28 rounded-full bg-white/20 sm:right-5 sm:top-5" />
-            </div>
-            <div className="px-5 pb-6 sm:px-8">
-              <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
-                <div className="h-24 w-24 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-28 sm:w-28" />
-                <div className="mb-1 h-6 w-20 rounded-full bg-[#eee8e2]" />
-              </div>
-              <div className="mt-4">
-                <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
-                <div className="mt-2 h-4 w-60 max-w-full rounded bg-[#eee8e2]" />
-                <div className="mt-2 h-3.5 w-52 max-w-full rounded bg-[#f0ebe5]" />
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <div className="h-7 w-28 rounded-full bg-[#f0ebe5]" />
-                  <div className="h-7 w-36 rounded-full bg-[#f0ebe5]" />
-                </div>
-                <div className="mt-5 max-w-2xl">
-                  <div className="mb-1.5 h-2.5 w-12 rounded bg-[#e8e0d8]" />
-                  <div className="mt-2 h-3 w-full max-w-xl rounded bg-[#eee8e2]" />
-                  <div className="mt-2 h-3 w-4/5 max-w-lg rounded bg-[#f0ebe5]" />
-                </div>
-                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                  <div className="h-10 w-full rounded-lg border border-[#e2d9d0] bg-[#faf8f6] sm:w-32" />
-                  <div className="h-10 w-full rounded-lg bg-[#ead7d9] sm:w-48" />
-                </div>
-              </div>
-            </div>
-          </section>
-          <div className="mt-6 mb-5 flex justify-center">
-            <div className="flex w-full max-w-sm items-center justify-between gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5 sm:w-auto sm:justify-center sm:gap-2">
-              <div className="h-8 flex-1 rounded-lg bg-[#f1e7e5] sm:w-24 sm:flex-none" />
-              <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
-              <div className="h-8 flex-1 rounded-lg bg-[#f5f1ed] sm:w-28 sm:flex-none" />
-            </div>
-          </div>
-          <div className="grid min-w-0 gap-5 md:grid-cols-2">
-            <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-              <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] bg-[#faf8f6]/70 px-4 py-3.5 sm:px-5">
-                <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
-                <div className="h-3.5 w-36 rounded bg-[#e8e0d8]" />
-              </div>
-              <div className="px-4 py-2 sm:px-5">
-                {Array.from({ length: 6 }, (_, i) => (
-                  <div key={i} className="flex items-center gap-3 border-b border-[#f0ebe5] py-3 last:border-0">
-                    <div className="h-4 w-4 shrink-0 rounded bg-[#e8e0d8]" />
-                    <div className="min-w-0 flex-1">
-                      <div className="h-2.5 w-20 rounded bg-[#eee8e2]" />
-                      <div className="mt-2 h-3 w-3/4 max-w-56 rounded bg-[#f0ebe5]" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-            <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-              <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] bg-[#faf8f6]/70 px-4 py-3.5 sm:px-5">
-                <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
-                <div className="h-3.5 w-32 rounded bg-[#e8e0d8]" />
-              </div>
-              <div className="flex min-h-[200px] flex-col items-center justify-center border-dashed px-5 py-8">
-                <div className="h-7 w-7 rounded bg-[#e8e0d8]" />
-                <div className="mt-3.5 h-3.5 w-28 rounded bg-[#e8e0d8]" />
-                <div className="mt-2 h-6 w-32 rounded-full bg-[#f3e8e9]" />
-                <div className="mt-4 h-2.5 w-36 rounded bg-[#eee8e2]" />
-              </div>
-            </section>
-          </div>
-        </div>
-      </main>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (error || !data) {
@@ -377,20 +449,32 @@ export default function StudentProfilePage() {
           </div>
           <div className="px-5 pb-6 sm:px-8">
             <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
-              {user.image ? (
-                <img
-                  src={user.image}
-                  alt={user.name}
-                  className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28"
-                />
-              ) : (
-                <div
-                  aria-hidden="true"
-                  className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl"
-                >
-                  {initials(user.name)}
-                </div>
-              )}
+              {/* Avatar with a Facebook-style "active" dot on its bottom-right edge */}
+              <div className="relative shrink-0">
+                {user.image ? (
+                  <img
+                    src={user.image}
+                    alt={user.name}
+                    className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28"
+                  />
+                ) : (
+                  <div
+                    aria-hidden="true"
+                    className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[studentProfile.status]}`} 
+                  >
+
+                    {initials(user.name)}
+                  </div>
+                )}
+                {studentProfile.status === "ACTIVE" && (
+                  <span
+                    title="Active"
+                    className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-emerald-500 ring-[3px] ring-white sm:bottom-1.5 sm:right-1.5 sm:h-5 sm:w-5"
+                  >
+                    <span className="sr-only">Active</span>
+                  </span>
+                )}
+              </div>
               <span className="mb-1 inline-flex items-center gap-2  bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span
                   className={`h-2 w-2 rounded-full ${

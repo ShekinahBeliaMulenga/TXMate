@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Most offerings returned in one response. The page is told when the list was cut short. */
+const RESULT_LIMIT = 100;
+
 export async function GET(request: Request) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -52,6 +55,7 @@ export async function GET(request: Request) {
         academicMates: [],
         matchedCourses: [],
         mode: "suggestions",
+        truncated: false,
       });
     }
 
@@ -82,6 +86,21 @@ export async function GET(request: Request) {
                 teachingExperience: { contains: query, mode: "insensitive" as const },
               },
             },
+            // Department name or code (the search box promises "department").
+            {
+              academicMateProfile: {
+                studentProfile: {
+                  programme: {
+                    department: {
+                      OR: [
+                        { name: { contains: query, mode: "insensitive" as const } },
+                        { code: { contains: query, mode: "insensitive" as const } },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
             {
               topics: {
                 some: {
@@ -93,7 +112,7 @@ export async function GET(request: Request) {
         }
       : { courseId: { in: enrolledCourseIds } };
 
-    const offerings = await prisma.mateOffering.findMany({
+    const found = await prisma.mateOffering.findMany({
       where: {
         universityId: student.universityId,
         status: "ACTIVE",
@@ -110,6 +129,8 @@ export async function GET(request: Request) {
         { course: { code: "asc" } },
         { academicMateProfile: { user: { name: "asc" } } },
       ],
+      // One extra row tells us whether there was more than we are returning.
+      take: RESULT_LIMIT + 1,
       select: {
         id: true,
         title: true,
@@ -148,7 +169,11 @@ export async function GET(request: Request) {
       },
     });
 
+    const truncated = found.length > RESULT_LIMIT;
+    const offerings = truncated ? found.slice(0, RESULT_LIMIT) : found;
+
     const offeringIds = offerings.map((offering) => offering.id);
+
     const existingRequests = offeringIds.length
       ? await prisma.mateRequest.findMany({
           where: {
@@ -156,17 +181,33 @@ export async function GET(request: Request) {
             offeringId: { in: offeringIds },
             status: { in: ["REQUESTED", "ACCEPTED"] },
           },
-          select: { id: true, offeringId: true, status: true },
+          select: {
+            id: true,
+            offeringId: true,
+            status: true,
+            tutoringSession: {
+              select: {
+                id: true,
+                status: true,
+                scheduledStart: true,
+                scheduledEnd: true,
+                meetingLocation: true,
+              },
+            },
+          },
         })
       : [];
 
     const requestsByOffering = new Map(
       existingRequests.map((item) => [
         item.offeringId,
-        { id: item.id, status: item.status },
+        {
+          id: item.id,
+          status: item.status,
+          tutoringSession: item.tutoringSession,
+        },
       ]),
     );
-
     const academicMates = offerings.map((offering) => ({
       offeringId: offering.id,
       title: offering.title,
@@ -194,6 +235,7 @@ export async function GET(request: Request) {
       academicMates,
       matchedCourses,
       mode: query ? "search" : "suggestions",
+      truncated,
     });
   } catch (error) {
     console.error("Academic Mate matching GET failed:", error);

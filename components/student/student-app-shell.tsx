@@ -144,6 +144,31 @@ const NAVIGATION_GROUPS: {
   },
 ];
 
+/** The four main tabs pinned to the bottom bar on mobile (they are left out of the mobile drawer). */
+const BOTTOM_TABS: {
+  label: string;
+  href: string;
+  icon: IconName;
+  badge?: "unread" | "accepted";
+}[] = [
+  { label: "Dashboard", href: "/student/dashboard", icon: "dashboard" },
+  { label: "Find", href: "/student/find-academic-mate", icon: "search" },
+  {
+    label: "Messages",
+    href: "/student/messages",
+    icon: "messages",
+    badge: "unread",
+  },
+  {
+    label: "My Requests",
+    href: "/student/requests",
+    icon: "inbox",
+    badge: "accepted",
+  },
+];
+
+const BOTTOM_TAB_HREFS = BOTTOM_TABS.map((tab) => tab.href);
+
 function Icon({
   name,
   className = "h-[18px] w-[18px]",
@@ -351,91 +376,101 @@ function NavigationGroups({
   pendingCount = 0,
   unreadCount = 0,
   acceptedCount = 0,
+  excludeHrefs = [],
 }: {
   pathname: string;
   onNavigate?: () => void;
   pendingCount?: number;
   unreadCount?: number;
   acceptedCount?: number;
+  /** Items already shown elsewhere (the mobile bottom bar) and so hidden here. */
+  excludeHrefs?: string[];
 }) {
   return (
     <nav aria-label="TXMate navigation" className="space-y-6">
-      {NAVIGATION_GROUPS.map((group) => (
-        <section key={group.title}>
-          <h2 className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#94877e]">
-            {group.title}
-          </h2>
+      {NAVIGATION_GROUPS.map((group) => {
+        const items = group.items.filter(
+          (item) => !excludeHrefs.includes(item.href)
+        );
+        if (items.length === 0) return null;
 
-          <ul className="mt-2 space-y-1">
-            {group.items.map((item) => {
-              const active = isActivePath(pathname, item.href);
-              const badge = item.showPendingBadge
-                ? {
-                    count: pendingCount,
-                    singular: "pending request",
-                    plural: "pending requests",
-                    tone: "brand" as const,
-                  }
-                : item.showUnreadBadge
+        return (
+          <section key={group.title}>
+            <h2 className="px-3 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#94877e]">
+              {group.title}
+            </h2>
+
+            <ul className="mt-2 space-y-1">
+              {items.map((item) => {
+                const active = isActivePath(pathname, item.href);
+                const badge = item.showPendingBadge
                   ? {
-                      count: unreadCount,
-                      singular: "unread message",
-                      plural: "unread messages",
+                      count: pendingCount,
+                      singular: "pending request",
+                      plural: "pending requests",
                       tone: "brand" as const,
                     }
-                  : item.showAcceptedBadge
+                  : item.showUnreadBadge
                     ? {
-                        count: acceptedCount,
-                        singular: "newly accepted request",
-                        plural: "newly accepted requests",
-                        tone: "green" as const,
+                        count: unreadCount,
+                        singular: "unread message",
+                        plural: "unread messages",
+                        tone: "brand" as const,
                       }
-                    : null;
+                    : item.showAcceptedBadge
+                      ? {
+                          count: acceptedCount,
+                          singular: "newly accepted request",
+                          plural: "newly accepted requests",
+                          tone: "green" as const,
+                        }
+                      : null;
 
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    aria-current={active ? "page" : undefined}
-                    className={`relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${
-                      active
-                        ? "bg-[#f4eceb] font-semibold text-[#7d1f2a]"
-                        : "text-[#625954] hover:bg-[#f8f5f2] hover:text-[#282321]"
-                    }`}
-                  >
-                    {active && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r bg-[#7d1f2a]"
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      aria-current={active ? "page" : undefined}
+                      className={`relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${
+                        active
+                          ? "bg-[#f4eceb] font-semibold text-[#7d1f2a]"
+                          : "text-[#625954] hover:bg-[#f8f5f2] hover:text-[#282321]"
+                      }`}
+                    >
+                      {active && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r bg-[#7d1f2a]"
+                        />
+                      )}
+
+                      <Icon
+                        name={item.icon}
+                        className="h-[17px] w-[17px] shrink-0"
                       />
-                    )}
 
-                    <Icon
-                      name={item.icon}
-                      className="h-[17px] w-[17px] shrink-0"
-                    />
+                      <span className="min-w-0 flex-1 truncate">
+                        {item.label}
+                      </span>
 
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.label}
-                    </span>
-
-                    {badge && badge.count > 0 && (
-                      <CountBadge
-                        count={badge.count}
-                        active={active}
-                        singular={badge.singular}
-                        plural={badge.plural}
-                        tone={badge.tone}
-                      />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
+                      {badge && badge.count > 0 && (
+                        <CountBadge
+                          count={badge.count}
+                          active={active}
+                          singular={badge.singular}
+                          plural={badge.plural}
+                          tone={badge.tone}
+                        />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
     </nav>
   );
 }
@@ -453,6 +488,68 @@ function Brand({ onClick }: { onClick?: () => void }) {
   );
 }
 
+type ProfileUser = {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
+
+/** Profile card shown first in the mobile drawer. Links to the student profile page. */
+function ProfileCard({
+  user,
+  onNavigate,
+}: {
+  user?: ProfileUser;
+  onNavigate?: () => void;
+}) {
+  const name = user?.name?.trim() || "Student";
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "S";
+
+  return (
+    <Link
+      href="/student/profile"
+      onClick={onNavigate}
+      className="flex items-center gap-3 border-b border-[#eee8e2] px-5 py-4 transition-colors hover:bg-[#f8f5f2] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40"
+    >
+      {user?.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={user.image}
+          alt=""
+          className="h-12 w-12 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-base font-semibold text-white"
+        >
+          {initials}
+        </span>
+      )}
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-[#282321]">
+          {name}
+        </span>
+        {user?.email && (
+          <span className="block truncate text-xs text-[#94877e]">
+            {user.email}
+          </span>
+        )}
+        <span className="mt-0.5 block text-xs font-medium text-[#7d1f2a]">
+          View profile
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 function SidebarContents({
   pathname,
   onNavigate,
@@ -464,6 +561,7 @@ function SidebarContents({
   pendingCount = 0,
   unreadCount = 0,
   acceptedCount = 0,
+  user,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -475,6 +573,7 @@ function SidebarContents({
   pendingCount?: number;
   unreadCount?: number;
   acceptedCount?: number;
+  user?: ProfileUser;
 }) {
   return (
     <>
@@ -494,6 +593,9 @@ function SidebarContents({
         )}
       </div>
 
+      {/* Profile details come first in the mobile drawer */}
+      {mobile && <ProfileCard user={user} onNavigate={onNavigate} />}
+
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
         <NavigationGroups
           pathname={pathname}
@@ -501,6 +603,7 @@ function SidebarContents({
           pendingCount={pendingCount}
           unreadCount={unreadCount}
           acceptedCount={acceptedCount}
+          excludeHrefs={mobile ? BOTTOM_TAB_HREFS : []}
         />
       </div>
 
@@ -521,11 +624,35 @@ function SidebarContents({
           <span>{signingOut ? "Signing out..." : "Sign out"}</span>
         </button>
 
-        <p className="mt-3 px-3 text-[10px] text-[#a0958d]">
-          TXMate · Shekinah B Mulenga
-        </p>
+        {!mobile && (
+          <p className="mt-3 px-3 text-[10px] text-[#a0958d]">
+            TXMate · Shekinah B Mulenga
+          </p>
+        )}
       </div>
     </>
+  );
+}
+
+/** Small count bubble sitting on a bottom-bar icon. */
+function TabBadge({
+  count,
+  tone,
+}: {
+  count: number;
+  tone: "brand" | "green";
+}) {
+  if (count <= 0) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold leading-none tabular-nums text-white ring-2 ring-white ${
+        tone === "green" ? "bg-emerald-600" : "bg-[#7d1f2a]"
+      }`}
+    >
+      {count > 99 ? "99+" : count}
+    </span>
   );
 }
 
@@ -536,6 +663,7 @@ export default function StudentAppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -544,19 +672,6 @@ export default function StudentAppShell({
   const pendingCount = usePendingRequestCount();
   const unreadCount = useUnreadMessageCount();
   const acceptedCount = useAcceptedRequestCount();
-
-  // Everything that needs the student's attention, for the mobile menu button's label and dot.
-  const attention = [
-    pendingCount > 0
-      ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
-      : "",
-    unreadCount > 0
-      ? `${unreadCount} unread ${unreadCount === 1 ? "message" : "messages"}`
-      : "",
-    acceptedCount > 0
-      ? `${acceptedCount} newly accepted ${acceptedCount === 1 ? "request" : "requests"}`
-      : "",
-  ].filter(Boolean);
 
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileDrawerRef = useRef<HTMLElement>(null);
@@ -647,6 +762,11 @@ export default function StudentAppShell({
     }
   }
 
+  const tabBadges = {
+    unread: { count: unreadCount, tone: "brand" as const },
+    accepted: { count: acceptedCount, tone: "green" as const },
+  };
+
   return (
     <div className="min-h-screen bg-[#f9f8f6] text-[#282321] antialiased">
       <a
@@ -669,38 +789,88 @@ export default function StudentAppShell({
         />
       </aside>
 
-      {/* Mobile top bar */}
+      {/* Mobile top bar: brand only, navigation lives in the bottom bar */}
       <header className="sticky top-0 z-30 border-b border-[#e2d9d0] bg-white lg:hidden">
-        <div className="flex h-16 items-center justify-start gap-3 px-4">
-          <button
-            ref={menuButtonRef}
-            type="button"
-            aria-label={
-              attention.length > 0
-                ? `Open navigation, ${attention.join(", ")}`
-                : "Open navigation"
-            }
-            aria-controls="student-mobile-navigation"
-            aria-expanded={mobileOpen}
-            onClick={() => setMobileOpen(true)}
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#e2d9d0] bg-white text-[#514640] transition hover:bg-[#f8f5f2] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
-          >
-            <Icon name="menu" className="h-5 w-5" />
-
-            {/* Dot so phone users can see there is something pending without opening the drawer */}
-            {attention.length > 0 && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"
-              />
-            )}
-          </button>
-
+        <div className="flex h-14 items-center px-4">
           <Brand />
         </div>
       </header>
 
-      {/* Mobile navigation drawer container (with fade-in & slide-in) */}
+      {/* Mobile bottom tab bar */}
+      <nav
+        aria-label="Main"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e2d9d0] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
+        <ul className="grid grid-cols-5">
+          {BOTTOM_TABS.map((tab) => {
+            const active = isActivePath(pathname, tab.href);
+            const badge = tab.badge ? tabBadges[tab.badge] : null;
+
+            return (
+              <li key={tab.href}>
+                <Link
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={
+                    badge && badge.count > 0
+                      ? `${tab.label}, ${badge.count} ${
+                          tab.badge === "unread" ? "unread" : "newly accepted"
+                        }`
+                      : tab.label
+                  }
+                  className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40 ${
+                    active ? "text-[#7d1f2a]" : "text-[#7a6f68]"
+                  }`}
+                >
+                  <span className="relative">
+                    <Icon
+                      name={tab.icon}
+                      className={`h-[22px] w-[22px] ${
+                        active ? "stroke-[2.1]" : ""
+                      }`}
+                    />
+                    {badge && <TabBadge count={badge.count} tone={badge.tone} />}
+                  </span>
+                  <span>{tab.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+
+          {/* Hamburger in the bottom corner opens the side drawer */}
+          <li>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              aria-label={
+                pendingCount > 0
+                  ? `Open menu, ${pendingCount} pending ${
+                      pendingCount === 1 ? "request" : "requests"
+                    }`
+                  : "Open menu"
+              }
+              aria-controls="student-mobile-navigation"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(true)}
+              className="flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium text-[#7a6f68] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40"
+            >
+              <span className="relative">
+                <Icon name="menu" className="h-[22px] w-[22px]" />
+                {/* Mate requests live inside the drawer, so flag them here */}
+                {pendingCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"
+                  />
+                )}
+              </span>
+              <span>Menu</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      {/* Mobile side drawer: slides in from the right, the side of the menu button */}
       <div
         className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
           mobileOpen
@@ -720,8 +890,8 @@ export default function StudentAppShell({
           id="student-mobile-navigation"
           ref={mobileDrawerRef}
           aria-label="Mobile navigation"
-          className={`absolute inset-y-0 left-0 flex w-[min(86vw,280px)] flex-col border-r border-[#e2d9d0] bg-white shadow-xl transition-transform duration-300 ease-in-out ${
-            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          className={`absolute inset-y-0 right-0 flex w-[min(86vw,300px)] flex-col border-l border-[#e2d9d0] bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+            mobileOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <SidebarContents
@@ -735,12 +905,17 @@ export default function StudentAppShell({
             pendingCount={pendingCount}
             unreadCount={unreadCount}
             acceptedCount={acceptedCount}
+            user={session?.user}
           />
         </aside>
       </div>
 
-      {/* Every student page is rendered inside this shared content area. */}
-      <div id="main-content" className="min-w-0 lg:pl-64">
+      {/* Every student page is rendered inside this shared content area.
+          Bottom padding keeps content clear of the mobile tab bar. */}
+      <div
+        id="main-content"
+        className="min-w-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-64"
+      >
         {children}
       </div>
     </div>

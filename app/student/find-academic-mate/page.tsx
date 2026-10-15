@@ -22,7 +22,7 @@ type AcademicMateOffering = {
     bio: string | null;
     teachingExperience: string | null;
     yearsExperience: number | null;
-    verificationStatus: string;
+    verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
     user: { id: string; name: string; image: string | null };
     studentProfile: {
       programme: {
@@ -30,14 +30,23 @@ type AcademicMateOffering = {
       } | null;
     } | null;
   };
-  existingRequest: {
-    id: string;
-    status: string;
-  } | null;
+  existingRequest: ExistingRequest | null;
 };
 
-type ExistingRequest = { id: string; status: string };
-type MatchingResponse = { academicMates: AcademicMateOffering[]; matchedCourses: Course[]; mode?: "suggestions" | "search"; error?: string };
+type TutoringSessionSummary = {
+  id: string;
+  status: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  meetingLocation: string;
+};
+
+type ExistingRequest = {
+  id: string;
+  status: string;
+  tutoringSession?: TutoringSessionSummary | null;
+};
+type MatchingResponse = { academicMates: AcademicMateOffering[]; matchedCourses: Course[]; mode?: "suggestions" | "search"; truncated?: boolean; error?: string };
 type RequestResponse = { message?: string; error?: string; request?: { id: string; status: string } };
 
 function profileHref(mateId: string) {
@@ -155,7 +164,7 @@ function Avatar({ name, image, className = "h-10 w-10" }: { name: string; image:
 
 function SpecRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-6 border-b border-[#efe8e1] py-1.5">
+    <div className="flex items-baseline justify-between gap-4 border-b border-[#efe8e1] py-1">
       <dt className="shrink-0 text-xs text-[#8a7f7a]">{label}</dt>
       <dd className="min-w-0 text-right text-xs leading-5 text-[#282321]">{children}</dd>
     </div>
@@ -164,19 +173,19 @@ function SpecRow({ label, children }: { label: string; children: ReactNode }) {
 
 function ProseBlock({ title, text }: { title: string; text: string }) {
   return (
-    <section className="border-b border-[#efe8e1] py-3">
+    <section className="border-b border-[#efe8e1] py-2">
       <h3 className="text-xs font-semibold text-[#8a7f7a]">{title}</h3>
-      <p className="mt-1 whitespace-pre-line text-xs leading-6 text-[#4b423e]">{text}</p>
+      <p className="mt-0.5 whitespace-pre-line text-xs leading-5 text-[#4b423e]">{text}</p>
     </section>
   );
 }
 
 function SkeletonCard() {
   return (
-    <div aria-hidden="true" className="rounded-xl border border-[#e4dbd3] bg-white p-5">
-      <div className="flex items-start gap-3.5">
+    <div aria-hidden="true" className="rounded-xl border border-[#e4dbd3] bg-white p-3.5">
+      <div className="flex items-start gap-3">
         <div className="mc-skel h-12 w-12 rounded-full" />
-        <div className="flex-1 space-y-2.5">
+        <div className="flex-1 space-y-2">
           <div className="mc-skel h-4 w-1/3 rounded" />
           <div className="mc-skel h-3 w-1/2 rounded" />
           <div className="mc-skel h-3 w-2/3 rounded" />
@@ -221,21 +230,18 @@ function OfferingRow({
   
     return (
       <article
-        // Reduced outer padding from px-4 py-4 sm:px-5 sm:py-5 to p-3.5
-        className="mc-rise relative overflow-hidden rounded-xl border border-[#e4dbd3] bg-white p-3.5 shadow-[0_1px_2px_rgba(40,35,33,0.05),0_10px_24px_-14px_rgba(125,31,42,0.25)]"
+        className="mc-rise relative overflow-hidden rounded-xl border border-[#e4dbd3] bg-white p-3 shadow-[0_1px_2px_rgba(40,35,33,0.05),0_10px_24px_-14px_rgba(125,31,42,0.25)]"
         style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2.5">
           <span className="mc-ring mt-0.5 shrink-0 rounded-full p-[2px] shadow-sm">
-            {/* Reduced avatar size from h-12 w-12 to h-10 w-10 */}
             <Avatar name={mate.user.name} image={mate.user.image} className="h-10 w-10 ring-2 ring-white" />
           </span>
   
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {/* Reduced font size from [15px] to sm */}
                   <h2 className="text-sm font-semibold text-[#282321]">
                     <Link
                       href={profileHref(mate.id)}
@@ -245,7 +251,7 @@ function OfferingRow({
                       {mate.user.name}
                     </Link>
                   </h2>
-                  {mate.verificationStatus && (
+                  {mate.verificationStatus === "VERIFIED" && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
                       <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" pathLength={1} className="mc-tick" />
@@ -254,7 +260,6 @@ function OfferingRow({
                     </span>
                   )}
                 </div>
-                {mate.headline && <p className="mt-0.5 text-xs font-medium leading-4 text-[#7d1f2a]">{mate.headline}</p>}
                 {mate.studentProfile?.programme?.department && (
                   <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#6d6260]">
                     <Icon name="building" className="h-3 w-3 shrink-0 text-[#9a8f89]" />
@@ -264,20 +269,19 @@ function OfferingRow({
               </div>
   
               <div className="shrink-0 text-right">
-                {/* Reduced price text size slightly */}
                 <p className="text-sm font-bold tabular-nums tracking-tight text-[#7d1f2a]">{formatRate(offering.rate, offering.currency)}</p>
                 <p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatRateType(offering.rateType)}</p>
               </div>
             </div>
   
-            <p className="mt-2 text-xs leading-4 text-[#282321]">
+            <p className="mt-1.5 text-xs leading-4 text-[#282321]">
               <span className="rounded bg-[#f3ece7] px-1.5 py-0.5 font-semibold text-[#7d1f2a]">{offering.course.code}</span>
               <span className="text-[#6d6260]"> · {offering.course.name}</span>
             </p>
   
-            {offering.title && <p className="mt-1 text-xs font-medium leading-4 text-[#4b423e]">{offering.title}</p>}
+            {offering.title && <p className="mt-0.5 text-xs font-medium leading-4 text-[#4b423e]">{offering.title}</p>}
   
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-4 text-[#6d6260]">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] leading-4 text-[#6d6260]">
               <span className="inline-flex items-center gap-1">
                 <Icon name="clock" className="h-3 w-3 text-[#9a8f89]" />
                 {formatDuration(offering.sessionDurationMinutes)} session
@@ -290,10 +294,10 @@ function OfferingRow({
               )}
             </div>
   
-            {preview && <p className="mt-1.5 line-clamp-1 text-xs leading-4 text-[#5c534f]">{preview}</p>}
+            {preview && <p className="mt-1 line-clamp-1 text-xs leading-4 text-[#5c534f]">{preview}</p>}
   
             {topics.length > 0 && (
-              <ul className="mt-2 flex flex-wrap gap-1" aria-label="Topics covered">
+              <ul className="mt-1.5 flex flex-wrap gap-1" aria-label="Topics covered">
                 {topics.map((topic) => (
                   <li key={topic.id} className="rounded-full border border-[#eadfd9] bg-[#fbf8f6] px-2 py-0.5 text-[10px] font-medium text-[#6d6260]">
                     {topic.name}
@@ -304,65 +308,94 @@ function OfferingRow({
             )}
   
             {offering.rateType === "CUSTOM" && offering.rateDetails && (
-              <p className="mt-1 truncate text-[11px] leading-4 text-[#6d6260]" title={offering.rateDetails}>
+              <p className="mt-0.5 truncate text-[11px] leading-4 text-[#6d6260]" title={offering.rateDetails}>
                 <span className="text-[#8a7f7a]">Pricing · </span>
                 {offering.rateDetails}
               </p>
             )}
-  
+
             {/* Compact Footer Actions */}
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-[#f1ebe5] pt-2.5">
-              <div className="flex items-center gap-3">
+            {offering.existingRequest?.tutoringSession ? (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#f1ebe5] pt-2">
+                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                  <Icon name="check" className="h-3.5 w-3.5" />
+                  Booked
+                </span>
+
                 <button
                   type="button"
                   onClick={() => onOpenDetails(offering)}
                   aria-haspopup="dialog"
-                  aria-label={`Quick details for ${mate.user.name}, ${offering.course.code}`}
-                  className="relative z-10 inline-flex min-h-7 items-center text-xs font-semibold text-[#7d1f2a] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
+                  className="relative z-10 inline-flex min-h-8 items-center justify-center rounded-lg bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
                 >
-                  Quick details
+                  View session details
                 </button>
               </div>
-  
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
-                {requestSent && canCancel && (
-                  <button
-                    type="button"
-                    disabled={cancelling}
-                    onClick={() => onCancelRequest(offering)}
-                    aria-label={`Cancel your request to ${mate.user.name} for ${offering.course.code}`}
-                    className="relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed disabled:opacity-60"
+            ) : (
+              <>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-[#f1ebe5] pt-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onOpenDetails(offering)}
+                      aria-haspopup="dialog"
+                      aria-label={`Quick details for ${mate.user.name}, ${offering.course.code}`}
+                      className="relative z-10 inline-flex min-h-7 items-center text-xs font-semibold text-[#7d1f2a] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
+                    >
+                      Quick details
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {requestSent && canCancel && (
+                      <button
+                        type="button"
+                        disabled={cancelling}
+                        onClick={() => onCancelRequest(offering)}
+                        aria-label={`Cancel your request to ${mate.user.name} for ${offering.course.code}`}
+                        className="relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#7d1f2a] transition hover:border-[#c9a9ad] hover:bg-[#f8f2f0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {cancelling && <Spinner className="h-3 w-3" />}
+                        {cancelling ? "Cancelling..." : "Cancel"}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={requestSent}
+                      onClick={() => onOpenRequest(offering)}
+                      aria-label={
+                        requestSent
+                          ? `Request sent to ${mate.user.name}`
+                          : `Request academic support from ${mate.user.name}`
+                      }
+                      className={`relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed ${
+                        requestSent
+                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:shadow-md active:scale-95 motion-reduce:active:scale-100"
+                      }`}
+                    >
+                      {requestSent ? (
+                        <>
+                          <Icon name="check" className="h-3.5 w-3.5" />
+                          Sent
+                        </>
+                      ) : (
+                        "Request"
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {cancelError && (
+                  <p
+                    role="alert"
+                    className="relative z-10 mt-1 text-right text-[11px] leading-4 text-red-700"
                   >
-                    {cancelling && <Spinner className="h-3 w-3" />}
-                    {cancelling ? "Cancelling..." : "Cancel"}
-                  </button>
+                    {cancelError}
+                  </p>
                 )}
-  
-                <button
-                  type="button"
-                  disabled={requestSent}
-                  onClick={() => onOpenRequest(offering)}
-                  aria-label={requestSent ? `Request sent to ${mate.user.name}` : `Request academic support from ${mate.user.name}`}
-                  className={`relative z-10 inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-not-allowed ${
-                    requestSent
-                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] text-white shadow-sm shadow-[#7d1f2a]/25 hover:shadow-md active:scale-95 motion-reduce:active:scale-100"
-                  }`}
-                >
-                  {requestSent ? (
-                    <>
-                      <Icon name="check" className="h-3.5 w-3.5" />
-                      Sent
-                    </>
-                  ) : (
-                    "Request"
-                  )}
-                </button>
-              </div>
-            </div>
-  
-            {cancelError && (
-              <p role="alert" className="relative z-10 mt-1.5 text-right text-[11px] leading-4 text-red-700">{cancelError}</p>
+              </>
             )}
           </div>
         </div>
@@ -373,6 +406,7 @@ function OfferingRow({
 export default function FindAcademicMatePage() {
   const [data, setData] = useState<MatchingResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("ALL");
@@ -391,9 +425,11 @@ export default function FindAcademicMatePage() {
   const [requestsByOffering, setRequestsByOffering] = useState<Record<string, ExistingRequest>>({});
   const [cancellingOfferingId, setCancellingOfferingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<{ offeringId: string; message: string } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<AcademicMateOffering | null>(null);
 
   const requestDialogRef = useRef<HTMLDialogElement>(null);
   const detailsDialogRef = useRef<HTMLDialogElement>(null);
+  const cancelDialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -415,8 +451,8 @@ export default function FindAcademicMatePage() {
           signal: controller.signal,
         });
 
-        const body = (await response.json()) as MatchingResponse;
-        if (!response.ok) throw new Error(body.error || "Unable to load Academic Mates.");
+        const body = (await response.json().catch(() => null)) as MatchingResponse | null;
+        if (!response.ok || !body) throw new Error(body?.error || "Unable to load Academic Mates. Please try again.");
 
         const offerings = Array.isArray(body.academicMates) ? body.academicMates : [];
 
@@ -434,11 +470,14 @@ export default function FindAcademicMatePage() {
             ),
           ),
         );
+        const matchedCourses = Array.isArray(body.matchedCourses) ? body.matchedCourses : [];
         setCancelError(null);
-        setData({
-          academicMates: offerings,
-          matchedCourses: Array.isArray(body.matchedCourses) ? body.matchedCourses : [],
-        });
+        setLoadedQuery(query);
+        // A course chip that is no longer in the new results must not keep filtering silently.
+        setSelectedCourseId((current) =>
+          current === "ALL" || matchedCourses.some((course) => course.id === current) ? current : "ALL",
+        );
+        setData({ academicMates: offerings, matchedCourses, truncated: body.truncated === true });
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Unable to load Academic Mates. Please try again.");
@@ -471,10 +510,19 @@ export default function FindAcademicMatePage() {
     else if (!selectedOffering && dialog.open) dialog.close();
   }, [selectedOffering]);
 
+  useEffect(() => {
+    const dialog = cancelDialogRef.current;
+    if (!dialog) return;
+    if (cancelTarget && !dialog.open) dialog.showModal();
+    else if (!cancelTarget && dialog.open) dialog.close();
+  }, [cancelTarget]);
+
   const filteredOfferings = useMemo(() => {
     if (!data) return [];
 
-    const query = search.trim().toLowerCase();
+    // Once the server has answered for this exact query, trust its results.
+    // The local text filter only gives instant feedback while the new request is still pending.
+    const query = loadedQuery === search.trim() ? "" : search.trim().toLowerCase();
     const minimum = minPrice.trim() === "" ? null : Number(minPrice);
     const maximum = maxPrice.trim() === "" ? null : Number(maxPrice);
 
@@ -512,7 +560,10 @@ export default function FindAcademicMatePage() {
 
       return matchesCourse && matchesQuery && matchesMinPrice && matchesMaxPrice && matchesDuration;
     });
-  }, [data, search, selectedCourseId, minPrice, maxPrice, durationFilter]);
+  }, [data, search, loadedQuery, selectedCourseId, minPrice, maxPrice, durationFilter]);
+
+  // Skeletons only for the first load, or when nothing is left to show while loading.
+  const showSkeleton = loading && (data === null || filteredOfferings.length === 0);
 
   const activeFilterCount =
     (selectedCourseId !== "ALL" ? 1 : 0) + (minPrice !== "" ? 1 : 0) + (maxPrice !== "" ? 1 : 0) + (durationFilter !== "ALL" ? 1 : 0);
@@ -601,13 +652,6 @@ export default function FindAcademicMatePage() {
     const request = requestsByOffering[offering.offeringId];
     if (!request || cancellingOfferingId) return;
 
-    const confirmed = window.confirm(
-      request.status === "ACCEPTED"
-        ? "Cancel this accepted request? You can no longer book a session from it."
-        : "Cancel this academic support request?",
-    );
-    if (!confirmed) return;
-
     setCancellingOfferingId(offering.offeringId);
     setCancelError(null);
 
@@ -644,22 +688,22 @@ export default function FindAcademicMatePage() {
   const detailsRequestSent = detailsOffering ? requestedOfferingIds.has(detailsOffering.offeringId) : false;
 
   const fieldClass =
-    "h-11 w-full rounded-lg border border-[#d8cec5] bg-white px-3 text-base text-[#282321] shadow-sm outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 sm:h-10 sm:text-sm";
+    "h-10 w-full rounded-lg border border-[#d8cec5] bg-white px-3 text-base text-[#282321] shadow-sm outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 sm:h-9 sm:text-sm";
 
   return (
-    <main className="min-h-[calc(100dvh-4rem)] bg-[#f9f8f6] px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-[calc(100dvh-4rem)] bg-[#f9f8f6] px-3 py-4 sm:px-5 lg:px-6">
       <style>{CARD_STYLES}</style>
 
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6">
+        <header className="mb-3">
           <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Find an Academic Mate</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6d6260]">
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-[#6d6260]">
             Compare course offerings, experience and rates. Tap a card to see the full profile.
           </p>
         </header>
 
         {/* ---------- search ---------- */}
-        <section className="mb-4" aria-label="Search Academic Mates">
+        <section className="mb-3" aria-label="Search Academic Mates">
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <label htmlFor="mate-search" className="sr-only">Search Academic Mates</label>
@@ -670,7 +714,7 @@ export default function FindAcademicMatePage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by name, course, topic or department"
-                className={`${fieldClass} h-12 rounded-xl pl-10 pr-4 sm:h-12`}
+                className={`${fieldClass} h-11 rounded-xl pl-10 pr-4 sm:h-11`}
               />
             </div>
             <button
@@ -678,7 +722,7 @@ export default function FindAcademicMatePage() {
               onClick={() => setShowFilters((v) => !v)}
               aria-expanded={showFilters}
               aria-controls="filter-panel"
-              className={`relative inline-flex h-12 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition lg:hidden ${
+              className={`relative inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold shadow-sm transition lg:hidden ${
                 showFilters || activeFilterCount > 0 ? "border-[#7d1f2a]/40 bg-[#f8f2f0] text-[#7d1f2a]" : "border-[#d8cec5] bg-white text-[#4b423e]"
               }`}
             >
@@ -692,7 +736,7 @@ export default function FindAcademicMatePage() {
 
           {/* Course chips: scroll sideways on mobile */}
           {(data?.matchedCourses.length ?? 0) > 0 && (
-            <div className="mc-noscroll -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filter by course">
+            <div className="mc-noscroll -mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filter by course">
               {[{ id: "ALL", code: "All courses", name: "" }, ...(data?.matchedCourses ?? [])].map((course) => {
                 const active = selectedCourseId === course.id;
                 return (
@@ -702,7 +746,7 @@ export default function FindAcademicMatePage() {
                     aria-pressed={active}
                     title={course.name || undefined}
                     onClick={() => setSelectedCourseId(course.id)}
-                    className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
                       active ? "border-[#7d1f2a] bg-[#7d1f2a] text-white shadow-sm" : "border-[#e4dbd3] bg-white text-[#4b423e] hover:border-[#d8c2c5] hover:bg-[#fbf8f6]"
                     }`}
                   >
@@ -714,18 +758,18 @@ export default function FindAcademicMatePage() {
           )}
         </section>
 
-        <div className="lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
           {/* ---------- filters (sidebar on desktop, drawer-style panel on mobile) ---------- */}
           <aside
             id="filter-panel"
             aria-label="Price and duration filters"
-            className={`${showFilters ? "block" : "hidden"} mb-5 rounded-xl border border-[#e4dbd3] bg-white p-4 shadow-sm lg:sticky lg:top-4 lg:mb-0 lg:block`}
+            className={`${showFilters ? "block" : "hidden"} mb-2 rounded-lg border border-[#e4dbd3] bg-white p-2 lg:sticky lg:top-3 lg:mb-0 lg:block`}
           >
             <h2 className="text-sm font-semibold text-[#282321]">Filters</h2>
 
-            <fieldset className="mt-4">
+            <fieldset className="mt-3">
               <legend className="text-xs font-semibold text-[#6d6260]">Price</legend>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="min-price" className="sr-only">Minimum price</label>
                   <input id="min-price" type="number" min="0" step="any" inputMode="decimal" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} placeholder="Min" className={fieldClass} />
@@ -737,9 +781,9 @@ export default function FindAcademicMatePage() {
               </div>
             </fieldset>
 
-            <div className="mt-4">
+            <div className="mt-3">
               <label htmlFor="duration-filter" className="text-xs font-semibold text-[#6d6260]">Session length</label>
-              <select id="duration-filter" value={durationFilter} onChange={(event) => setDurationFilter(event.target.value)} className={`${fieldClass} mt-2`}>
+              <select id="duration-filter" value={durationFilter} onChange={(event) => setDurationFilter(event.target.value)} className={`${fieldClass} mt-1.5`}>
                 <option value="ALL">Any length</option>
                 <option value="UP_TO_30">30 minutes or less</option>
                 <option value="31_TO_60">31 to 60 minutes</option>
@@ -749,7 +793,7 @@ export default function FindAcademicMatePage() {
             </div>
 
             {hasAnyFilter && (
-              <button type="button" onClick={clearFilters} className="mt-4 w-full rounded-lg border border-[#e4dbd3] py-2 text-xs font-semibold text-[#7d1f2a] transition hover:bg-[#f8f2f0]">
+              <button type="button" onClick={clearFilters} className="mt-3 w-full rounded-lg border border-[#e4dbd3] py-1.5 text-xs font-semibold text-[#7d1f2a] transition hover:bg-[#f8f2f0]">
                 Clear all filters
               </button>
             )}
@@ -757,54 +801,60 @@ export default function FindAcademicMatePage() {
 
           {/* ---------- results ---------- */}
           <section aria-label="Academic Mate results" className="min-w-0">
-            {!loading && !error && (
-              <div className="mb-3 flex items-end justify-between gap-3">
+            {!showSkeleton && !error && (
+              <div className="mb-2 flex items-end justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-semibold text-[#282321]">
                     {search.trim() ? `Search results for “${search.trim()}”` : "Suggested"}
                   </h2>
-                  <p className="mt-1 text-xs leading-5 text-[#6d6260]">
+                  <p className="mt-0.5 text-xs leading-4 text-[#6d6260]">
                     {search.trim()
                       ? "Results can include courses outside your current enrolment."
                       : "Based on courses you are enrolled in or repeating. Search to discover others."}
                   </p>
                 </div>
-                <p className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold tabular-nums text-[#7d1f2a] shadow-sm ring-1 ring-[#eadfd9]" aria-live="polite">
+                <p className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold tabular-nums text-[#7d1f2a] shadow-sm ring-1 ring-[#eadfd9]" aria-live="polite">
                   {filteredOfferings.length} {filteredOfferings.length === 1 ? "offering" : "offerings"}
                 </p>
               </div>
             )}
 
-            {loading && (
-              <div role="status" className="space-y-4">
+            {!showSkeleton && !error && data?.truncated && (
+              <p className="mb-2 rounded-lg bg-[#fbf8f6] px-3 py-1.5 text-xs leading-4 text-[#6d6260]">
+                Showing the first 100 results. Search for something more specific to narrow them down.
+              </p>
+            )}
+
+            {showSkeleton && (
+              <div role="status" className="space-y-3">
                 <span className="sr-only">Loading Academic Mates...</span>
                 <SkeletonCard /><SkeletonCard /><SkeletonCard />
               </div>
             )}
 
             {!loading && error && (
-              <div role="alert" className="rounded-xl border border-[#e4dbd3] bg-white px-5 py-14 text-center shadow-sm">
+              <div role="alert" className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-8 text-center shadow-sm">
                 <h2 className="text-base font-semibold text-[#282321]">Unable to load results</h2>
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#6d6260]">{error}</p>
-                <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="mt-5 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923]">Try again</button>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm leading-5 text-[#6d6260]">{error}</p>
+                <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="mt-4 rounded-lg bg-[#7d1f2a] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923]">Try again</button>
               </div>
             )}
 
             {!loading && !error && filteredOfferings.length === 0 && (
-              <div className="rounded-xl border border-[#e4dbd3] bg-white px-5 py-14 text-center shadow-sm">
+              <div className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-8 text-center shadow-sm">
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f4eceb] text-[#7d1f2a]"><Icon name="search" className="h-6 w-6" /></span>
-                <h2 className="mt-4 text-base font-semibold text-[#282321]">{data && data.academicMates.length > 0 ? "No matching results" : "No Academic Mate matches yet"}</h2>
-                <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#6d6260]">
+                <h2 className="mt-3 text-base font-semibold text-[#282321]">{data && data.academicMates.length > 0 ? "No matching results" : "No Academic Mate matches yet"}</h2>
+                <p className="mx-auto mt-1.5 max-w-sm text-sm leading-5 text-[#6d6260]">
                   {data && data.academicMates.length > 0 ? "Try a different search term, or loosen your filters." : "There are currently no verified Academic Mate offerings matching your courses. Check back later, or search for another course."}
                 </p>
                 {hasAnyFilter && (
-                  <button type="button" onClick={clearFilters} className="mt-4 text-sm font-semibold text-[#7d1f2a] hover:underline">Clear filters</button>
+                  <button type="button" onClick={clearFilters} className="mt-3 text-sm font-semibold text-[#7d1f2a] hover:underline">Clear filters</button>
                 )}
               </div>
             )}
 
-            {!loading && !error && filteredOfferings.length > 0 && (
-              <div className="space-y-4">
+            {!showSkeleton && !error && filteredOfferings.length > 0 && (
+              <div aria-busy={loading} className={`space-y-3 transition-opacity ${loading ? "opacity-60" : ""}`}>
                 {filteredOfferings.map((offering, index) => (
                   <OfferingRow
                     key={offering.offeringId}
@@ -819,7 +869,7 @@ export default function FindAcademicMatePage() {
                     cancelError={cancelError?.offeringId === offering.offeringId ? cancelError.message : null}
                     onOpenDetails={openDetailsDialog}
                     onOpenRequest={openRequestDialog}
-                    onCancelRequest={(target) => void handleCancelRequest(target)}
+                    onCancelRequest={setCancelTarget}
                   />
                 ))}
               </div>
@@ -838,7 +888,7 @@ export default function FindAcademicMatePage() {
       >
         {detailsOffering && (
           <>
-            <div className="flex items-start justify-between gap-4 border-b border-[#efe8e1] px-5 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-3 border-b border-[#efe8e1] px-4 py-3 sm:px-5">
               <div className="flex min-w-0 items-start gap-3">
                 <Avatar name={detailsOffering.academicMate.user.name} image={detailsOffering.academicMate.user.image} className="h-10 w-10" />
                 <div className="min-w-0">
@@ -846,15 +896,15 @@ export default function FindAcademicMatePage() {
                 <h2 id="details-dialog-title" className="text-base font-semibold tracking-tight text-[#282321]">
                     {detailsOffering.academicMate.user.name}
                 </h2>
-                {detailsOffering.academicMate.verificationStatus && (
+                {detailsOffering.academicMate.verificationStatus === "VERIFIED" && (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
                     <Icon name="check" className="h-3 w-3" />
                     Verified
                     </span>
                 )}
                 </div>
-                  {detailsOffering.academicMate.headline && <p className="mt-1 text-xs leading-5 text-[#7d1f2a]">{detailsOffering.academicMate.headline}</p>}
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6d6260]">
+                  {detailsOffering.academicMate.headline && <p className="mt-0.5 text-xs leading-5 text-[#7d1f2a]">{detailsOffering.academicMate.headline}</p>}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#6d6260]">
                     
                     {detailsOffering.academicMate.yearsExperience !== null && detailsOffering.academicMate.yearsExperience > 0 && (
                       <>
@@ -870,7 +920,7 @@ export default function FindAcademicMatePage() {
               </button>
             </div>
 
-            <div className="px-5 sm:px-6">
+            <div className="px-4 sm:px-5">
               <dl className="border-b border-[#efe8e1]">
                 <SpecRow label="Course">
                   <span className="text-sm">{detailsOffering.course.code}</span>
@@ -890,33 +940,85 @@ export default function FindAcademicMatePage() {
                 )}
               </dl>
 
+              {detailsOffering.existingRequest?.tutoringSession && (
+              <section className="border-b border-[#efe8e1] py-3">
+                <div className="flex items-center gap-2">
+                  <Icon name="clock" className="h-4 w-4 text-[#7d1f2a]" />
+                  <h3 className="text-sm font-semibold text-[#282321]">
+                    Booked session
+                  </h3>
+                </div>
+
+                <dl className="mt-1.5">
+                  <SpecRow label="Status">
+                    <span className="font-semibold capitalize text-emerald-700">
+                      {detailsOffering.existingRequest.tutoringSession.status
+                        .replace(/_/g, " ")
+                        .toLowerCase()}
+                    </span>
+                  </SpecRow>
+
+                  <SpecRow label="Starts">
+                    {new Date(
+                      detailsOffering.existingRequest.tutoringSession.scheduledStart
+                    ).toLocaleString("en-ZM", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                      timeZone: "Africa/Lusaka",
+                    })}
+                  </SpecRow>
+
+                  <SpecRow label="Ends">
+                    {new Date(
+                      detailsOffering.existingRequest.tutoringSession.scheduledEnd
+                    ).toLocaleString("en-ZM", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                      timeZone: "Africa/Lusaka",
+                    })}
+                  </SpecRow>
+
+                  <SpecRow label="Location">
+                    {detailsOffering.existingRequest.tutoringSession.meetingLocation ||
+                      "Not specified"}
+                  </SpecRow>
+                </dl>
+              </section>
+            )}
+
               {detailsOffering.description && <ProseBlock title="Offering details" text={detailsOffering.description} />}
               {detailsOffering.academicMate.bio && <ProseBlock title="About" text={detailsOffering.academicMate.bio} />}
               {detailsOffering.academicMate.teachingExperience && <ProseBlock title="Teaching experience" text={detailsOffering.academicMate.teachingExperience} />}
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-[#efe8e1] px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-              <Link href={profileHref(detailsOffering.academicMate.id)} className="inline-flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold text-[#7d1f2a] hover:underline sm:mr-auto">
+            <div className="flex flex-col-reverse gap-1.5 border-t border-[#efe8e1] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+              <Link href={profileHref(detailsOffering.academicMate.id)} className="inline-flex min-h-9 items-center justify-center gap-1.5 text-xs font-semibold text-[#7d1f2a] hover:underline sm:mr-auto">
                 View full profile
               </Link>
-              <button type="button" onClick={() => detailsDialogRef.current?.close()} className="min-h-10 rounded-lg border border-[#d8cec5] bg-white px-4 py-2.5 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]">Close</button>
-              <button
-                type="button"
-                disabled={detailsRequestSent}
-                onClick={requestFromDetails}
-                className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-                  detailsRequestSent ? "border border-emerald-200 bg-emerald-50 text-emerald-700" : "bg-[#7d1f2a] text-white hover:bg-[#681923]"
-                }`}
-              >
-                {detailsRequestSent ? (
-                  <>
-                    <Icon name="check" className="h-3 w-3" />
-                   Request Sent
-                  </>
-                ) : (
-                  "Request academic support"
-                )}
-              </button>
+              <button type="button" onClick={() => detailsDialogRef.current?.close()} className="min-h-9 rounded-lg border border-[#d8cec5] bg-white px-4 py-2 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]">Close</button>
+             
+              {!detailsOffering.existingRequest?.tutoringSession && (
+                <button
+                  type="button"
+                  disabled={detailsRequestSent}
+                  onClick={requestFromDetails}
+                  className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
+                    detailsRequestSent
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "bg-[#7d1f2a] text-white hover:bg-[#681923]"
+                  }`}
+                >
+                  {detailsRequestSent ? (
+                    <>
+                      <Icon name="check" className="h-3 w-3" />
+                      Request Sent
+                    </>
+                  ) : (
+                    "Request academic support"
+                  )}
+                </button>
+              )}
+
             </div>
           </>
         )}
@@ -1068,6 +1170,46 @@ export default function FindAcademicMatePage() {
             </>
         )}
     </dialog>
+
+      {/* ---------- cancel confirmation dialog ---------- */}
+      <dialog
+        ref={cancelDialogRef}
+        aria-labelledby="cancel-dialog-title"
+        onClose={() => setCancelTarget(null)}
+        onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}
+        className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-sm rounded-xl border border-[#e2d9d0] bg-white p-0 text-[#282321] shadow-2xl backdrop:bg-black/50"
+      >
+        {cancelTarget && (
+          <div className="px-4 py-3">
+            <h2 id="cancel-dialog-title" className="text-base font-semibold tracking-tight text-[#282321]">Cancel this request?</h2>
+            <p className="mt-1 text-xs leading-5 text-[#6d6260]">
+              {requestsByOffering[cancelTarget.offeringId]?.status === "ACCEPTED"
+                ? "This request was accepted. If you cancel it, you can no longer book a session from it."
+                : `Your request to ${cancelTarget.academicMate.user.name} for ${cancelTarget.course.code} will be withdrawn.`}
+            </p>
+            <div className="mt-3 flex flex-col-reverse gap-1.5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => cancelDialogRef.current?.close()}
+                className="min-h-8 rounded-md border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]"
+              >
+                Keep request
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = cancelTarget;
+                  cancelDialogRef.current?.close();
+                  void handleCancelRequest(target);
+                }}
+                className="min-h-8 rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923]"
+              >
+                Cancel request
+              </button>
+            </div>
+          </div>
+        )}
+      </dialog>
     </main>
   );
 }

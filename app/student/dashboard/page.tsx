@@ -205,19 +205,24 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
-function Metric({ label, value, description, attention = false }: { label: string; value: number; description: string; attention?: boolean }) {
+
+function Metric({ label, value, description, icon, attention = false }: { label: string; value: number; description: string; icon: IconName; attention?: boolean }) {
   const shown = useCountUp(value);
   return (
-    <article className="min-w-0 bg-white px-3 py-3 sm:px-4">
-      <p className="flex items-center gap-2 text-2xl font-semibold leading-none tracking-tight tabular-nums text-[#282321]">
+    <article className="min-w-0 bg-white px-3.5 py-3 sm:px-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-[11px] font-medium text-[#756b65] sm:text-xs">{label}</p>
+        <Icon name={icon} className="h-4 w-4 shrink-0 text-[#b3a79f]" />
+      </div>
+      <p className="mt-1.5 flex items-center gap-2 text-xl font-semibold leading-none tracking-tight tabular-nums text-[#282321] sm:text-[22px]">
         {shown}
         {attention && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
       </p>
-      <p className="mt-1.5 truncate text-[11px] font-medium text-[#625954] sm:text-xs">{label}</p>
-      <p className="mt-0.5 truncate text-[10px] leading-4 text-[#8a7f7a]">{description}</p>
+      <p className="mt-1.5 truncate text-[10px] leading-4 text-[#8a7f7a] sm:text-[11px]">{description}</p>
     </article>
   );
 }
+
 function PanelHeader({ title, description, count, href }: { title: string; description: string; count?: number; href?: string }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-[#eee8e2] px-4 py-3.5 sm:px-5">
@@ -343,10 +348,10 @@ function DashboardContent({
 
       <section className="dash-rise mt-5" style={{ animationDelay: "60ms" }} aria-label="Academic support overview">
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-[#e6ded6] bg-[#e9e1d9] shadow-[0_1px_2px_rgba(40,35,33,0.04)] lg:grid-cols-4">
-          <Metric label="Total requests" value={summary.totalRequests} description="All tutoring requests" />
-          <Metric label="Pending" value={summary.pendingRequests} description="Awaiting a response" attention={summary.pendingRequests > 0} />
-          <Metric label="Completed sessions" value={summary.completedSessions} description="Sessions completed" />
-          <Metric label="Upcoming sessions" value={summary.upcomingSessions} description="Scheduled sessions" />
+          <Metric label="Total requests" value={summary.totalRequests} icon="requests" description="All tutoring requests" />
+          <Metric label="Pending" value={summary.pendingRequests} icon="pending" description="Awaiting a response" attention={summary.pendingRequests > 0} />
+          <Metric label="Completed sessions" value={summary.completedSessions} icon="completed" description="Sessions completed" />
+          <Metric label="Upcoming sessions" value={summary.upcomingSessions} icon="calendar" description="Scheduled sessions" />
         </div>
       </section>
 

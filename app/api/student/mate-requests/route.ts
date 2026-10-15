@@ -241,6 +241,23 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    // Two quick taps can both pass the existingRequest check above. The database's
+    // unique index (MateRequest_active_unique) rejects the second one with code P2002.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You already have a pending or accepted request for this offering.",
+        },
+        { status: 409 },
+      );
+    }
+
     console.error("POST /api/student/mate-requests failed:", error);
 
     return NextResponse.json(
