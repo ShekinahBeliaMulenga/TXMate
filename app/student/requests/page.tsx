@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import SessionBookingDialog from "@/components/student/session-booking-dialog";
 
@@ -36,8 +36,9 @@ type RequestItem = {
   } | null;
 };
 
-type RequestsResponse = { requests: RequestItem[]; error?: string };
+type ApiBody = { requests?: RequestItem[]; message?: string; error?: string };
 
+const PAGE_SIZE = 10;
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "ALL", label: "All" },
   { value: "REQUESTED", label: "Pending" },
@@ -46,72 +47,108 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "CANCELLED", label: "Cancelled" },
   { value: "EXPIRED", label: "Expired" },
 ];
+const COLUMNS = ["Course", "Academic Mate", "Requested", "Status", "Session", "Actions"];
 
-function formatStatus(status: string) {
-  if (status === "REQUESTED") return "Pending";
-  return status.toLowerCase().split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+const RED = "bg-red-50 text-red-800 ring-red-200";
+const STATUS_CLASSES: Record<string, string> = {
+  ACCEPTED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  REQUESTED: "bg-amber-50 text-amber-800 ring-amber-200",
+  DECLINED: RED,
+  CANCELLED: RED,
+  EXPIRED: RED,
+};
+
+const BTN_OUTLINE = "rounded-md border border-[#d8cec5] px-3 py-2 text-xs font-medium text-[#625954] hover:bg-[#f7f4f0] disabled:opacity-50";
+const BTN_PRIMARY = "rounded-md bg-[#7d1f2a] px-3 py-2 text-xs font-semibold text-white hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-50";
+const BTN_SM = "whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium";
+const TH = "px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4";
+const TD = "px-3 py-3 sm:px-4";
+
+const formatStatus = (status: string) =>
+  status === "REQUESTED"
+    ? "Pending"
+    : status.toLowerCase().split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+
+function makeFormatter(extra: Intl.DateTimeFormatOptions) {
+  const fmt = new Intl.DateTimeFormat("en-ZM", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Lusaka", ...extra });
+  return (value: string | null) => {
+    if (!value) return "Not specified";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : fmt.format(date);
+  };
 }
+const formatDate = makeFormatter({});
+const formatDateTime = makeFormatter({ hour: "2-digit", minute: "2-digit" });
 
-function formatDate(value: string | null) {
-  if (!value) return "Not specified";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-ZM", {
-    day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Lusaka",
-  }).format(date);
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return "Not specified";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-ZM", {
-    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Africa/Lusaka",
-  }).format(date);
-}
-
-function statusClasses(status: string) {
-  switch (status) {
-    case "ACCEPTED":
-      return "bg-emerald-50 text-emerald-800 ring-emerald-200";
-    case "REQUESTED":
-      return "bg-amber-50 text-amber-800 ring-amber-200";
-    case "DECLINED":
-    case "CANCELLED":
-    case "EXPIRED":
-      return "bg-red-50 text-red-800 ring-red-200";
-    default:
-      return "bg-stone-100 text-stone-700 ring-stone-200";
-  }
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium ring-1 ring-inset ${statusClasses(status)}`}>
-      {formatStatus(status)}
-    </span>
-  );
-}
-
-function canCancel(item: RequestItem) {
-  return (item.status === "REQUESTED" || item.status === "ACCEPTED") && !item.tutoringSession;
-}
-
-function initials(name: string) {
+const initials = (name: string) => {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "AM";
+  if (!parts.length) return "AM";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+const canCancel = (item: RequestItem) => (item.status === "REQUESTED" || item.status === "ACCEPTED") && !item.tutoringSession;
+const errorMessage = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback);
+
+/** JSON request helper: always parses safely and throws `body.error` (or the fallback) on failure. */
+async function api(url: string, fallback: string, init: RequestInit = {}): Promise<ApiBody> {
+  const response = await fetch(url, {
+    cache: "no-store",
+    ...init,
+    headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}) },
+  });
+  const body: ApiBody = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || fallback);
+  return body;
 }
 
 // Tells the sidebar to clear its green "newly accepted" badge (same event name as use-accepted-requests.ts).
 async function markAcceptedRequestsSeen() {
   try {
-    const response = await fetch("/api/student/my-requests/seen", { method: "POST", cache: "no-store" });
-    if (response.ok) window.dispatchEvent(new Event("txmate:accepted-requests-seen"));
+    await api("/api/student/my-requests/seen", "", { method: "POST" });
+    window.dispatchEvent(new Event("txmate:accepted-requests-seen"));
   } catch {
     // The badge will clear the next time the page is opened.
   }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium ring-1 ring-inset ${STATUS_CLASSES[status] ?? "bg-stone-100 text-stone-700 ring-stone-200"}`}>
+      {formatStatus(status)}
+    </span>
+  );
+}
+
+function Modal({ id, width, onClose, children }: { id: string; width: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-5" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby={id} className={`my-auto w-full ${width} rounded-lg border border-[#e2d9d0] bg-white p-4 shadow-xl sm:p-5`}>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function CancelDialog({ id, title, busy, keepLabel, onKeep, onConfirm, children }: {
+  id: string; title: string; busy: boolean; keepLabel: string; onKeep: () => void; onConfirm: () => void; children: ReactNode;
+}) {
+  return (
+    <Modal id={id} width="max-w-md" onClose={() => !busy && onKeep()}>
+      <h2 id={id} className="text-base font-semibold">{title}</h2>
+      {children}
+      <div className="mt-5 flex justify-end gap-2">
+        <button type="button" disabled={busy} onClick={onKeep} className={BTN_OUTLINE}>{keepLabel}</button>
+        <button type="button" disabled={busy} onClick={onConfirm} className={BTN_PRIMARY}>{busy ? "Cancelling..." : "Confirm cancellation"}</button>
+      </div>
+    </Modal>
+  );
 }
 
 export default function StudentRequestsPage() {
@@ -126,25 +163,20 @@ export default function StudentRequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<RequestItem | null>(null);
   const [bookingTarget, setBookingTarget] = useState<RequestItem | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelSessionTarget, setCancelSessionTarget] = useState<RequestItem | null>(null);
+  const [cancelSessionReason, setCancelSessionReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const loadRequests = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setPageError("");
-      const response = await fetch("/api/student/my-requests", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal,
-      });
-      const body = (await response.json()) as RequestsResponse;
-      if (!response.ok) throw new Error(body.error || "Unable to load your requests.");
-      setRequests(body.requests);
+      const body = await api("/api/student/my-requests", "Unable to load your requests.", { signal });
+      setRequests(body.requests ?? []);
       void markAcceptedRequestsSeen();
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
-      setPageError(error instanceof Error ? error.message : "Unable to load your requests.");
+      setPageError(errorMessage(error, "Unable to load your requests."));
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -156,84 +188,94 @@ export default function StudentRequestsPage() {
     return () => controller.abort();
   }, [loadRequests]);
 
-  useEffect(() => {
-    if (!selectedRequest && !cancelTarget) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !cancellingId) {
-        setSelectedRequest(null);
-        setCancelTarget(null);
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedRequest, cancelTarget, cancellingId]);
+  useEffect(() => setPage(1), [query, status, sortOrder]);
 
   const counts = useMemo(() => {
-    const values: Record<StatusFilter, number> = {
-      ALL: requests.length,
-      REQUESTED: 0,
-      ACCEPTED: 0,
-      DECLINED: 0,
-      CANCELLED: 0,
-      EXPIRED: 0,
-    };
+    const values: Record<StatusFilter, number> = { ALL: requests.length, REQUESTED: 0, ACCEPTED: 0, DECLINED: 0, CANCELLED: 0, EXPIRED: 0 };
     for (const item of requests) values[item.status] += 1;
     return values;
   }, [requests]);
 
   const filteredRequests = useMemo(() => {
     const search = query.trim().toLowerCase();
-    const result = requests.filter((item) => {
-      const matchesStatus = status === "ALL" || item.status === status;
-      const searchable = [
-        item.offering.course.code,
-        item.offering.course.name,
-        item.offering.title ?? "",
-        item.offering.academicMate.name,
-        item.message ?? "",
-      ].join(" ").toLowerCase();
-      return matchesStatus && (!search || searchable.includes(search));
-    });
-    return result.sort((a, b) => {
-      const difference = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      return sortOrder === "NEWEST" ? -difference : difference;
-    });
+    const direction = sortOrder === "NEWEST" ? -1 : 1;
+    return requests
+      .filter((item) => {
+        if (status !== "ALL" && item.status !== status) return false;
+        const { course, title, academicMate } = item.offering;
+        return !search || [course.code, course.name, title ?? "", academicMate.name, item.message ?? ""].join(" ").toLowerCase().includes(search);
+      })
+      .sort((a, b) => direction * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
   }, [requests, query, status, sortOrder]);
 
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const visibleRequests = filteredRequests.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const visibleRequests = filteredRequests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => {
-    setPage(1);
-  }, [query, status, sortOrder]);
-
-  async function handleCancel() {
-    if (!cancelTarget || cancellingId) return;
-    const requestId = cancelTarget.id;
-    setCancellingId(requestId);
+  /** Runs a cancel call with shared busy/notice/error handling. Returns true on success. */
+  async function runCancel(url: string, init: RequestInit, fallback: string, onSuccess: (body: ApiBody) => void, successNotice: string) {
+    if (cancelling) return;
+    setCancelling(true);
     setPageError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/student/mate-requests/${encodeURIComponent(requestId)}`, {
-        method: "PATCH",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "CANCELLED" }),
-      });
-      const body = (await response.json()) as { message?: string; error?: string };
-      if (!response.ok) throw new Error(body.error || "Unable to cancel this request.");
-      setRequests((current) => current.map((item) => item.id === requestId ? { ...item, status: "CANCELLED" } : item));
-      setNotice(body.message || "Your request has been cancelled.");
-      setCancelTarget(null);
-      setSelectedRequest(null);
+      const body = await api(url, fallback, init);
+      onSuccess(body);
+      setNotice(body.message || successNotice);
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Unable to cancel this request.");
+      setPageError(errorMessage(error, fallback));
       setCancelTarget(null);
     } finally {
-      setCancellingId(null);
+      setCancelling(false);
     }
   }
+
+  const handleCancel = () => {
+    const target = cancelTarget;
+    if (!target) return;
+    return runCancel(
+      `/api/student/mate-requests/${encodeURIComponent(target.id)}`,
+      { method: "PATCH", body: JSON.stringify({ action: "CANCELLED" }) },
+      "Unable to cancel this request.",
+      () => {
+        setRequests((cur) => cur.map((r) => (r.id === target.id ? { ...r, status: "CANCELLED" } : r)));
+        setCancelTarget(null);
+        setSelectedRequest(null);
+      },
+      "Your request has been cancelled.",
+    );
+  };
+
+  const handleCancelSession = () => {
+    const target = cancelSessionTarget;
+    const session = target?.tutoringSession;
+    if (!target || !session) return;
+    return runCancel(
+      `/api/student/sessions/${encodeURIComponent(session.id)}/cancel`,
+      { method: "POST", body: JSON.stringify({ reason: cancelSessionReason.trim() }) },
+      "Unable to cancel this session.",
+      () => {
+        setRequests((cur) =>
+          cur.map((r) => (r.id === target.id && r.tutoringSession ? { ...r, tutoringSession: { ...r.tutoringSession, status: "CANCELLED" } } : r)),
+        );
+        setCancelSessionTarget(null);
+        setCancelSessionReason("");
+      },
+      "Session cancelled successfully.",
+    );
+  };
+
+  const detailRows = (r: RequestItem) =>
+    [
+      ["Academic Mate", r.offering.academicMate.name],
+      ["Date requested", formatDateTime(r.createdAt)],
+      r.respondedAt && ["Response date", formatDateTime(r.respondedAt)],
+      (r.requestedStart || r.requestedEnd) && ["Requested time", `${formatDateTime(r.requestedStart)} to ${formatDateTime(r.requestedEnd)}`],
+      r.tutoringSession && ["Booked session", `${formatDateTime(r.tutoringSession.scheduledStart)} to ${formatDateTime(r.tutoringSession.scheduledEnd)}`],
+    ].filter(Boolean) as [string, string][];
+
+  const now = new Date();
+  const inputClass = "h-10 w-full rounded-md border border-[#d8cec5] bg-white px-3 text-sm outline-none focus:border-[#7d1f2a]";
 
   return (
     <main className="min-h-screen bg-[#fcfbfa] px-3 py-5 text-[#282321] sm:px-5 sm:py-7 lg:px-8">
@@ -248,7 +290,7 @@ export default function StudentRequestsPage() {
           </Link>
         </header>
 
-        {pageError && (
+        {pageError && !cancelSessionTarget && (
           <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
             <p className="text-sm text-red-800">{pageError}</p>
             <button type="button" onClick={() => void loadRequests()} className="text-xs font-semibold text-red-800 underline underline-offset-2">Try again</button>
@@ -260,20 +302,20 @@ export default function StudentRequestsPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_190px]">
             <div>
               <label htmlFor="request-search" className="mb-1.5 block text-xs font-medium text-[#625954]">Search</label>
-              <input id="request-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Academic Mate or course" className="h-10 w-full rounded-md border border-[#d8cec5] bg-white px-3 text-sm outline-none placeholder:text-[#a39a94] focus:border-[#7d1f2a]" />
+              <input id="request-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Academic Mate or course" className={`${inputClass} placeholder:text-[#a39a94]`} />
             </div>
             <div>
               <label htmlFor="request-sort" className="mb-1.5 block text-xs font-medium text-[#625954]">Sort by date</label>
-              <select id="request-sort" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as SortOrder)} className="h-10 w-full rounded-md border border-[#d8cec5] bg-white px-3 text-sm outline-none focus:border-[#7d1f2a]">
+              <select id="request-sort" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as SortOrder)} className={inputClass}>
                 <option value="NEWEST">Newest first</option>
                 <option value="OLDEST">Oldest first</option>
               </select>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by request status">
-            {FILTERS.map((item) => (
-              <button key={item.value} type="button" aria-pressed={status === item.value} onClick={() => setStatus(item.value)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${status === item.value ? "bg-[#7d1f2a] text-white" : "border border-[#d8cec5] bg-white text-[#625954] hover:bg-[#f7f4f0]"}`}>
-                {item.label}<span className="ml-1.5 tabular-nums opacity-80">{counts[item.value]}</span>
+            {FILTERS.map(({ value, label }) => (
+              <button key={value} type="button" aria-pressed={status === value} onClick={() => setStatus(value)} className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${status === value ? "bg-[#7d1f2a] text-white" : "border border-[#d8cec5] bg-white text-[#625954] hover:bg-[#f7f4f0]"}`}>
+                {label}<span className="ml-1.5 tabular-nums opacity-80">{counts[value]}</span>
               </button>
             ))}
           </div>
@@ -297,72 +339,60 @@ export default function StudentRequestsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] border-collapse text-left">
                   <thead className="bg-[#f7f4f0]">
-                    <tr className="border-b border-[#e2d9d0]">
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Course</th>
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Academic Mate</th>
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Requested</th>
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Status</th>
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Session</th>
-                      <th className="px-3 py-3 text-[11px] font-semibold text-[#625954] sm:px-4">Actions</th>
-                    </tr>
+                    <tr className="border-b border-[#e2d9d0]">{COLUMNS.map((c) => <th key={c} className={TH}>{c}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {visibleRequests.map((item) => (
-                      <tr key={item.id} className="border-b border-[#eee8e2] last:border-0 hover:bg-[#fcfaf8]">
-                        <td className="max-w-[230px] px-3 py-3 sm:px-4">
-                          <p className="font-mono text-[11px] font-semibold text-[#7d1f2a]">{item.offering.course.code}</p>
-                          <p className="mt-0.5 text-xs leading-5 text-[#282321]">{item.offering.course.name}</p>
-                        </td>
-                        <td className="px-3 py-3 sm:px-4">
-                          <div className="flex items-center gap-2">
-                            {item.offering.academicMate.image ? <img src={item.offering.academicMate.image} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f2e7e5] text-[10px] font-semibold text-[#7d1f2a]">{initials(item.offering.academicMate.name)}</span>}
-                            <span className="text-xs font-medium text-[#4d4541]">{item.offering.academicMate.name}</span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-3 text-xs text-[#625954] sm:px-4">{formatDate(item.createdAt)}</td>
-                        <td className="px-3 py-3 sm:px-4"><StatusBadge status={item.status} /></td>
-                        <td className="px-3 py-3 sm:px-4">
-                          {item.tutoringSession ? <><p className="text-xs font-medium text-[#4d4541]">{formatDateTime(item.tutoringSession.scheduledStart)}</p><p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatStatus(item.tutoringSession.status)}</p></> : <span className="text-xs text-[#8a7f7a]">Not booked</span>}
-                        </td>
-                        <td className="px-3 py-3 sm:px-4">
-                          <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => setSelectedRequest(item)} className="rounded-md border border-[#d8cec5] px-2.5 py-1.5 text-xs font-medium text-[#625954] hover:bg-[#f7f4f0]">Details</button>
-                            {item.status === "ACCEPTED" && !item.tutoringSession && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedRequest(null);
-                                  setBookingTarget(item);
-                                }}
-                                className="rounded-md bg-[#7d1f2a] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#681923]"
-                              >
-                                Book session
-                              </button>
-                            )}
-
-                            {item.tutoringSession && (
-                              <Link
-                                href={`/student/sessions/${encodeURIComponent(item.tutoringSession.id)}/conversation`}
-                                className="whitespace-nowrap rounded-md border border-[#d8cec5] px-2.5 py-1.5 text-xs font-medium text-[#7d1f2a] hover:bg-[#f7f4f0]"
-                              >
-                                Open conversation
-                              </Link>
-                            )}
-
-                            {canCancel(item) && <button type="button" onClick={() => setCancelTarget(item)} className="rounded-md px-2.5 py-1.5 text-xs font-medium text-[#8b3335] hover:bg-red-50">Cancel</button>}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleRequests.map((item) => {
+                      const { course, academicMate } = item.offering;
+                      const session = item.tutoringSession;
+                      return (
+                        <tr key={item.id} className="border-b border-[#eee8e2] last:border-0 hover:bg-[#fcfaf8]">
+                          <td className={`max-w-[230px] ${TD}`}>
+                            <p className="font-mono text-[11px] font-semibold text-[#7d1f2a]">{course.code}</p>
+                            <p className="mt-0.5 text-xs leading-5 text-[#282321]">{course.name}</p>
+                          </td>
+                          <td className={TD}>
+                            <div className="flex items-center gap-2">
+                              {academicMate.image
+                                ? <img src={academicMate.image} alt="" className="h-7 w-7 rounded-full object-cover" />
+                                : <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f2e7e5] text-[10px] font-semibold text-[#7d1f2a]">{initials(academicMate.name)}</span>}
+                              <span className="text-xs font-medium text-[#4d4541]">{academicMate.name}</span>
+                            </div>
+                          </td>
+                          <td className={`whitespace-nowrap text-xs text-[#625954] ${TD}`}>{formatDate(item.createdAt)}</td>
+                          <td className={TD}><StatusBadge status={item.status} /></td>
+                          <td className={TD}>
+                            {session
+                              ? <><p className="text-xs font-medium text-[#4d4541]">{formatDateTime(session.scheduledStart)}</p><p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatStatus(session.status)}</p></>
+                              : <span className="text-xs text-[#8a7f7a]">Not booked</span>}
+                          </td>
+                          <td className={TD}>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => setSelectedRequest(item)} className={`${BTN_SM} border border-[#d8cec5] text-[#625954] hover:bg-[#f7f4f0]`}>Details</button>
+                              {item.status === "ACCEPTED" && !session && (
+                                <button type="button" onClick={() => { setSelectedRequest(null); setBookingTarget(item); }} className={`${BTN_SM} bg-[#7d1f2a] font-semibold text-white hover:bg-[#681923]`}>Book session</button>
+                              )}
+                              {session && (
+                                <Link href={`/student/sessions/${encodeURIComponent(session.id)}/conversation`} className={`${BTN_SM} border border-[#d8cec5] text-[#7d1f2a] hover:bg-[#f7f4f0]`}>Open conversation</Link>
+                              )}
+                              {session?.status === "SCHEDULED" && new Date(session.scheduledStart) > now && (
+                                <button type="button" onClick={() => { setPageError(""); setCancelSessionReason(""); setCancelSessionTarget(item); }} className={`${BTN_SM} text-red-700 hover:bg-red-50`}>Cancel session</button>
+                              )}
+                              {canCancel(item) && <button type="button" onClick={() => setCancelTarget(item)} className={`${BTN_SM} text-[#8b3335] hover:bg-red-50`}>Cancel</button>}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e2d9d0] bg-[#fcfbf9] px-3 py-2.5 sm:px-4">
-                <p className="text-xs text-[#7a6f6a]">Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredRequests.length)} of {filteredRequests.length}</p>
+                <p className="text-xs text-[#7a6f6a]">Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRequests.length)} of {filteredRequests.length}</p>
                 <div className="flex items-center gap-2">
-                  <button type="button" disabled={currentPage <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-md border border-[#d8cec5] px-3 py-1.5 text-xs font-medium disabled:opacity-40">Previous</button>
+                  <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} className="rounded-md border border-[#d8cec5] px-3 py-1.5 text-xs font-medium disabled:opacity-40">Previous</button>
                   <span className="text-xs tabular-nums text-[#6d6260]">{currentPage} / {totalPages}</span>
-                  <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="rounded-md border border-[#d8cec5] px-3 py-1.5 text-xs font-medium disabled:opacity-40">Next</button>
+                  <button type="button" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)} className="rounded-md border border-[#d8cec5] px-3 py-1.5 text-xs font-medium disabled:opacity-40">Next</button>
                 </div>
               </div>
             </>
@@ -371,57 +401,72 @@ export default function StudentRequestsPage() {
       </div>
 
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedRequest(null); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="request-details-title" className="my-auto w-full max-w-lg rounded-lg border border-[#e2d9d0] bg-white p-4 shadow-xl sm:p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 id="request-details-title" className="text-base font-semibold">Request details</h2>
-                <p className="mt-1 text-xs text-[#6d6260]">{selectedRequest.offering.course.code} · {selectedRequest.offering.course.name}</p>
+        <Modal id="request-details-title" width="max-w-lg" onClose={() => setSelectedRequest(null)}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="request-details-title" className="text-base font-semibold">Request details</h2>
+              <p className="mt-1 text-xs text-[#6d6260]">{selectedRequest.offering.course.code} · {selectedRequest.offering.course.name}</p>
+            </div>
+            <StatusBadge status={selectedRequest.status} />
+          </div>
+          <dl className="mt-4 divide-y divide-[#eee8e2] border-y border-[#eee8e2]">
+            {detailRows(selectedRequest).map(([label, value]) => (
+              <div key={label} className="flex justify-between gap-4 py-2.5">
+                <dt className="text-xs text-[#7a6f6a]">{label}</dt>
+                <dd className="text-right text-xs font-medium">{value}</dd>
               </div>
-              <StatusBadge status={selectedRequest.status} />
-            </div>
-            <dl className="mt-4 divide-y divide-[#eee8e2] border-y border-[#eee8e2]">
-              <div className="flex justify-between gap-4 py-2.5"><dt className="text-xs text-[#7a6f6a]">Academic Mate</dt><dd className="text-right text-xs font-medium">{selectedRequest.offering.academicMate.name}</dd></div>
-              <div className="flex justify-between gap-4 py-2.5"><dt className="text-xs text-[#7a6f6a]">Date requested</dt><dd className="text-right text-xs font-medium">{formatDateTime(selectedRequest.createdAt)}</dd></div>
-              {selectedRequest.respondedAt && <div className="flex justify-between gap-4 py-2.5"><dt className="text-xs text-[#7a6f6a]">Response date</dt><dd className="text-right text-xs font-medium">{formatDateTime(selectedRequest.respondedAt)}</dd></div>}
-              {(selectedRequest.requestedStart || selectedRequest.requestedEnd) && <div className="flex justify-between gap-4 py-2.5"><dt className="text-xs text-[#7a6f6a]">Requested time</dt><dd className="text-right text-xs font-medium">{formatDateTime(selectedRequest.requestedStart)} to {formatDateTime(selectedRequest.requestedEnd)}</dd></div>}
-              {selectedRequest.tutoringSession && <div className="flex justify-between gap-4 py-2.5"><dt className="text-xs text-[#7a6f6a]">Booked session</dt><dd className="text-right text-xs font-medium">{formatDateTime(selectedRequest.tutoringSession.scheduledStart)} to {formatDateTime(selectedRequest.tutoringSession.scheduledEnd)}</dd></div>}
-            </dl>
-            <div className="mt-4"><p className="text-xs font-semibold text-[#625954]">Your message</p><p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5 text-[#4d4541]">{selectedRequest.message?.trim() || "No message was included with this request."}</p></div>
-            <div className="mt-5 flex justify-end gap-2">
-              {canCancel(selectedRequest) && <button type="button" onClick={() => { setCancelTarget(selectedRequest); setSelectedRequest(null); }} className="rounded-md px-3 py-2 text-xs font-medium text-[#8b3335] hover:bg-red-50">Cancel request</button>}
-              <button type="button" onClick={() => setSelectedRequest(null)} className="rounded-md border border-[#d8cec5] px-3 py-2 text-xs font-medium text-[#625954] hover:bg-[#f7f4f0]">Close</button>
-            </div>
-          </section>
-        </div>
+            ))}
+          </dl>
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-[#625954]">Your message</p>
+            <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5 text-[#4d4541]">{selectedRequest.message?.trim() || "No message was included with this request."}</p>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            {canCancel(selectedRequest) && (
+              <button type="button" onClick={() => { setCancelTarget(selectedRequest); setSelectedRequest(null); }} className="rounded-md px-3 py-2 text-xs font-medium text-[#8b3335] hover:bg-red-50">Cancel request</button>
+            )}
+            <button type="button" onClick={() => setSelectedRequest(null)} className={BTN_OUTLINE}>Close</button>
+          </div>
+        </Modal>
       )}
 
       {bookingTarget && (
-          <SessionBookingDialog
-            requestId={bookingTarget.id}
-            courseLabel={`${bookingTarget.offering.course.code} · ${bookingTarget.offering.course.name}`}
-            onClose={() => setBookingTarget(null)}
-            onBooked={async () => {
-              await loadRequests();
-              setNotice("Session booked successfully.");
-            }}
-          />
-        )}
+        <SessionBookingDialog
+          requestId={bookingTarget.id}
+          courseLabel={`${bookingTarget.offering.course.code} · ${bookingTarget.offering.course.name}`}
+          onClose={() => setBookingTarget(null)}
+          onBooked={async () => {
+            await loadRequests();
+            setNotice("Session booked successfully.");
+          }}
+        />
+      )}
 
-        
-        
-        {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget && !cancellingId) setCancelTarget(null); }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="cancel-request-title" className="my-auto w-full max-w-md rounded-lg border border-[#e2d9d0] bg-white p-4 shadow-xl sm:p-5">
-            <h2 id="cancel-request-title" className="text-base font-semibold">Cancel this request?</h2>
-            <p className="mt-1.5 text-xs leading-5 text-[#625954]">You are cancelling your request for <strong>{cancelTarget.offering.course.code}</strong> with <strong>{cancelTarget.offering.academicMate.name}</strong>. The Academic Mate will be notified, and this request will remain in your history as Cancelled.</p>
-            {cancelTarget.status === "ACCEPTED" && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">This request has already been accepted. Cancelling it will end the request before a session is booked.</p>}
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" disabled={cancellingId !== null} onClick={() => setCancelTarget(null)} className="rounded-md border border-[#d8cec5] px-3 py-2 text-xs font-medium text-[#625954] hover:bg-[#f7f4f0] disabled:opacity-50">Keep request</button>
-              <button type="button" disabled={cancellingId !== null} onClick={() => void handleCancel()} className="rounded-md bg-[#7d1f2a] px-3 py-2 text-xs font-semibold text-white hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-50">{cancellingId ? "Cancelling..." : "Confirm cancellation"}</button>
-            </div>
-          </section>
-        </div>
+      {cancelTarget && (
+        <CancelDialog id="cancel-request-title" title="Cancel this request?" busy={cancelling} keepLabel="Keep request" onKeep={() => setCancelTarget(null)} onConfirm={() => void handleCancel()}>
+          <p className="mt-1.5 text-xs leading-5 text-[#625954]">You are cancelling your request for <strong>{cancelTarget.offering.course.code}</strong> with <strong>{cancelTarget.offering.academicMate.name}</strong>. The Academic Mate will be notified, and this request will remain in your history as Cancelled.</p>
+          {cancelTarget.status === "ACCEPTED" && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">This request has already been accepted. Cancelling it will end the request before a session is booked.</p>}
+        </CancelDialog>
+      )}
+
+      {cancelSessionTarget?.tutoringSession && (
+        <CancelDialog id="cancel-session-title" title="Cancel booked session?" busy={cancelling} keepLabel="Keep session" onKeep={() => setCancelSessionTarget(null)} onConfirm={() => void handleCancelSession()}>
+          <p className="mt-2 text-sm leading-5 text-[#625954]">
+            This will cancel your session for <strong>{cancelSessionTarget.offering.course.code}</strong> with <strong>{cancelSessionTarget.offering.academicMate.name}</strong>. Both participants will be notified. Your conversation and booking history will remain available.
+          </p>
+          <label htmlFor="session-cancellation-reason" className="mt-4 block text-xs font-medium text-[#625954]">Reason (optional)</label>
+          <textarea
+            id="session-cancellation-reason"
+            value={cancelSessionReason}
+            onChange={(e) => setCancelSessionReason(e.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="Why are you cancelling?"
+            disabled={cancelling}
+            className="mt-1.5 w-full resize-y rounded-md border border-[#d8cec5] px-3 py-2 text-sm outline-none focus:border-[#7d1f2a]"
+          />
+          {pageError && <p role="alert" className="mt-3 text-xs text-red-700">{pageError}</p>}
+        </CancelDialog>
       )}
     </main>
   );
