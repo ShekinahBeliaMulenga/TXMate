@@ -77,6 +77,14 @@ enum AttendanceStatus {
   EXCUSED
 }
 
+enum RescheduleRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
 enum StudentCourseStatus {
   ENROLLED
   COMPLETED
@@ -114,6 +122,7 @@ enum NotificationType {
 
 enum NotificationChannel {
   IN_APP
+  PUSH
   EMAIL
   WHATSAPP
 }
@@ -174,25 +183,27 @@ enum AdminRole {
 }
 
 model User {
-  id             String               @id
-  name           String
-  email          String               @unique
-  emailVerified  Boolean
-  image          String?
-  createdAt      DateTime
-  updatedAt      DateTime
-  username       String?              @unique
-  sessions       Session[]
-  accounts       Account[]
-  studentProfile StudentProfile?      @relation("UserStudentProfile")
-  academicMate   AcademicMateProfile? @relation("UserAcademicMateProfile")
-  adminProfile   AdminProfile?        @relation("UserAdminProfile")
-  notifications  Notification[]       @relation("UserNotifications")
-  sentMessages   Message[]            @relation("UserSentMessages")
-  conversationReads ConversationRead[]
-  reviewsWritten Review[]             @relation("UserReviewsWritten")
-  paymentsMade   Payment[]            @relation("UserPaymentsMade")
-  subscriptions  UserSubscription[]
+  id                         String                     @id
+  name                       String
+  email                      String                     @unique
+  emailVerified              Boolean
+  image                      String?
+  createdAt                  DateTime
+  updatedAt                  DateTime
+  username                   String?                    @unique
+  sessions                   Session[]
+  accounts                   Account[]
+  studentProfile             StudentProfile?            @relation("UserStudentProfile")
+  academicMate               AcademicMateProfile?       @relation("UserAcademicMateProfile")
+  adminProfile               AdminProfile?              @relation("UserAdminProfile")
+  notifications              Notification[]             @relation("UserNotifications")
+  sentMessages               Message[]                  @relation("UserSentMessages")
+  conversationReads          ConversationRead[]
+  reviewsWritten             Review[]                   @relation("UserReviewsWritten")
+  paymentsMade               Payment[]                  @relation("UserPaymentsMade")
+  subscriptions              UserSubscription[]
+  rescheduleRequestsProposed SessionRescheduleRequest[] @relation("RescheduleProposer")
+  rescheduleRequestsReceived SessionRescheduleRequest[] @relation("RescheduleResponder")
 }
 
 model Session {
@@ -670,22 +681,23 @@ model MateRequest {
 }
 
 model TutoringSession {
-  id                 String                @id @default(uuid())
-  requestId          String                @unique
+  id                 String                     @id @default(uuid())
+  requestId          String                     @unique
   scheduledStart     DateTime
   scheduledEnd       DateTime
   meetingLocation    String
-  status             TutoringSessionStatus @default(SCHEDULED)
+  status             TutoringSessionStatus      @default(SCHEDULED)
   completedAt        DateTime?
   cancelledAt        DateTime?
   cancellationReason String?
   reminderSentAt     DateTime?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  request            MateRequest           @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  request            MateRequest                @relation(fields: [requestId], references: [id], onDelete: Restrict)
   attendance         Attendance?
   review             Review?
   payments           Payment[]
+  rescheduleRequests SessionRescheduleRequest[]
 
   @@index([scheduledStart, status])
   @@index([status, reminderSentAt, scheduledStart])
@@ -707,6 +719,27 @@ model Attendance {
   resolvedByAdmin    AdminProfile?    @relation("AdminResolvedAttendance", fields: [resolvedByAdminId], references: [id], onDelete: SetNull)
 }
 
+model SessionRescheduleRequest {
+  id               String                  @id @default(uuid())
+  sessionId        String
+  proposedByUserId String
+  respondingUserId String
+  proposedStart    DateTime
+  proposedEnd      DateTime
+  reason           String?
+  status           RescheduleRequestStatus @default(PENDING)
+  respondedAt      DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  session        TutoringSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  proposedBy     User            @relation("RescheduleProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
+  respondingUser User            @relation("RescheduleResponder", fields: [respondingUserId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, status])
+  @@index([respondingUserId, status])
+}
+
 model Review {
   id             String              @id @default(uuid())
   sessionId      String              @unique
@@ -725,24 +758,24 @@ model Review {
 }
 
 model Conversation {
-  id        String      @id @default(uuid())
-  requestId String      @unique
-  studentMessagingEnabled Boolean    @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  request   MateRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  reads ConversationRead[]
-  messages  Message[]
+  id                      String             @id @default(uuid())
+  requestId               String             @unique
+  studentMessagingEnabled Boolean            @default(true)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  request                 MateRequest        @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  reads                   ConversationRead[]
+  messages                Message[]
 }
 
 model ConversationRead {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   conversationId String
   userId         String
-  lastReadAt     DateTime     @default(now())
+  lastReadAt     DateTime @default(now())
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([userId])

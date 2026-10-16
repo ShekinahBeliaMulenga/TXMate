@@ -16,23 +16,35 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export async function POST(request: Request, { params }: RouteContext) {
   try {
-    const authSession = await auth.api.getSession({ headers: await headers() });
+    const authSession = await auth.api.getSession({
+      headers: await headers(),
+    });
 
     if (!authSession?.user) {
-      return NextResponse.json({ error: "You must be signed in to cancel a session." }, { status: 401 });
+      return NextResponse.json(
+        { error: "You must be signed in to cancel a session." },
+        { status: 401 },
+      );
     }
 
     const { sessionId } = await params;
 
     if (!sessionId?.trim() || sessionId.length > 100) {
-      return NextResponse.json({ error: "A valid session ID is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "A valid session ID is required." },
+        { status: 400 },
+      );
     }
 
     let body: unknown;
+
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Request body must contain valid JSON." },
+        { status: 400 },
+      );
     }
 
     if (
@@ -40,24 +52,31 @@ export async function POST(request: Request, { params }: RouteContext) {
       Object.keys(body).some((key) => key !== "reason") ||
       (body.reason !== undefined && typeof body.reason !== "string")
     ) {
-      return NextResponse.json({ error: 'Provide an optional string field named "reason".' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Provide an optional string field named "reason".' },
+        { status: 400 },
+      );
     }
 
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
 
     if (reason.length > 500) {
-      return NextResponse.json({ error: "The cancellation reason cannot exceed 500 characters." }, { status: 400 });
+      return NextResponse.json(
+        { error: "The cancellation reason cannot exceed 500 characters." },
+        { status: 400 },
+      );
     }
 
-    // Read and validate outside the transaction so the transaction only holds the writes.
     const booking = await prisma.tutoringSession.findUnique({
       where: { id: sessionId },
       select: {
         id: true,
+        requestId: true,
         status: true,
         scheduledStart: true,
         request: {
           select: {
+            status: true,
             studentProfile: {
               select: {
                 userId: true,
@@ -68,7 +87,9 @@ export async function POST(request: Request, { params }: RouteContext) {
               select: {
                 title: true,
                 course: { select: { name: true } },
-                academicMateProfile: { select: { userId: true } },
+                academicMateProfile: {
+                  select: { userId: true },
+                },
               },
             },
           },
@@ -77,16 +98,30 @@ export async function POST(request: Request, { params }: RouteContext) {
     });
 
     if (!booking) {
-      return NextResponse.json({ error: "Session not found." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Session not found." },
+        { status: 404 },
+      );
     }
 
-    if (booking.request.studentProfile.userId !== authSession.user.id) {
-      return NextResponse.json({ error: "Only the student who booked this session can cancel it." }, { status: 403 });
+    const student = booking.request.studentProfile;
+    const mate = booking.request.offering.academicMateProfile;
+
+    if (student.userId !== authSession.user.id) {
+      return NextResponse.json(
+        {
+          error: "Only the student who booked this session can cancel it.",
+        },
+        { status: 403 },
+      );
     }
 
     if (booking.status !== "SCHEDULED") {
       return NextResponse.json(
-        { error: "Only scheduled sessions can be cancelled. Refresh to see the current status." },
+        {
+          error:
+            "Only scheduled sessions can be cancelled. Refresh to see the current status.",
+        },
         { status: 409 },
       );
     }
@@ -95,23 +130,27 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     if (booking.scheduledStart <= now) {
       return NextResponse.json(
-        { error: "This session can no longer be cancelled because its scheduled start time has arrived." },
+        {
+          error:
+            "This session can no longer be cancelled because its scheduled start time has arrived.",
+        },
         { status: 409 },
       );
     }
 
-    const student = booking.request.studentProfile;
-    const mate = booking.request.offering.academicMateProfile;
-    const courseName = booking.request.offering.title || booking.request.offering.course.name;
+    const courseName =
+      booking.request.offering.title ||
+      booking.request.offering.course.name;
+
     const notificationData = {
       sessionId: booking.id,
+      requestId: booking.requestId,
       courseName,
       cancelledAt: now.toISOString(),
     };
 
     const cancelled = await prisma.$transaction(
       async (tx) => {
-        // The conditional update still guards against concurrent changes.
         const updated = await tx.tutoringSession.updateMany({
           where: {
             id: booking.id,
@@ -125,7 +164,31 @@ export async function POST(request: Request, { params }: RouteContext) {
           },
         });
 
-        if (updated.count !== 1) return false;
+        if (updated.count !== 1) {
+          return false;
+        }
+
+        await tx.mateRequest.updateMany({
+          where: {
+            id: booking.requestId,
+            status: "ACCEPTED",
+          },
+          data: {
+            status: "CANCELLED",
+            respondedAt: now,
+          },
+        });
+
+        await tx.sessionRescheduleRequest.updateMany({
+          where: {
+            sessionId: booking.id,
+            status: "PENDING",
+          },
+          data: {
+            status: "CANCELLED",
+            respondedAt: now,
+          },
+        });
 
         await tx.notification.createMany({
           data: [
@@ -133,14 +196,14 @@ export async function POST(request: Request, { params }: RouteContext) {
               userId: student.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `Your session for ${courseName} has been cancelled.`,
+              body: `Your session for ${courseName} has been cancelled. You can submit a new request to arrange another session.`,
               data: notificationData,
             },
             {
               userId: mate.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `${student.user.name} cancelled the session for ${courseName}.`,
+              body: `${student.user.name} cancelled the session for ${courseName}. The student must submit a new request before another session can be booked.`,
               data: notificationData,
             },
           ],
@@ -153,22 +216,37 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     if (!cancelled) {
       return NextResponse.json(
-        { error: "The session has changed and could not be cancelled. Refresh and try again." },
+        {
+          error:
+            "The session has changed and could not be cancelled. Refresh and try again.",
+        },
         { status: 409 },
       );
     }
 
     return NextResponse.json({
-      message: "Your session has been cancelled. Both participants have been notified.",
+      message:
+        "The session and its original request have been cancelled. Both participants have been notified. You can submit a new request to arrange another session.",
       session: {
         id: booking.id,
         status: "CANCELLED" as const,
         cancelledAt: now.toISOString(),
         cancellationReason: reason || null,
       },
+      request: {
+        id: booking.requestId,
+        status: "CANCELLED" as const,
+      },
     });
   } catch (error) {
-    console.error("POST /api/student/sessions/[sessionId]/cancel failed:", error);
-    return NextResponse.json({ error: "Unable to cancel this session." }, { status: 500 });
+    console.error(
+      "POST /api/student/sessions/[sessionId]/cancel failed:",
+      error,
+    );
+
+    return NextResponse.json(
+      { error: "Unable to cancel this session." },
+      { status: 500 },
+    );
   }
 }
