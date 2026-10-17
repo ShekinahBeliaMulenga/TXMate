@@ -176,11 +176,14 @@ export async function GET(request: Request) {
 
     const existingRequests = offeringIds.length
       ? await prisma.mateRequest.findMany({
-          where: {
-            studentProfileId: student.id,
-            offeringId: { in: offeringIds },
-            status: { in: ["REQUESTED", "ACCEPTED"] },
+        where: {
+          studentProfileId: student.id,
+          offeringId: { in: offeringIds },
+          status: { in: ["REQUESTED", "ACCEPTED"] },
+          tutoringSession: {
+            isNot: { status: "CANCELLED" },
           },
+        },
           select: {
             id: true,
             offeringId: true,

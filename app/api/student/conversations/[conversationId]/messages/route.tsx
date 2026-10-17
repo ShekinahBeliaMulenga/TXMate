@@ -30,6 +30,23 @@ function pausedMessage(isStudent: boolean) {
     : "Messaging is paused. Reopen messaging to send messages.";
 }
 
+function isConversationCancelled(conversation: {
+  request: {
+    status: string;
+    tutoringSession: {
+      status: string;
+    } | null;
+  };
+}) {
+  return (
+    conversation.request.status === "CANCELLED" ||
+    conversation.request.tutoringSession?.status === "CANCELLED"
+  );
+}
+
+const CANCELLED_MESSAGE =
+  "This session has been cancelled. Messaging is closed. Submit a new session request to arrange another session.";
+
 async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -46,6 +63,7 @@ async function getConversation(conversationId: string) {
       studentMessagingEnabled: true,
       request: {
         select: {
+          status: true,
           studentProfile: {
             select: {
               userId: true,
@@ -65,6 +83,7 @@ async function getConversation(conversationId: string) {
               id: true,
               scheduledStart: true,
               scheduledEnd: true,
+              status: true,
             },
           },
         },
@@ -256,6 +275,13 @@ export async function POST(
       );
     }
 
+    if (isConversationCancelled(conversation)) {
+      return NextResponse.json(
+        { error: CANCELLED_MESSAGE },
+        { status: 403 },
+      );
+    }
+
     // A paused conversation blocks both participants. Either side can still read the history.
     if (!conversation.studentMessagingEnabled) {
       return NextResponse.json(
@@ -278,13 +304,27 @@ export async function POST(
         select: {
           id: true,
           studentMessagingEnabled: true,
+          request: {
+            select: {
+              status: true,
+              tutoringSession: {
+                select: {
+                  status: true,
+                },
+              },
+            },
+          },
         },
       });
-
+      
       if (!currentConversation) {
         return { kind: "not-found" as const };
       }
-
+      
+      if (isConversationCancelled(currentConversation)) {
+        return { kind: "cancelled" as const };
+      }
+      
       if (!currentConversation.studentMessagingEnabled) {
         return { kind: "messaging-paused" as const };
       }
@@ -330,6 +370,13 @@ export async function POST(
       return NextResponse.json(
         { error: "Conversation not found." },
         { status: 404 },
+      );
+    }
+
+    if (result.kind === "cancelled") {
+      return NextResponse.json(
+        { error: CANCELLED_MESSAGE },
+        { status: 403 },
       );
     }
 

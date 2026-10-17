@@ -182,6 +182,7 @@ export async function POST(request: Request) {
       );
     }
 
+   
     const existingRequest = await prisma.mateRequest.findFirst({
       where: {
         studentProfileId: student.id,
@@ -194,8 +195,37 @@ export async function POST(request: Request) {
         id: true,
         status: true,
         createdAt: true,
+        tutoringSession: {
+          select: {
+            status: true,
+          },
+        },
       },
     });
+
+    if (
+      existingRequest?.status === "ACCEPTED" && existingRequest.tutoringSession?.status === "CANCELLED") {
+      await prisma.mateRequest.updateMany({
+        where: {
+          id: existingRequest.id,
+          status: "ACCEPTED",
+        },
+        data: {
+          status: "CANCELLED",
+          respondedAt: new Date(),
+        },
+      });
+    } else if (existingRequest) {
+      return NextResponse.json(
+        {
+          error:
+            "You already have a pending or accepted request for this offering.",
+          existingRequest,
+        },
+        { status: 409 },
+      );
+    }
+
 
     if (existingRequest) {
       return NextResponse.json(

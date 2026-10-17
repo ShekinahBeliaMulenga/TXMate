@@ -5,6 +5,32 @@ import { useParams, useRouter } from "next/navigation";
 
 type ParticipantRole = "STUDENT" | "ACADEMIC_MATE";
 
+
+type RescheduleProposal = {
+  id: string;
+  proposedByUserId: string;
+  respondingUserId: string;
+  proposedByName: string | null;
+  proposedStart: string;
+  proposedEnd: string;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+};
+type RescheduleSlot = {
+  start: string;
+  end: string;
+  timezone: string;
+  localDate: string;
+  localStart: string | null;
+  localEnd: string | null;
+};
+
+type RescheduleSlotsResponse = {
+  slots?: RescheduleSlot[];
+  error?: string;
+};
+
 type ConversationDetails = {
   id: string;
   studentMessagingEnabled: boolean;
@@ -12,11 +38,13 @@ type ConversationDetails = {
   otherUserImage?: string | null;
   courseName?: string | null;
   session: {
-    id: string;
-    scheduledStart: string;
-    scheduledEnd: string;
-    status?: string;
-  } | null;
+  id: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  status?: string;
+  rescheduleProposals?: RescheduleProposal[];
+} | null;
+
 };
 
 type ChatMessage = {
@@ -230,6 +258,17 @@ export default function SessionConversationPage() {
   const [notice, setNotice] = useState("");
   const [showJump, setShowJump] = useState(false);
   const [nowMs] = useState(() => Date.now());
+  const [proposedStart, setProposedStart] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [rescheduleBusy, setRescheduleBusy] = useState(false);
+  const [respondingProposalId, setRespondingProposalId] = useState("");
+  const [showBookingMenu, setShowBookingMenu] = useState(false);
+  const [showRescheduleForm, setShowRescheduleForm] = useState(false);
+  const [rescheduleSlots, setRescheduleSlots] = useState<RescheduleSlot[]>([]);
+  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
+  const [rescheduleSlotsError, setRescheduleSlotsError] = useState("");
+  const [confirmCancelBooking, setConfirmCancelBooking] = useState(false);
+  const [cancellingBooking, setCancellingBooking] = useState(false);
 
   const rootRef = useRef<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -296,6 +335,29 @@ export default function SessionConversationPage() {
     await loadMessages(body.conversation.id, signal);
   }, [sessionId, loadMessages]);
 
+
+const refreshConversationDetails = useCallback(async () => {
+  const response = await fetch(
+    `/api/student/sessions/${encodeURIComponent(sessionId)}/conversation`,
+    {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    },
+  );
+
+  const body = (await response.json()) as ConversationResponse;
+
+  if (!response.ok || !body.conversation || !body.participantRole) {
+    throw new Error(
+      body.error || "Unable to refresh session details.",
+    );
+  }
+
+  setConversation(body.conversation);
+  setRole(body.participantRole);
+}, [sessionId]);
+
+
   useEffect(() => {
     const controller = new AbortController();
     async function initialise() {
@@ -340,7 +402,10 @@ export default function SessionConversationPage() {
       if (stopped || inFlight) return;
       inFlight = true;
       try {
-        await loadMessages(conversationId);
+        await Promise.all([
+          loadMessages(conversationId),
+          refreshConversationDetails(),
+        ]);
         failures = 0;
       } catch {
         failures = Math.min(failures + 1, 4);
@@ -369,7 +434,7 @@ export default function SessionConversationPage() {
       window.removeEventListener("focus", wake);
       window.removeEventListener("online", wake);
     };
-  }, [conversation?.id, loadMessages]);
+  }, [conversation?.id, loadMessages, refreshConversationDetails]);
 
   // Keep the newest message in view when messages arrive OR the keyboard changes the viewport height.
   useEffect(() => {
@@ -414,7 +479,7 @@ export default function SessionConversationPage() {
   }
 
   async function sendMessage() {
-    if (!conversation || !conversation.studentMessagingEnabled || !draft.trim() || sending) return;
+    if (!conversation || sessionCancelled || !conversation.studentMessagingEnabled || !draft.trim() || sending) return;
     setSending(true);
     lastActivityRef.current = Date.now();
     setError("");
@@ -479,7 +544,221 @@ export default function SessionConversationPage() {
     }
   }
 
-  const messagingPaused = conversation !== null && !conversation.studentMessagingEnabled;
+  async function submitReschedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  
+    if (!conversation?.session || rescheduleBusy || !proposedStart) return;
+  
+    const selectedDate = new Date(proposedStart);
+  
+    if (Number.isNaN(selectedDate.getTime())) {
+      setError("Choose a valid date and time.");
+      return;
+    }
+  
+    setRescheduleBusy(true);
+    setError("");
+    setNotice("");
+  
+    try {
+      const response = await fetch(
+        `/api/student/sessions/${encodeURIComponent(sessionId)}/reschedule`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            proposedStart: selectedDate.toISOString(),
+            reason: rescheduleReason.trim(),
+          }),
+        },
+      );
+  
+      const body = (await response.json()) as {
+        message?: string;
+        error?: string;
+      };
+  
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to propose a new session time.");
+      }
+  
+      setShowRescheduleForm(false);
+      setProposedStart("");
+      setRescheduleReason("");
+      setNotice(body.message || "Rescheduling proposal sent.");
+      await loadConversation();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to submit the rescheduling proposal.",
+      );
+    } finally {
+      setRescheduleBusy(false);
+    }
+  }
+  
+  async function respondToReschedule(
+    proposal: RescheduleProposal,
+    action: "ACCEPTED" | "DECLINED",
+  ) {
+    if (respondingProposalId) return;
+  
+    setRespondingProposalId(proposal.id);
+    setError("");
+    setNotice("");
+  
+    try {
+      const response = await fetch(
+        `/api/student/sessions/${encodeURIComponent(sessionId)}/reschedule/${encodeURIComponent(proposal.id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action }),
+        },
+      );
+  
+      const body = (await response.json()) as {
+        message?: string;
+        error?: string;
+      };
+  
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to respond to this proposal.");
+      }
+  
+      setNotice(body.message || "Your response has been recorded.");
+      await loadConversation();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to respond to this proposal.",
+      );
+    } finally {
+      setRespondingProposalId("");
+    }
+  }
+
+  async function cancelBooking() {
+    if (!conversation?.session || cancellingBooking) return;
+  
+    setCancellingBooking(true);
+    setError("");
+    setNotice("");
+    setConfirmCancelBooking(false);
+    setShowBookingMenu(false);
+    setShowRescheduleForm(false);
+  
+    try {
+      const response = await fetch(
+        `/api/student/sessions/${encodeURIComponent(sessionId)}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reason: "Cancelled from the session conversation.",
+          }),
+        },
+      );
+  
+      const body = (await response.json()) as {
+        message?: string;
+        error?: string;
+      };
+  
+      if (!response.ok) {
+        throw new Error(body.error || "Unable to cancel this booking.");
+      }
+  
+      setConversation((current) =>
+        current?.session
+          ? {
+              ...current,
+              session: {
+                ...current.session,
+                status: "CANCELLED",
+              },
+            }
+          : current,
+      );
+  
+      setNotice(
+        body.message ||
+          "Booking cancelled. Both participants have been notified.",
+      );
+  
+      void loadConversation().catch(() => {});
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to cancel this booking.",
+      );
+    } finally {
+      setCancellingBooking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!showRescheduleForm || !conversation?.session) return;
+  
+    const controller = new AbortController();
+  
+    async function loadRescheduleSlots() {
+      setRescheduleSlotsLoading(true);
+      setRescheduleSlotsError("");
+      setRescheduleSlots([]);
+      setProposedStart("");
+  
+      try {
+        const response = await fetch(
+          `/api/student/sessions/${encodeURIComponent(sessionId)}/reschedule`,
+          {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+  
+        const body = (await response.json()) as RescheduleSlotsResponse;
+  
+        if (!response.ok) {
+          throw new Error(body.error || "Unable to load available times.");
+        }
+  
+        setRescheduleSlots(Array.isArray(body.slots) ? body.slots : []);
+      } catch (cause) {
+        if (cause instanceof Error && cause.name === "AbortError") return;
+  
+        setRescheduleSlotsError(
+          cause instanceof Error
+            ? cause.message
+            : "Unable to load available times.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setRescheduleSlotsLoading(false);
+        }
+      }
+    }
+  
+    void loadRescheduleSlots();
+  
+    return () => controller.abort();
+  }, [showRescheduleForm, sessionId, conversation?.session?.id]);
+
+  const sessionCancelled = /cancel/i.test(conversation?.session?.status ?? "");
+  const messagingPaused = conversation !== null && (sessionCancelled || !conversation.studentMessagingEnabled);
   const fallbackCounterpart = role === "STUDENT" ? "Academic Mate" : role === "ACADEMIC_MATE" ? "Student" : "Session conversation";
   const displayName = conversation?.otherUserName || fallbackCounterpart;
   const avatarText = role === "STUDENT" ? "AM" : role === "ACADEMIC_MATE" ? "ST" : "TX";
@@ -559,22 +838,218 @@ export default function SessionConversationPage() {
           </button>
         </header>
 
+       
         {/* ---------- session strip ---------- */}
         {conversation?.session && (
           <div className="flex shrink-0 items-center gap-2 border-b border-[#eee5e0] bg-[#fbf8f6] px-4 py-2 text-xs text-stone-600 sm:px-6">
-            <span className="text-[#7d1f2a]"><CalendarIcon /></span>
+            <span className="text-[#7d1f2a]">
+              <CalendarIcon />
+            </span>
+
             <p className="min-w-0 flex-1 truncate text-[11px] sm:text-xs">
-              <span className="font-semibold text-stone-800">{formatSessionDate(conversation.session.scheduledStart)}</span>
-              <span className="text-stone-500"> &middot; ends {formatClock(conversation.session.scheduledEnd)}</span>
+              <span className="font-semibold text-stone-800">
+                {formatSessionDate(conversation.session.scheduledStart)}
+              </span>
+              <span className="text-stone-500">
+                {" "}· ends {formatClock(conversation.session.scheduledEnd)}
+              </span>
             </p>
-            {/cancel/i.test(conversation.session.status ?? "") && (
+
+            {/cancel/i.test(conversation.session.status ?? "") ? (
               <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-600">
                 Cancelled
               </span>
-            )}
+            ) : conversation.session.status === "SCHEDULED" &&
+              new Date(conversation.session.scheduledStart).getTime() > nowMs ? (
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  aria-label="Booking options"
+                  aria-haspopup="menu"
+                  aria-expanded={showBookingMenu}
+                  onClick={() => setShowBookingMenu((open) => !open)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-stone-600 hover:bg-stone-200/70 focus-visible:outline-2 focus-visible:outline-[#7d1f2a]"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="h-5 w-5"
+                  >
+                    <circle cx="5" cy="12" r="1.8" />
+                    <circle cx="12" cy="12" r="1.8" />
+                    <circle cx="19" cy="12" r="1.8" />
+                  </svg>
+                </button>
+
+                {showBookingMenu && (
+                  <div
+                    role="menu"
+                    aria-label="Booking options"
+                    className="absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-xl border border-[#eadfd9] bg-white py-1 shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowBookingMenu(false);
+                        setShowRescheduleForm(true);
+                      }}
+                      className="block w-full px-3 py-2.5 text-left text-xs font-medium text-stone-700 hover:bg-stone-50"
+                    >
+                      Reschedule session
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowBookingMenu(false);
+                        setConfirmCancelBooking(true);
+                      }}
+                      className="block w-full px-3 py-2.5 text-left text-xs font-medium text-red-700 hover:bg-red-50"
+                    >
+                      Cancel booking
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         )}
 
+        {/* ---------- rescheduling UI ---------- */}
+        {conversation?.session && conversation.session.status === "SCHEDULED" && !/cancel/i.test(conversation.session.status ?? "") && (
+     <>
+        {conversation.session.rescheduleProposals?.filter((proposal) => proposal.status === "PENDING").map((proposal) => (
+          <div key={proposal.id} className="shrink-0 border-b border-[#eee5e0] bg-white px-4 py-3 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-stone-800">Rescheduling proposal</p>
+                <p className="mt-1 text-xs text-stone-600">{proposal.proposedByName || "A participant"} proposed {formatSessionDate(proposal.proposedStart)}</p>
+                {proposal.reason && <p className="mt-1 break-words text-xs text-stone-500">{proposal.reason}</p>}
+                <p className="mt-1 text-[11px] text-stone-500">Ends {formatClock(proposal.proposedEnd)}</p>
+              </div>
+              {proposal.respondingUserId === currentUserId && (
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <button type="button" disabled={respondingProposalId === proposal.id} onClick={() => void respondToReschedule(proposal, "ACCEPTED")} className="rounded-lg bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#651822] disabled:opacity-50">
+                    {respondingProposalId === proposal.id ? "Saving..." : "Accept"}
+                  </button>
+                  <button type="button" disabled={respondingProposalId === proposal.id} onClick={() => void respondToReschedule(proposal, "DECLINED")} className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">Decline</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {showRescheduleForm && (
+          <div className="shrink-0 border-b border-[#eee5e0] bg-[#fbf8f6] px-4 py-3 sm:px-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-stone-900">Propose a new session time</h2>
+              <button type="button" onClick={() => { setShowRescheduleForm(false); setProposedStart(""); setRescheduleReason(""); setRescheduleSlotsError(""); setError(""); }} className="rounded-lg px-2 py-1 text-xs font-medium text-stone-500 hover:bg-stone-200/70 hover:text-stone-800">Close</button>
+            </div>
+
+            <form onSubmit={submitReschedule} className="space-y-3">
+              <div>
+                <p className="mb-2 text-xs font-medium text-stone-700">Choose an available start time</p>
+                {rescheduleSlotsLoading ? (
+                  <p className="rounded-lg border border-stone-200 bg-white px-3 py-4 text-xs text-stone-500">Loading available slots...</p>
+                ) : rescheduleSlotsError ? (
+                  <div className="rounded-lg border border-red-200 bg-white px-3 py-3">
+                    <p className="text-xs text-red-700">{rescheduleSlotsError}</p>
+                    <button type="button" onClick={() => { setShowRescheduleForm(false); setProposedStart(""); setTimeout(() => setShowRescheduleForm(true), 0); }} className="mt-2 text-xs font-semibold text-[#7d1f2a] hover:underline">Try again</button>
+                  </div>
+                ) : rescheduleSlots.length === 0 ? (
+                  <p className="rounded-lg border border-stone-200 bg-white px-3 py-4 text-xs text-stone-500">No available slots were found for the next 30 days.</p>
+                ) : (
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-stone-200 bg-white p-2">
+                    {rescheduleSlots.map((slot) => (
+                      <label key={slot.start} className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition ${proposedStart === slot.start ? "border-[#7d1f2a] bg-[#7d1f2a]/5" : "border-stone-200 hover:border-stone-400"}`}>
+                        <input type="radio" name="reschedule-start" value={slot.start} checked={proposedStart === slot.start} onChange={() => setProposedStart(slot.start)} className="mt-0.5 accent-[#7d1f2a]" />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-stone-800">{slot.localDate}</span>
+                          <span className="mt-0.5 block text-xs text-stone-600">{slot.localStart} - {slot.localEnd}</span>
+                          <span className="mt-0.5 block text-[10px] text-stone-400">{slot.timezone}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] text-stone-500">Only available slots matching the Academic Mate's schedule are listed. The existing booking changes only after the other participant accepts.</p>
+              </div>
+
+              <div>
+                <label htmlFor="reschedule-reason" className="mb-1 block text-xs font-medium text-stone-700">Reason (optional)</label>
+                <textarea id="reschedule-reason" value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} maxLength={500} rows={2} placeholder="Why does the session need to move?" className="w-full resize-y rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+              </div>
+
+              <div className="flex justify-end">
+                <button type="submit" disabled={rescheduleBusy || rescheduleSlotsLoading || !proposedStart || !!rescheduleSlotsError || rescheduleSlots.length === 0} className="rounded-lg bg-[#7d1f2a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#651822] disabled:cursor-not-allowed disabled:opacity-50">
+                  {rescheduleBusy ? "Sending proposal..." : "Send proposal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </>
+    )}
+
+        {/* ---------- cancel booking confirmation ---------- */}
+        {confirmCancelBooking && conversation?.session && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setConfirmCancelBooking(false);
+              }
+            }}
+          >
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="cancel-booking-title"
+              aria-describedby="cancel-booking-description"
+              className="w-full max-w-sm rounded-2xl border border-[#eadfd9] bg-white p-5 shadow-2xl"
+            >
+              <h2
+                id="cancel-booking-title"
+                className="text-base font-semibold text-stone-900"
+              >
+                Cancel this booking?
+              </h2>
+
+              <p
+                id="cancel-booking-description"
+                className="mt-2 text-sm leading-relaxed text-stone-600"
+              >
+                This will cancel the session and its original request.
+                Both participants will be notified. You will need to submit
+                a new request to arrange another session.
+              </p>
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={cancellingBooking}
+                  onClick={() => setConfirmCancelBooking(false)}
+                  className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                >
+                  Keep booking
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cancellingBooking}
+                  onClick={() => void cancelBooking()}
+                  className="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {cancellingBooking ? "Cancelling..." : "Cancel booking"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+        
         {/* ---------- banners ---------- */}
         {error && (
           <div role="alert" className="flex shrink-0 items-center justify-between gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
@@ -656,9 +1131,11 @@ export default function SessionConversationPage() {
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-900 sm:text-sm">
               <span className="mt-0.5 text-amber-600"><LockIcon /></span>
               <p>
-                {role === "ACADEMIC_MATE"
-                  ? "You've paused messaging. Tap Reopen at the top to send messages again. You can still read the history."
-                  : "Messaging has been paused by the Academic Mate. You can still read the history."}
+                {sessionCancelled
+                  ? "This session has been cancelled. Messaging is closed. Submit a new session request to arrange another session."
+                  : role === "ACADEMIC_MATE"
+                    ? "You've paused messaging. You can still read the conversation history."
+                    : "Messaging has been paused by the Academic Mate. You can still read the conversation history."}
               </p>
             </div>
           ) : (

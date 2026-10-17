@@ -315,7 +315,7 @@ function OfferingRow({
             )}
 
             {/* Compact Footer Actions */}
-            {offering.existingRequest?.tutoringSession ? (
+            {offering.existingRequest?.tutoringSession && offering.existingRequest.tutoringSession.status !== "CANCELLED" ? (
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#f1ebe5] pt-2">
                 <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
                   <Icon name="check" className="h-3.5 w-3.5" />
@@ -860,7 +860,8 @@ export default function FindAcademicMatePage() {
                     key={offering.offeringId}
                     offering={offering}
                     index={index}
-                    requestSent={requestedOfferingIds.has(offering.offeringId)}
+                    requestSent={requestsByOffering[offering.offeringId]?.status === "REQUESTED" || requestsByOffering[offering.offeringId]?.status === "ACCEPTED"
+                    }
                     canCancel={
                       requestsByOffering[offering.offeringId]?.status === "REQUESTED" ||
                       requestsByOffering[offering.offeringId]?.status === "ACCEPTED"
@@ -940,7 +941,7 @@ export default function FindAcademicMatePage() {
                 )}
               </dl>
 
-              {detailsOffering.existingRequest?.tutoringSession && (
+              {detailsOffering.existingRequest?.tutoringSession && detailsOffering.existingRequest.tutoringSession.status !== "CANCELLED" && (
               <section className="border-b border-[#efe8e1] py-3">
                 <div className="flex items-center gap-2">
                   <Icon name="clock" className="h-4 w-4 text-[#7d1f2a]" />

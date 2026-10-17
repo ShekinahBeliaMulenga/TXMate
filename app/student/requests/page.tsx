@@ -47,7 +47,7 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "CANCELLED", label: "Cancelled" },
   { value: "EXPIRED", label: "Expired" },
 ];
-const COLUMNS = ["Course", "Academic Mate", "Requested", "Status", "Session", "Actions"];
+const COLUMNS = ["Course", "Academic Mate", "Request Status", "Session", "Actions"];
 
 const RED = "bg-red-50 text-red-800 ring-red-200";
 const STATUS_CLASSES: Record<string, string> = {
@@ -359,7 +359,6 @@ export default function StudentRequestsPage() {
                               <span className="text-xs font-medium text-[#4d4541]">{academicMate.name}</span>
                             </div>
                           </td>
-                          <td className={`whitespace-nowrap text-xs text-[#625954] ${TD}`}>{formatDate(item.createdAt)}</td>
                           <td className={TD}><StatusBadge status={item.status} /></td>
                           <td className={TD}>
                             {session

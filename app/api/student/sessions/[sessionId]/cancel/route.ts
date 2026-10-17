@@ -107,10 +107,13 @@ export async function POST(request: Request, { params }: RouteContext) {
     const student = booking.request.studentProfile;
     const mate = booking.request.offering.academicMateProfile;
 
-    if (student.userId !== authSession.user.id) {
+    const isStudent = student.userId === authSession.user.id;
+    const isAcademicMate = mate.userId === authSession.user.id;
+    
+    if (!isStudent && !isAcademicMate) {
       return NextResponse.json(
         {
-          error: "Only the student who booked this session can cancel it.",
+          error: "You are not authorised to cancel this session.",
         },
         { status: 403 },
       );
@@ -141,13 +144,13 @@ export async function POST(request: Request, { params }: RouteContext) {
     const courseName =
       booking.request.offering.title ||
       booking.request.offering.course.name;
-
-    const notificationData = {
-      sessionId: booking.id,
-      requestId: booking.requestId,
-      courseName,
-      cancelledAt: now.toISOString(),
-    };
+      const notificationData = {
+        sessionId: booking.id,
+        requestId: booking.requestId,
+        courseName,
+        cancelledAt: now.toISOString(),
+        cancelledByUserId: authSession.user.id,
+      };
 
     const cancelled = await prisma.$transaction(
       async (tx) => {
@@ -196,14 +199,14 @@ export async function POST(request: Request, { params }: RouteContext) {
               userId: student.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `Your session for ${courseName} has been cancelled. You can submit a new request to arrange another session.`,
+              body: `Your session for ${courseName} has been cancelled by ${authSession.user.name || (isStudent ? "the student" : "the Academic Mate")}. You can submit a new request to arrange another session.`,
               data: notificationData,
             },
             {
               userId: mate.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `${student.user.name} cancelled the session for ${courseName}. The student must submit a new request before another session can be booked.`,
+              body: `Your session for ${courseName} has been cancelled by ${authSession.user.name || (isStudent ? "the student" : "the Academic Mate")}. You can submit a new request to arrange another session.`,
               data: notificationData,
             },
           ],

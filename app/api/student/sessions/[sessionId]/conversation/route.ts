@@ -34,6 +34,24 @@ async function getSessionConversation(sessionId: string) {
     where: { id: sessionId },
     select: {
       id: true,
+      rescheduleRequests: {
+        where: { status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          proposedByUserId: true,
+          respondingUserId: true,
+          proposedStart: true,
+          proposedEnd: true,
+          reason: true,
+          status: true,
+          createdAt: true,
+          proposedBy: {
+            select: { name: true },
+          },
+        },
+      },
+
       scheduledStart: true,
       scheduledEnd: true,
       status: true,
@@ -154,6 +172,7 @@ export async function GET(
     const sessionStatus = getEffectiveSessionStatus(booking);
 
     return NextResponse.json({
+    
       session: {
         id: booking.id,
         scheduledStart: booking.scheduledStart.toISOString(),
@@ -163,7 +182,8 @@ export async function GET(
       conversation: {
         id: booking.request.conversation.id,
         courseName: booking.request.offering.course.name,
-        studentMessagingEnabled: booking.request.conversation.studentMessagingEnabled,
+        studentMessagingEnabled:
+          booking.request.conversation.studentMessagingEnabled,
         createdAt: booking.request.conversation.createdAt.toISOString(),
         updatedAt: booking.request.conversation.updatedAt.toISOString(),
         otherUserName: otherUser.name,
@@ -173,10 +193,22 @@ export async function GET(
           scheduledStart: booking.scheduledStart.toISOString(),
           scheduledEnd: booking.scheduledEnd.toISOString(),
           status: sessionStatus,
+          rescheduleProposals: booking.rescheduleRequests.map((proposal) => ({
+            id: proposal.id,
+            proposedByUserId: proposal.proposedByUserId,
+            respondingUserId: proposal.respondingUserId,
+            proposedByName: proposal.proposedBy.name,
+            proposedStart: proposal.proposedStart.toISOString(),
+            proposedEnd: proposal.proposedEnd.toISOString(),
+            reason: proposal.reason,
+            status: proposal.status,
+            createdAt: proposal.createdAt.toISOString(),
+          })),
         },
       },
       participantRole: isStudent ? "STUDENT" : "ACADEMIC_MATE",
     });
+      
   } catch (error) {
     console.error(
       "GET /api/student/sessions/[sessionId]/conversation failed:",
@@ -189,6 +221,7 @@ export async function GET(
     );
   }
 }
+
 
 export async function PATCH(
   request: Request,
@@ -238,6 +271,9 @@ export async function PATCH(
       );
     }
 
+    const studentMessagingEnabled: boolean =
+      body.studentMessagingEnabled;
+
     const booking = await getSessionConversation(sessionId);
 
     if (!booking) {
@@ -261,32 +297,105 @@ export async function PATCH(
 
     if (!booking.request.conversation) {
       return NextResponse.json(
-        { error: "The conversation for this session has not been created." },
+        {
+          error:
+            "The conversation for this session has not been created.",
+        },
         { status: 404 },
       );
     }
 
-    const conversation = await prisma.conversation.update({
-      where: {
-        id: booking.request.conversation.id,
-      },
-      data: {
-        studentMessagingEnabled: body.studentMessagingEnabled,
-      },
-      select: {
-        id: true,
-        studentMessagingEnabled: true,
-        updatedAt: true,
-      },
+    if (getEffectiveSessionStatus(booking) === "CANCELLED") {
+      return NextResponse.json(
+        {
+          error:
+            "This session has been cancelled. Messaging settings can no longer be changed. Submit a new session request to arrange another session.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const currentSession = await tx.tutoringSession.findUnique({
+        where: { id: sessionId },
+        select: {
+          status: true,
+          request: {
+            select: {
+              status: true,
+              conversation: {
+                select: {
+                  id: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!currentSession || !currentSession.request.conversation) {
+        return { kind: "not-found" as const };
+      }
+
+      const sessionStatus = String(currentSession.status).toUpperCase();
+      const requestStatus = String(
+        currentSession.request.status,
+      ).toUpperCase();
+
+      if (
+        sessionStatus.includes("CANCEL") ||
+        requestStatus.includes("CANCEL")
+      ) {
+        return { kind: "cancelled" as const };
+      }
+
+      const conversation = await tx.conversation.update({
+        where: {
+          id: currentSession.request.conversation.id,
+        },
+        data: {
+          studentMessagingEnabled,
+        },
+        select: {
+          id: true,
+          studentMessagingEnabled: true,
+          updatedAt: true,
+        },
+      });
+
+      return {
+        kind: "updated" as const,
+        conversation,
+      };
     });
 
+    if (result.kind === "not-found") {
+      return NextResponse.json(
+        {
+          error:
+            "The session or its conversation could not be found.",
+        },
+        { status: 404 },
+      );
+    }
+
+    if (result.kind === "cancelled") {
+      return NextResponse.json(
+        {
+          error:
+            "This session has been cancelled. Messaging settings can no longer be changed. Submit a new session request to arrange another session.",
+        },
+        { status: 409 },
+      );
+    }
+
     return NextResponse.json({
-      message: conversation.studentMessagingEnabled
+      message: result.conversation.studentMessagingEnabled
         ? "Student messaging has been reopened."
         : "Student messaging has been paused.",
       conversation: {
-        ...conversation,
-        updatedAt: conversation.updatedAt.toISOString(),
+        ...result.conversation,
+        updatedAt: result.conversation.updatedAt.toISOString(),
       },
     });
   } catch (error) {

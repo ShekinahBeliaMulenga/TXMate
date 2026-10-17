@@ -83,6 +83,170 @@ function matchesAvailability(
   }
 }
 
+function getLocalParts(date: Date, timezone: string) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const value = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+    const result = { year: value("year"), month: value("month"), day: value("day"), hour: value("hour"), minute: value("minute"), second: value("second") };
+    return Object.values(result).every(Number.isFinite) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
+function localDateString(date: Date, timezone: string): string | null {
+  const p = getLocalParts(date, timezone);
+  return p ? `${String(p.year).padStart(4, "0")}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}` : null;
+}
+
+function addCalendarDays(dateString: string, days: number): string {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${String(date.getUTCFullYear()).padStart(4, "0")}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function weekdayForDate(dateString: string): (typeof WEEKDAYS)[number] {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+function localTimeToUtc(dateString: string, minuteOfDay: number, timezone: string): Date | null {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  const target = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = target;
+  for (let i = 0; i < 6; i++) {
+    const p = getLocalParts(new Date(guess), timezone);
+    if (!p) return null;
+    const represented = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+    const corrected = guess + target - represented;
+    if (corrected === guess) break;
+    guess = corrected;
+  }
+  const result = new Date(guess);
+  const p = getLocalParts(result, timezone);
+  if (!p || p.year !== year || p.month !== month || p.day !== day || p.hour !== hour || p.minute !== minute || p.second !== 0 || result.getUTCMilliseconds() !== 0) return null;
+  return result;
+}
+
+function formatLocalClock(date: Date, timezone: string): string | null {
+  const p = getLocalParts(date, timezone);
+  return p ? `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}` : null;
+}
+
+export async function GET(_request: Request, { params }: RouteContext) {
+  try {
+    const authSession = await auth.api.getSession({ headers: await headers() });
+    if (!authSession?.user) return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+
+    const { sessionId } = await params;
+    if (!sessionId?.trim() || sessionId.length > 100) return NextResponse.json({ error: "A valid session ID is required." }, { status: 400 });
+
+    const existing = await prisma.tutoringSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        request: {
+          select: {
+            studentProfile: { select: { id: true, userId: true, status: true } },
+            offering: {
+              select: {
+                id: true,
+                status: true,
+                sessionDurationMinutes: true,
+                course: { select: { isActive: true } },
+                academicMateProfile: { select: { id: true, userId: true, status: true, verificationStatus: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!existing) return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    const student = existing.request.studentProfile;
+    const offering = existing.request.offering;
+    const mate = offering.academicMateProfile;
+    const userId = authSession.user.id;
+
+    if (userId !== student.userId && userId !== mate.userId) return NextResponse.json({ error: "You are not a participant in this session." }, { status: 403 });
+    if (existing.status !== "SCHEDULED" || existing.scheduledStart <= new Date()) return NextResponse.json({ error: "Only upcoming scheduled sessions can be rescheduled." }, { status: 409 });
+    if (student.status !== "ACTIVE" || offering.status !== "ACTIVE" || !offering.course.isActive || mate.status !== "ACTIVE" || mate.verificationStatus !== "VERIFIED") return NextResponse.json({ error: "The student, offering, or Academic Mate is no longer eligible for rescheduling." }, { status: 409 });
+
+    const pending = await prisma.sessionRescheduleRequest.findFirst({ where: { sessionId, status: "PENDING" }, select: { id: true } });
+    if (pending) return NextResponse.json({ error: "A rescheduling proposal is already awaiting a response." }, { status: 409 });
+
+    const now = new Date();
+    const horizonEnd = new Date(now.getTime() + 32 * 24 * 60 * 60 * 1000);
+    const duration = offering.sessionDurationMinutes;
+    const availability = await prisma.mateAvailability.findMany({
+      where: { academicMateProfileId: mate.id, mateOfferingId: offering.id, isActive: true },
+      select: { day: true, startMinute: true, endMinute: true, timezone: true },
+    });
+    const candidateSlots = new Map<string, { start: Date; end: Date; timezone: string }>();
+
+    for (const window of availability) {
+      if (window.endMinute - window.startMinute !== duration) continue;
+      const today = localDateString(now, window.timezone);
+      if (!today) continue;
+      for (let offset = 0; offset <= 30; offset++) {
+        const localDate = addCalendarDays(today, offset);
+        if (weekdayForDate(localDate) !== window.day) continue;
+        const start = localTimeToUtc(localDate, window.startMinute, window.timezone);
+        if (!start || start <= now || start.getTime() === existing.scheduledStart.getTime()) continue;
+        const end = new Date(start.getTime() + duration * 60_000);
+        candidateSlots.set(start.toISOString(), { start, end, timezone: window.timezone });
+      }
+    }
+
+    const candidates = [...candidateSlots.values()];
+    if (!candidates.length) return NextResponse.json({ slots: [] });
+
+    const conflicts = await prisma.tutoringSession.findMany({
+      where: {
+        id: { not: sessionId },
+        status: { in: [...ACTIVE_SESSION_STATUSES] },
+        scheduledStart: { lt: horizonEnd },
+        scheduledEnd: { gt: now },
+        request: { is: { OR: [
+          { studentProfileId: student.id },
+          { offering: { is: { academicMateProfileId: mate.id } } },
+        ] } },
+      },
+      select: { scheduledStart: true, scheduledEnd: true },
+    });
+
+    const slots = candidates
+      .filter((slot) => !conflicts.some((conflict) => slot.start < conflict.scheduledEnd && slot.end > conflict.scheduledStart))
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+      .map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+        timezone: slot.timezone,
+        localDate: localDateString(slot.start, slot.timezone),
+        localStart: formatLocalClock(slot.start, slot.timezone),
+        localEnd: formatLocalClock(slot.end, slot.timezone),
+      }));
+
+    return NextResponse.json({ slots });
+  } catch (error) {
+    console.error("GET session reschedule slots failed:", error);
+    return NextResponse.json({ error: "Unable to load available rescheduling slots." }, { status: 500 });
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: RouteContext,
