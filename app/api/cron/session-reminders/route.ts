@@ -1,6 +1,8 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ensureRecurringSessions } from "@/lib/recurring-session-generator";
+import { expirePendingRescheduleProposals } from "@/lib/reschedule-proposal-expiry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +27,32 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
+  let rescheduleProposalExpiry = {
+    checked: 0,
+    expired: 0,
+    failed: 0,
+    hasMore: false,
+  };
+  try {
+    rescheduleProposalExpiry = await expirePendingRescheduleProposals(now);
+  } catch (error) {
+    rescheduleProposalExpiry.failed++;
+    console.error("Rescheduling-proposal expiry failed:", error);
+  }
+
+  let recurringGeneration = {
+    arrangementsChecked: 0,
+    sessionsCreated: 0,
+    conflicts: 0,
+    failed: 0,
+  };
+  try {
+    recurringGeneration = await ensureRecurringSessions(now);
+  } catch (error) {
+    recurringGeneration.failed++;
+    console.error("Recurring-session generation failed:", error);
+  }
+
   const reminderDeadline = new Date(now.getTime() + REMINDER_WINDOW_MS);
   const earliestStart = new Date(now.getTime() - MAX_LATE_MS);
 
@@ -48,16 +76,18 @@ export async function GET(request: Request) {
         request: {
           select: {
             status: true,
+            arrangementStatus: true,
             studentProfile: {
               select: {
                 userId: true,
                 user: { select: { name: true } },
               },
             },
+            recurrenceTimezone: true,
             offering: {
               select: {
                 course: { select: { code: true, name: true } },
-                academicMateProfile: { select: { userId: true } },
+                academicMateProfile: { select: { userId: true, user: { select: { name: true } } } },
               },
             },
           },
@@ -70,16 +100,27 @@ export async function GET(request: Request) {
     let failed = 0;
 
     for (const session of sessions) {
-      if (session.request.status !== "ACCEPTED") {
+      if (session.request.status !== "ACCEPTED" || session.request.arrangementStatus !== "ACTIVE") {
         skipped++;
         continue;
       }
 
       const studentId = session.request.studentProfile.userId;
-      const studentName = session.request.studentProfile.user.name;
+      const studentName = session.request.studentProfile.user.name || "the student";
       const mateId = session.request.offering.academicMateProfile.userId;
+      const mateName = session.request.offering.academicMateProfile.user.name || "the Academic Mate";
       const course = session.request.offering.course;
       const courseName = `${course.code} · ${course.name}`;
+      const timezone = session.request.recurrenceTimezone || "Africa/Lusaka";
+      let scheduledTimeLabel: string;
+      try {
+        scheduledTimeLabel = new Intl.DateTimeFormat("en-ZM", {
+          timeZone: timezone, weekday: "short", day: "numeric", month: "short", year: "numeric",
+          hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+        }).format(session.scheduledStart);
+      } catch {
+        scheduledTimeLabel = session.scheduledStart.toISOString();
+      }
 
       try {
         const sent = await prisma.$transaction(async (tx) => {
@@ -94,6 +135,12 @@ export async function GET(request: Request) {
           const claim = await tx.tutoringSession.updateMany({
             where: {
               id: session.id,
+              request: {
+                is: {
+                  status: "ACCEPTED",
+                  arrangementStatus: "ACTIVE",
+                },
+              },
               status: "SCHEDULED",
               reminderSentAt: null,
               scheduledStart: {
@@ -116,26 +163,33 @@ export async function GET(request: Request) {
               ? "Your session is starting now or has just started."
               : `Your session starts in about ${minutesUntilStart} minute${minutesUntilStart === 1 ? "" : "s"}.`;
 
+          const conversationUrl = `/student/sessions/${encodeURIComponent(session.id)}/conversation`;
           const notificationData = {
             sessionId: session.id,
             scheduledStart: session.scheduledStart.toISOString(),
-            conversationUrl: `/student/sessions/${encodeURIComponent(session.id)}/conversation`,
+            scheduledEnd: session.scheduledEnd.toISOString(),
+            courseCode: course.code,
+            courseName: course.name,
+            studentName,
+            academicMateName: mateName,
+            timezone,
+            conversationUrl,
+            url: conversationUrl,
           };
-
           await tx.notification.createMany({
             data: [
               {
                 userId: studentId,
                 type: "SESSION_REMINDER",
-                title: "Tutoring session reminder",
-                body: `${timingMessage} Course: ${courseName}. Open TXMate to review the details.`,
+                title: `Session with ${mateName} starts soon`,
+                body: `${timingMessage} Your ${courseName} session with ${mateName} is scheduled for ${scheduledTimeLabel} (${timezone}).`,
                 data: notificationData,
               },
               {
                 userId: mateId,
                 type: "SESSION_REMINDER",
-                title: "Tutoring session reminder",
-                body: `${timingMessage} Course: ${courseName}. Student: ${studentName}. Open TXMate to review the details.`,
+                title: `Session with ${studentName} starts soon`,
+                body: `${timingMessage} Your ${courseName} session with ${studentName} is scheduled for ${scheduledTimeLabel} (${timezone}).`,
                 data: notificationData,
               },
             ],
@@ -161,6 +215,8 @@ export async function GET(request: Request) {
       remindersSent,
       skipped,
       failed,
+      recurringGeneration,
+      rescheduleProposalExpiry,
       processedAt: new Date().toISOString(),
     });
   } catch (error) {

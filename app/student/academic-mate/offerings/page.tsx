@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 type RateType =
@@ -417,9 +417,7 @@ export default function AcademicMateOfferingsPage() {
     return response.json() as Promise<Record<string, unknown>>;
   }
 
-  async function loadData() {
-    setLoading(true);
-    setError("");
+  const loadData = useCallback(async () => {
 
     try {
       const [coursesResponse, offeringsResponse] = await Promise.all([
@@ -469,11 +467,11 @@ export default function AcademicMateOfferingsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {

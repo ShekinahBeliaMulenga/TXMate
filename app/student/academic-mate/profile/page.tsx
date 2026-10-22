@@ -1,7 +1,7 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 type AcademicMateStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -255,14 +255,6 @@ function formatTime(minutes: number) {
   return `${displayHour}:${String(mins).padStart(2, "0")} ${period}`;
 }
 
-function formatRate(rate: string, currency: string, rateType: MateOfferingRateType) {
-  const numericRate = Number(rate);
-  if (!Number.isFinite(numericRate)) return `${currency} ${rate}`;
-  const formatted = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(numericRate);
-  if (numericRate === 0) return "Free";
-  const suffix = rateTypeLabel[rateType];
-  return suffix ? `${currency} ${formatted} ${suffix}` : `${currency} ${formatted}`;
-}
 
 function formatRateType(rateType: MateOfferingRateType) {
   return rateTypeLabel[rateType] || titleCase(rateType);
@@ -459,7 +451,7 @@ export default function AcademicMateProfilePage() {
           <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
             <div className="relative inline-block">
               {user.image ? (
-                <img src={user.image} alt={user.name} className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
+                <Image src={user.image} alt={user.name} width={64} height={64} unoptimized className="h-20 w-20 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-24 sm:w-24" />
               ) : (
                 <div aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">
                   {initials(user.name)}
@@ -668,7 +660,7 @@ export default function AcademicMateProfilePage() {
                   {reviews.map((review) => (
                     <li key={review.id} className="flex items-start gap-3.5 py-4 first:pt-0 last:pb-0">
                       {review.reviewerUser.image ? (
-                        <img src={review.reviewerUser.image} alt={review.reviewerUser.name} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                        <Image src={review.reviewerUser.image} alt={review.reviewerUser.name} width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" />
                       ) : (
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-xs font-semibold text-[#7d1f2a]">
                           {initials(review.reviewerUser.name)}

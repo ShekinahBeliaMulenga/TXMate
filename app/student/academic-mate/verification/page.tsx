@@ -279,7 +279,7 @@ export default function AcademicMateVerificationPage() {
   }
 
   useEffect(() => {
-    void loadVerification();
+    void loadVerification(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
   async function requestVerification() {

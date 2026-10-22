@@ -71,12 +71,14 @@ export async function POST(request: Request, { params }: RouteContext) {
       where: { id: sessionId },
       select: {
         id: true,
-        requestId: true,
+        arrangementId: true,
         status: true,
         scheduledStart: true,
         request: {
           select: {
             status: true,
+            arrangementType: true,
+            arrangementStatus: true,
             studentProfile: {
               select: {
                 userId: true,
@@ -86,7 +88,7 @@ export async function POST(request: Request, { params }: RouteContext) {
             offering: {
               select: {
                 title: true,
-                course: { select: { name: true } },
+                course: { select: { code: true, name: true } },
                 academicMateProfile: {
                   select: { userId: true },
                 },
@@ -119,6 +121,13 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
+    if (booking.request.arrangementStatus !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Only sessions in an active tutoring arrangement can be cancelled." },
+        { status: 409 },
+      );
+    }
+
     if (booking.status !== "SCHEDULED") {
       return NextResponse.json(
         {
@@ -141,16 +150,21 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
-    const courseName =
-      booking.request.offering.title ||
-      booking.request.offering.course.name;
-      const notificationData = {
-        sessionId: booking.id,
-        requestId: booking.requestId,
-        courseName,
-        cancelledAt: now.toISOString(),
-        cancelledByUserId: authSession.user.id,
-      };
+    const course = booking.request.offering.course;
+    const courseName = course.code ? `${course.code} · ${course.name}` : course.name;
+    const actorName = authSession.user.name || (isStudent ? "the student" : "the Academic Mate");
+    const isRecurringArrangement = booking.request.arrangementType === "RECURRING";
+    const arrangementStateLabel = booking.request.arrangementStatus.toLowerCase();
+    const cancellationBody = isRecurringArrangement
+      ? `${actorName} cancelled one session for ${courseName}. The recurring tutoring arrangement remains ${arrangementStateLabel}.`
+      : `${actorName} cancelled the session for ${courseName}. The one-time tutoring arrangement has been cancelled. Submit a new request if you need another session.`;
+    const notificationData = {
+      sessionId: booking.id,
+      requestId: booking.arrangementId,
+      courseName,
+      cancelledAt: now.toISOString(),
+      cancelledByUserId: authSession.user.id,
+    };
 
     const cancelled = await prisma.$transaction(
       async (tx) => {
@@ -171,16 +185,22 @@ export async function POST(request: Request, { params }: RouteContext) {
           return false;
         }
 
-        await tx.mateRequest.updateMany({
-          where: {
-            id: booking.requestId,
-            status: "ACCEPTED",
-          },
-          data: {
-            status: "CANCELLED",
-            respondedAt: now,
-          },
-        });
+        if (!isRecurringArrangement) {
+          await tx.mateRequest.updateMany({
+            where: {
+              id: booking.arrangementId,
+              arrangementStatus: "ACTIVE",
+            },
+            data: {
+              status: "CANCELLED",
+              arrangementStatus: "CANCELLED",
+              respondedAt: now,
+              arrangementCancelledAt: now,
+              arrangementCancelledByUserId: authSession.user.id,
+              arrangementCancellationReason: reason || null,
+            },
+          });
+        }
 
         await tx.sessionRescheduleRequest.updateMany({
           where: {
@@ -199,14 +219,14 @@ export async function POST(request: Request, { params }: RouteContext) {
               userId: student.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `Your session for ${courseName} has been cancelled by ${authSession.user.name || (isStudent ? "the student" : "the Academic Mate")}. You can submit a new request to arrange another session.`,
+              body: cancellationBody,
               data: notificationData,
             },
             {
               userId: mate.userId,
               type: "SESSION_CANCELLED",
               title: "Tutoring session cancelled",
-              body: `Your session for ${courseName} has been cancelled by ${authSession.user.name || (isStudent ? "the student" : "the Academic Mate")}. You can submit a new request to arrange another session.`,
+              body: cancellationBody,
               data: notificationData,
             },
           ],
@@ -228,17 +248,18 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     return NextResponse.json({
-      message:
-        "The session and its original request have been cancelled. Both participants have been notified. You can submit a new request to arrange another session.",
+      message: isRecurringArrangement
+        ? `This session has been cancelled. The recurring tutoring arrangement remains ${arrangementStateLabel}.`
+        : "The session and one-time tutoring arrangement have been cancelled. Both participants have been notified. You can submit a new request if you need another session.",
       session: {
         id: booking.id,
         status: "CANCELLED" as const,
         cancelledAt: now.toISOString(),
         cancellationReason: reason || null,
       },
-      request: {
-        id: booking.requestId,
-        status: "CANCELLED" as const,
+      arrangement: {
+        id: booking.arrangementId,
+        status: isRecurringArrangement ? booking.request.arrangementStatus : ("CANCELLED" as const),
       },
     });
   } catch (error) {

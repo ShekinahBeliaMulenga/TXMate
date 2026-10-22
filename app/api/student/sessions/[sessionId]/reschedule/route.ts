@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getScheduleConflictingStarts, hasScheduleConflict } from "@/lib/recurring-arrangement-conflicts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +12,6 @@ export const dynamic = "force-dynamic";
 type RouteContext = {
   params: Promise<{ sessionId: string }>;
 };
-
-const ACTIVE_SESSION_STATUSES = [
-  "SCHEDULED",
-  "IN_PROGRESS",
-  "DISPUTED",
-] as const;
 
 const WEEKDAYS = [
   "SUNDAY",
@@ -36,51 +31,6 @@ function isPlainObject(
     value !== null &&
     !Array.isArray(value)
   );
-}
-
-function matchesAvailability(
-  start: Date,
-  durationMinutes: number,
-  availability: {
-    day: (typeof WEEKDAYS)[number];
-    startMinute: number;
-    endMinute: number;
-    timezone: string;
-  },
-): boolean {
-  if (
-    start.getUTCSeconds() !== 0 ||
-    start.getUTCMilliseconds() !== 0 ||
-    availability.endMinute - availability.startMinute !==
-      durationMinutes
-  ) {
-    return false;
-  }
-
-  try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: availability.timezone,
-      weekday: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).formatToParts(start);
-
-    const get = (type: string) =>
-      parts.find((part) => part.type === type)?.value;
-
-    const weekday = get("weekday")?.toUpperCase();
-    const hour = Number(get("hour"));
-    const minute = Number(get("minute"));
-
-    return (
-      WEEKDAYS.includes(weekday as (typeof WEEKDAYS)[number]) &&
-      weekday === availability.day &&
-      hour * 60 + minute === availability.startMinute
-    );
-  } catch {
-    return false;
-  }
 }
 
 function getLocalParts(date: Date, timezone: string) {
@@ -156,10 +106,14 @@ export async function GET(_request: Request, { params }: RouteContext) {
       where: { id: sessionId },
       select: {
         id: true,
+        arrangementId: true,
         status: true,
         scheduledStart: true,
+        occurrenceSlotStart: true,
         request: {
           select: {
+            arrangementType: true,
+            arrangementStatus: true,
             studentProfile: { select: { id: true, userId: true, status: true } },
             offering: {
               select: {
@@ -182,14 +136,21 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const userId = authSession.user.id;
 
     if (userId !== student.userId && userId !== mate.userId) return NextResponse.json({ error: "You are not a participant in this session." }, { status: 403 });
-    if (existing.status !== "SCHEDULED" || existing.scheduledStart <= new Date()) return NextResponse.json({ error: "Only upcoming scheduled sessions can be rescheduled." }, { status: 409 });
+
+    const now = new Date();
+    const activeArrangement = existing.request.arrangementStatus === "ACTIVE";
+    const reversibleOneTimeCancellation =
+      existing.request.arrangementType === "ONE_TIME" &&
+      existing.request.arrangementStatus === "CANCELLED" &&
+      existing.status === "CANCELLED";
+    const canRescheduleStatus = existing.status === "SCHEDULED" || existing.status === "CANCELLED";
+    if (!(activeArrangement || reversibleOneTimeCancellation) || !canRescheduleStatus || existing.scheduledStart <= now) {
+      return NextResponse.json({ error: "Only a future scheduled session, or a cancelled session before its original start time, can be rescheduled." }, { status: 409 });
+    }
     if (student.status !== "ACTIVE" || offering.status !== "ACTIVE" || !offering.course.isActive || mate.status !== "ACTIVE" || mate.verificationStatus !== "VERIFIED") return NextResponse.json({ error: "The student, offering, or Academic Mate is no longer eligible for rescheduling." }, { status: 409 });
 
     const pending = await prisma.sessionRescheduleRequest.findFirst({ where: { sessionId, status: "PENDING" }, select: { id: true } });
     if (pending) return NextResponse.json({ error: "A rescheduling proposal is already awaiting a response." }, { status: 409 });
-
-    const now = new Date();
-    const horizonEnd = new Date(now.getTime() + 32 * 24 * 60 * 60 * 1000);
     const duration = offering.sessionDurationMinutes;
     const availability = await prisma.mateAvailability.findMany({
       where: { academicMateProfileId: mate.id, mateOfferingId: offering.id, isActive: true },
@@ -214,22 +175,31 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const candidates = [...candidateSlots.values()];
     if (!candidates.length) return NextResponse.json({ slots: [] });
 
-    const conflicts = await prisma.tutoringSession.findMany({
-      where: {
-        id: { not: sessionId },
-        status: { in: [...ACTIVE_SESSION_STATUSES] },
-        scheduledStart: { lt: horizonEnd },
-        scheduledEnd: { gt: now },
-        request: { is: { OR: [
-          { studentProfileId: student.id },
-          { offering: { is: { academicMateProfileId: mate.id } } },
-        ] } },
-      },
-      select: { scheduledStart: true, scheduledEnd: true },
-    });
+    const [heldStarts, conflictingStarts] = await Promise.all([
+      prisma.tutoringSession.findMany({
+        where: {
+          arrangementId: existing.arrangementId,
+          id: { not: sessionId },
+          scheduledStart: { in: candidates.map((slot) => slot.start) },
+        },
+        select: { scheduledStart: true },
+      }),
+      getScheduleConflictingStarts(prisma, {
+        occurrenceStarts: candidates.map((slot) => slot.start),
+        durationMinutes: duration,
+        studentProfileId: student.id,
+        academicMateProfileId: mate.id,
+        excludeRequestId: existing.arrangementId,
+        excludeSessionId: sessionId,
+        includeExcludedRequestRecurrence: true,
+        ignoreOccurrenceSlotStart: existing.occurrenceSlotStart,
+      }),
+    ]);
+    const heldStartTimes = new Set(heldStarts.map((session) => session.scheduledStart.getTime()));
 
     const slots = candidates
-      .filter((slot) => !conflicts.some((conflict) => slot.start < conflict.scheduledEnd && slot.end > conflict.scheduledStart))
+      .filter((slot) => !heldStartTimes.has(slot.start.getTime()))
+      .filter((slot) => !conflictingStarts.has(slot.start.getTime()))
       .sort((a, b) => a.start.getTime() - b.start.getTime())
       .map((slot) => ({
         start: slot.start.toISOString(),
@@ -326,11 +296,14 @@ export async function POST(
       where: { id: sessionId },
       select: {
         id: true,
+        arrangementId: true,
         status: true,
         scheduledStart: true,
         scheduledEnd: true,
         request: {
           select: {
+            arrangementType: true,
+            arrangementStatus: true,
             studentProfile: {
               select: {
                 id: true,
@@ -377,12 +350,21 @@ export async function POST(
       );
     }
 
-    if (existing.status !== "SCHEDULED") {
+    const activeArrangement = existing.request.arrangementStatus === "ACTIVE";
+    const reversibleOneTimeCancellation =
+      existing.request.arrangementType === "ONE_TIME" &&
+      existing.request.arrangementStatus === "CANCELLED" &&
+      existing.status === "CANCELLED";
+    if (!(activeArrangement || reversibleOneTimeCancellation)) {
       return NextResponse.json(
-        {
-          error:
-            "Only scheduled sessions can be rescheduled.",
-        },
+        { error: "This arrangement is not eligible for rescheduling." },
+        { status: 409 },
+      );
+    }
+
+    if (existing.status !== "SCHEDULED" && existing.status !== "CANCELLED") {
+      return NextResponse.json(
+        { error: "Only scheduled or cancelled future sessions can be rescheduled." },
         { status: 409 },
       );
     }
@@ -452,16 +434,27 @@ export async function POST(
       const current = await tx.tutoringSession.findUnique({
         where: { id: sessionId },
         select: {
+          arrangementId: true,
           status: true,
           scheduledStart: true,
           scheduledEnd: true,
+          occurrenceSlotStart: true,
+          request: { select: { arrangementType: true, arrangementStatus: true } },
         },
       });
 
+      const currentArrangementActive = current?.request.arrangementStatus === "ACTIVE";
+      const currentOneTimeCancelled =
+        current?.request.arrangementType === "ONE_TIME" &&
+        current.request.arrangementStatus === "CANCELLED" &&
+        current.status === "CANCELLED";
       if (
         !current ||
-        current.status !== "SCHEDULED" ||
-        current.scheduledStart <= new Date()
+        !(currentArrangementActive || currentOneTimeCancelled) ||
+        (current.status !== "SCHEDULED" && current.status !== "CANCELLED") ||
+        current.scheduledStart <= new Date() ||
+        proposedStart <= new Date() ||
+        proposedStart.getTime() === current.scheduledStart.getTime()
       ) {
         return { kind: "session-changed" as const };
       }
@@ -479,60 +472,36 @@ export async function POST(
         return { kind: "pending" as const };
       }
 
-      const availability = await tx.mateAvailability.findMany({
+      // Rescheduling is a proposal, not an immediate booking. A participant may
+      // propose a one-off time outside the published slots; the receiving
+      // participant's explicit acceptance confirms that time works for them.
+      // The time/overlap/duplicate checks below still apply before a proposal is saved.
+
+      // The database also has a unique (arrangementId, scheduledStart) constraint.
+      // Check all rows, including cancelled occurrences, so acceptance returns a useful
+      // conflict instead of surfacing a database uniqueness error.
+      const slotHeld = await tx.tutoringSession.findFirst({
         where: {
-          academicMateProfileId: mate.id,
-          mateOfferingId: offering.id,
-          isActive: true,
+          arrangementId: current.arrangementId,
+          id: { not: sessionId },
+          scheduledStart: proposedStart,
         },
-        select: {
-          day: true,
-          startMinute: true,
-          endMinute: true,
-          timezone: true,
-        },
+        select: { id: true },
+      });
+      if (slotHeld) return { kind: "slot-held" as const };
+
+      const conflict = await hasScheduleConflict(tx, {
+        occurrenceStarts: [proposedStart],
+        durationMinutes,
+        studentProfileId: student.id,
+        academicMateProfileId: mate.id,
+        excludeRequestId: current.arrangementId,
+        excludeSessionId: sessionId,
+        includeExcludedRequestRecurrence: true,
+        ignoreOccurrenceSlotStart: current.occurrenceSlotStart,
       });
 
-      if (
-        !availability.some((window) =>
-          matchesAvailability(
-            proposedStart,
-            durationMinutes,
-            window,
-          ),
-        )
-      ) {
-        return { kind: "invalid-slot" as const };
-      }
-
-      const conflict =
-        await tx.tutoringSession.findFirst({
-          where: {
-            id: { not: sessionId },
-            status: { in: [...ACTIVE_SESSION_STATUSES] },
-            scheduledStart: { lt: proposedEnd },
-            scheduledEnd: { gt: proposedStart },
-            request: {
-              is: {
-                OR: [
-                  { studentProfileId: student.id },
-                  {
-                    offering: {
-                      is: {
-                        academicMateProfileId: mate.id,
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          },
-          select: { id: true },
-        });
-
-      if (conflict) {
-        return { kind: "conflict" as const };
-      }
+      if (conflict) return { kind: "conflict" as const };
 
       const proposal =
         await tx.sessionRescheduleRequest.create({
@@ -592,12 +561,9 @@ export async function POST(
       );
     }
 
-    if (result.kind === "invalid-slot") {
+    if (result.kind === "slot-held") {
       return NextResponse.json(
-        {
-          error:
-            "The proposed time does not match the Academic Mate's available slots.",
-        },
+        { error: "Another occurrence in this tutoring arrangement already uses that exact start time. Choose a different available slot." },
         { status: 409 },
       );
     }
@@ -606,7 +572,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "You or the Academic Mate already has a session during that time.",
+            "The student has another session or pending recurring occurrence during that time.",
         },
         { status: 409 },
       );

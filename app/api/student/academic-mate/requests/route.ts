@@ -238,6 +238,12 @@ export async function GET(request: Request) {
             message: true,
             requestedStart: true,
             requestedEnd: true,
+            arrangementType: true,
+            recurrenceEveryWeeks: true,
+            recurrenceWeekday: true,
+            recurrenceLocalStartMinute: true,
+            recurrenceTimezone: true,
+            recurrenceEndsAt: true,
             respondedAt: true,
             createdAt: true,
 
@@ -286,6 +292,16 @@ export async function GET(request: Request) {
             },
 
             tutoringSession: {
+              select: {
+                id: true,
+                status: true,
+                scheduledStart: true,
+                scheduledEnd: true,
+                meetingLocation: true,
+              },
+            },
+            sessions: {
+              orderBy: { scheduledStart: "asc" },
               select: {
                 id: true,
                 status: true,
@@ -363,6 +379,12 @@ export async function GET(request: Request) {
       message: record.message,
       requestedStart: record.requestedStart?.toISOString() ?? null,
       requestedEnd: record.requestedEnd?.toISOString() ?? null,
+      arrangementType: record.arrangementType,
+      recurrenceEveryWeeks: record.recurrenceEveryWeeks,
+      recurrenceWeekday: record.recurrenceWeekday,
+      recurrenceLocalStartMinute: record.recurrenceLocalStartMinute,
+      recurrenceTimezone: record.recurrenceTimezone,
+      recurrenceEndsAt: record.recurrenceEndsAt?.toISOString() ?? null,
       respondedAt: record.respondedAt?.toISOString() ?? null,
       createdAt: record.createdAt.toISOString(),
 
@@ -398,6 +420,13 @@ export async function GET(request: Request) {
             meetingLocation: record.tutoringSession.meetingLocation,
           }
         : null,
+      sessions: record.sessions.map((item) => ({
+        id: item.id,
+        status: item.status,
+        scheduledStart: item.scheduledStart.toISOString(),
+        scheduledEnd: item.scheduledEnd.toISOString(),
+        meetingLocation: item.meetingLocation,
+      })),
     }));
 
     return NextResponse.json({

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { emitConversationMessage } from "@/lib/realtime/socket-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,20 +33,14 @@ function pausedMessage(isStudent: boolean) {
 
 function isConversationCancelled(conversation: {
   request: {
-    status: string;
-    tutoringSession: {
-      status: string;
-    } | null;
+    arrangementStatus: string;
   };
 }) {
-  return (
-    conversation.request.status === "CANCELLED" ||
-    conversation.request.tutoringSession?.status === "CANCELLED"
-  );
+  return conversation.request.arrangementStatus === "CANCELLED";
 }
 
 const CANCELLED_MESSAGE =
-  "This session has been cancelled. Messaging is closed. Submit a new session request to arrange another session.";
+  "This tutoring arrangement has been cancelled. Messaging is closed.";
 
 async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
@@ -64,9 +59,11 @@ async function getConversation(conversationId: string) {
       request: {
         select: {
           status: true,
+          arrangementStatus: true,
           studentProfile: {
             select: {
               userId: true,
+              user: { select: { name: true } },
             },
           },
           offering: {
@@ -74,8 +71,10 @@ async function getConversation(conversationId: string) {
               academicMateProfile: {
                 select: {
                   userId: true,
+                  user: { select: { name: true } },
                 },
               },
+              course: { select: { code: true, name: true } },
             },
           },
           tutoringSession: {
@@ -85,6 +84,12 @@ async function getConversation(conversationId: string) {
               scheduledEnd: true,
               status: true,
             },
+          },
+          sessions: {
+            where: { status: { in: ["SCHEDULED", "IN_PROGRESS"] }, scheduledEnd: { gte: new Date() } },
+            orderBy: [{ scheduledStart: "asc" }, { id: "asc" }],
+            take: 1,
+            select: { id: true },
           },
         },
       },
@@ -172,6 +177,7 @@ export async function GET(
         user.id === studentUserId ? "STUDENT" : "ACADEMIC_MATE",
       messages: messages.map((message) => ({
         ...message,
+        conversationId,
         createdAt: message.createdAt.toISOString(),
         readAt: message.readAt?.toISOString() ?? null,
       })),
@@ -307,6 +313,7 @@ export async function POST(
           request: {
             select: {
               status: true,
+              arrangementStatus: true,
               tutoringSession: {
                 select: {
                   status: true,
@@ -341,22 +348,7 @@ export async function POST(
           senderUserId: true,
           body: true,
           createdAt: true,
-        },
-      });
-
-      await tx.notification.create({
-        data: {
-          userId: recipientUserId,
-          type: "NEW_MESSAGE",
-          title: "New TXMate message",
-          body:
-            messageBody.length > 120
-              ? `${messageBody.slice(0, 117)}...`
-              : messageBody,
-          data: {
-            conversationId,
-            messageId: message.id,
-          },
+          readAt: true,
         },
       });
 
@@ -387,13 +379,62 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(
-      {
-        message: {
-          ...result.message,
-          createdAt: result.message.createdAt.toISOString(),
+    // Build the notification from the same trusted conversation record used to
+    // authorize this send. Keep notification persistence outside the message
+    // transaction so a notification failure cannot roll back a saved message.
+    try {
+      const senderName = (isStudent
+        ? conversation.request.studentProfile.user.name
+        : conversation.request.offering.academicMateProfile.user.name
+      )?.trim() || user.name?.trim() || (isStudent ? "Student" : "Academic Mate");
+      const course = conversation.request.offering.course;
+      const courseLabel = `${course.code} · ${course.name}`;
+      const compactMessage = messageBody.replace(/\s+/g, " ").trim();
+      const preview = compactMessage.length > 120 ? `${compactMessage.slice(0, 117)}…` : compactMessage;
+      const sessionId = conversation.request.sessions[0]?.id ?? conversation.request.tutoringSession?.id ?? null;
+      const url = sessionId
+        ? `/student/sessions/${encodeURIComponent(sessionId)}/conversation`
+        : `/student/messages?conversationId=${encodeURIComponent(conversationId)}`;
+
+      await prisma.notification.create({
+        data: {
+          userId: recipientUserId,
+          type: "NEW_MESSAGE",
+          title: `New message from ${senderName}`,
+          body: `${courseLabel}: ${preview}`,
+          data: {
+            conversationId,
+            messageId: result.message.id,
+            senderUserId: user.id,
+            senderName,
+            courseCode: course.code,
+            courseName: course.name,
+            ...(sessionId ? { sessionId } : {}),
+            url,
+            conversationUrl: url,
+          },
         },
-      },
+      });
+    } catch (error) {
+      console.error("Unable to create new-message notification:", error instanceof Error ? error.message : "Unknown notification error");
+    }
+
+    const message = {
+      ...result.message,
+      createdAt: result.message.createdAt.toISOString(),
+      readAt: result.message.readAt?.toISOString() ?? null,
+    };
+
+    // Database persistence is authoritative. Realtime delivery is best-effort:
+    // a Socket.IO outage must not turn a successfully saved message into an API error.
+    try {
+      emitConversationMessage(message);
+    } catch (error) {
+      console.error("Unable to broadcast newly created message:", error);
+    }
+
+    return NextResponse.json(
+      { message },
       { status: 201 },
     );
   } catch (error) {

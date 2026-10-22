@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 type Course = { id?: string; code: string; name: string };
@@ -176,7 +177,7 @@ function useCountUp(target: number, duration = 800) {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       from.current = target;
-      setValue(target);
+      setValue(target); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
     const start = performance.now();
@@ -420,7 +421,7 @@ function DashboardContent({
                 return (
                   <article key={request.id} className="flex items-start gap-3 px-4 py-4 transition-colors hover:bg-[#fcfaf8] sm:px-5">
                     {mate.image ? (
-                      <img src={mate.image} alt="" className="h-9 w-9 shrink-0 rounded-full bg-[#f2e7e5] object-cover" />
+                      <Image src={mate.image} alt="" width={64} height={64} unoptimized className="h-9 w-9 shrink-0 rounded-full bg-[#f2e7e5] object-cover" />
                     ) : (
                       <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f2e7e5] text-[11px] font-semibold text-[#7d1f2a]">{initials(mate.name)}</div>
                     )}

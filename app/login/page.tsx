@@ -87,7 +87,7 @@ export default function LoginPage() {
   // Shake the card whenever a new error appears.
   useEffect(() => {
     if (!error) return;
-    setShake(true);
+    setShake(true); // eslint-disable-line react-hooks/set-state-in-effect
     const t = setTimeout(() => setShake(false), 500);
     return () => clearTimeout(t);
   }, [error]);

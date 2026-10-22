@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
@@ -14,7 +15,6 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    // Same set of conversations the inbox shows.
     const conversations = await prisma.conversation.findMany({
       where: {
         request: {
@@ -36,12 +36,12 @@ export async function GET() {
       where: { userId, conversationId: { in: conversations.map((c) => c.id) } },
       select: { conversationId: true, lastReadAt: true },
     });
+
     const lastReadByConversation = new Map(
       readRows.map((row) => [row.conversationId, row.lastReadAt]),
     );
 
-    // One query: for each conversation, count messages from the other person newer than my last read time.
-    const count = await prisma.message.count({
+    const unreadConversations = await prisma.message.findMany({
       where: {
         senderUserId: { not: userId },
         OR: conversations.map((conversation) => {
@@ -52,9 +52,11 @@ export async function GET() {
           };
         }),
       },
+      distinct: ["conversationId"],
+      select: { conversationId: true },
     });
 
-    return NextResponse.json({ count });
+    return NextResponse.json({ count: unreadConversations.length });
   } catch (error) {
     console.error("GET /api/student/messages/unread-count failed:", error);
     return NextResponse.json({ error: "Unable to load unread count." }, { status: 500 });

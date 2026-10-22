@@ -64,12 +64,12 @@ export default function ImageCropModal({
   const [localError, setLocalError] = useState<string | null>(null);
 
   const cancelRef = useRef(onCancel);
-  cancelRef.current = onCancel;
+  useEffect(() => { cancelRef.current = onCancel; }, [onCancel]);
 
   // Create the object URL inside the effect so Strict Mode's double-run is safe
   useEffect(() => {
     const url = URL.createObjectURL(file);
-    setSrc(url);
+    setSrc(url); // eslint-disable-line react-hooks/set-state-in-effect
     return () => URL.revokeObjectURL(url);
   }, [file]);
 

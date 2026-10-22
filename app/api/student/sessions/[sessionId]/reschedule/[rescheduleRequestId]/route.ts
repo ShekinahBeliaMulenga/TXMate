@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasScheduleConflict } from "@/lib/recurring-arrangement-conflicts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,12 +15,6 @@ type RouteContext = {
     rescheduleRequestId: string;
   }>;
 };
-
-const ACTIVE_SESSION_STATUSES = [
-  "SCHEDULED",
-  "IN_PROGRESS",
-  "DISPUTED",
-] as const;
 
 export async function PATCH(
   request: Request,
@@ -95,10 +90,15 @@ export async function PATCH(
           session: {
             select: {
               id: true,
+              arrangementId: true,
               status: true,
               scheduledStart: true,
+              occurrenceSlotStart: true,
               request: {
                 select: {
+                  status: true,
+                  arrangementType: true,
+                  arrangementStatus: true,
                   studentProfile: {
                     select: {
                       id: true,
@@ -110,9 +110,11 @@ export async function PATCH(
                   },
                   offering: {
                     select: {
+                      id: true,
+                      sessionDurationMinutes: true,
                       title: true,
                       course: {
-                        select: { name: true },
+                        select: { code: true, name: true },
                       },
                       academicMateProfile: {
                         select: {
@@ -144,6 +146,18 @@ export async function PATCH(
         },
         { status: 403 },
       );
+    }
+
+    if (proposal.status === "EXPIRED") {
+      const now = new Date();
+      const errorMessage =
+        proposal.session.scheduledStart <= now
+          ? "The original session's scheduled start time has passed. This proposal has expired, and the session was not moved."
+          : proposal.proposedStart <= now
+            ? "The proposed replacement time has passed. This proposal has expired, and the session was not moved."
+            : "This rescheduling proposal has expired or is no longer valid. The session was not moved.";
+
+      return NextResponse.json({ error: errorMessage }, { status: 409 });
     }
 
     if (proposal.status !== "PENDING") {
@@ -190,26 +204,94 @@ export async function PATCH(
               session: {
                 select: {
                   id: true,
+                  arrangementId: true,
                   status: true,
                   scheduledStart: true,
+                  occurrenceSlotStart: true,
+                  request: {
+                    select: {
+                      status: true,
+                      arrangementType: true,
+                      arrangementStatus: true,
+                      offering: {
+                        select: {
+                          id: true,
+                          sessionDurationMinutes: true,
+                          academicMateProfile: { select: { id: true } },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
           });
 
-        if (
-          !current ||
-          current.status !== "PENDING" ||
-          current.respondingUserId !== userId
-        ) {
+        if (!current || current.respondingUserId !== userId) {
           return { kind: "proposal-changed" as const };
         }
 
         const now = new Date();
 
+        if (current.status === "EXPIRED") {
+          return current.session.scheduledStart <= now
+            ? { kind: "original-deadline-passed" as const }
+            : current.proposedStart <= now
+              ? { kind: "time-expired" as const }
+              : { kind: "proposal-changed" as const };
+        }
+
+        if (current.status !== "PENDING") {
+          return { kind: "proposal-changed" as const };
+        }
+
+        const currentArrangementActive = current.session.request.arrangementStatus === "ACTIVE";
+        const currentOneTimeCancelled =
+          current.session.request.arrangementType === "ONE_TIME" &&
+          current.session.request.arrangementStatus === "CANCELLED" &&
+          current.session.request.status === "CANCELLED" &&
+          current.session.status === "CANCELLED";
+        if (current.session.scheduledStart <= now) {
+          const expiredProposal = await tx.sessionRescheduleRequest.updateMany({
+            where: {
+              id: current.id,
+              status: "PENDING",
+            },
+            data: {
+              status: "EXPIRED",
+              respondedAt: now,
+            },
+          });
+
+          if (expiredProposal.count === 1) {
+            const expirationMessage =
+              "The original session start time has passed. The rescheduling proposal expired, and the session was not moved.";
+            await tx.notification.createMany({
+              data: [
+                {
+                  userId: student.userId,
+                  type: "SYSTEM",
+                  title: "Rescheduling proposal expired",
+                  body: expirationMessage,
+                  data: { sessionId, rescheduleRequestId },
+                },
+                {
+                  userId: mate.userId,
+                  type: "SYSTEM",
+                  title: "Rescheduling proposal expired",
+                  body: expirationMessage,
+                  data: { sessionId, rescheduleRequestId },
+                },
+              ],
+            });
+          }
+
+          return { kind: "original-deadline-passed" as const };
+        }
+
         if (
-          current.session.status !== "SCHEDULED" ||
-          current.session.scheduledStart <= now
+          !(currentArrangementActive || currentOneTimeCancelled) ||
+          (current.session.status !== "SCHEDULED" && current.session.status !== "CANCELLED")
         ) {
           await tx.sessionRescheduleRequest.updateMany({
             where: {
@@ -274,6 +356,11 @@ export async function PATCH(
           return { kind: "declined" as const };
         }
 
+        // Acceptance is the other participant's explicit confirmation that the
+        // proposed one-off time works. Published availability is used to suggest
+        // slots, but does not prevent participants agreeing to an exception here.
+        // We still validate the proposed time, same-student conflicts, and duplicates.
+
         if (current.proposedStart <= now) {
           await tx.sessionRescheduleRequest.updateMany({
             where: {
@@ -289,49 +376,57 @@ export async function PATCH(
           return { kind: "time-expired" as const };
         }
 
-        const conflict =
-          await tx.tutoringSession.findFirst({
+        // A cancelled occurrence can still occupy the arrangement's unique scheduledStart key.
+        // Guard it explicitly so the API reports a conflict instead of a Prisma error.
+        const slotHeld = await tx.tutoringSession.findFirst({
+          where: {
+            arrangementId: current.session.arrangementId,
+            id: { not: sessionId },
+            scheduledStart: current.proposedStart,
+          },
+          select: { id: true },
+        });
+        if (slotHeld) return { kind: "slot-held" as const };
+
+        const conflict = await hasScheduleConflict(tx, {
+          occurrenceStarts: [current.proposedStart],
+          durationMinutes: current.session.request.offering.sessionDurationMinutes,
+          studentProfileId: student.id,
+          academicMateProfileId: mate.id,
+          excludeRequestId: current.session.arrangementId,
+          excludeSessionId: sessionId,
+          includeExcludedRequestRecurrence: true,
+          ignoreOccurrenceSlotStart: current.session.occurrenceSlotStart,
+        });
+
+        if (conflict) return { kind: "conflict" as const };
+
+        if (currentOneTimeCancelled) {
+          const competingArrangement = await tx.mateRequest.findFirst({
             where: {
-              id: { not: sessionId },
-              status: { in: [...ACTIVE_SESSION_STATUSES] },
-              scheduledStart: {
-                lt: current.proposedEnd,
-              },
-              scheduledEnd: {
-                gt: current.proposedStart,
-              },
-              request: {
-                is: {
-                  OR: [
-                    { studentProfileId: student.id },
-                    {
-                      offering: {
-                        is: {
-                          academicMateProfileId: mate.id,
-                        },
-                      },
-                    },
-                  ],
-                },
-              },
+              id: { not: current.session.arrangementId },
+              studentProfileId: student.id,
+              offeringId: current.session.request.offering.id,
+              status: { in: ["REQUESTED", "ACCEPTED"] },
             },
             select: { id: true },
           });
-
-        if (conflict) {
-          return { kind: "conflict" as const };
+          if (competingArrangement) return { kind: "arrangement-exists" as const };
         }
 
         const updatedSession =
           await tx.tutoringSession.updateMany({
             where: {
               id: sessionId,
-              status: "SCHEDULED",
+              status: { in: ["SCHEDULED", "CANCELLED"] },
               scheduledStart: { gt: now },
             },
             data: {
+              status: "SCHEDULED",
               scheduledStart: current.proposedStart,
               scheduledEnd: current.proposedEnd,
+              cancelledAt: null,
+              cancellationReason: null,
               reminderSentAt: null,
             },
           });
@@ -358,6 +453,25 @@ export async function PATCH(
           );
         }
 
+        if (currentOneTimeCancelled) {
+          const restoredArrangement = await tx.mateRequest.updateMany({
+            where: {
+              id: current.session.arrangementId,
+              arrangementType: "ONE_TIME",
+              status: "CANCELLED",
+              arrangementStatus: "CANCELLED",
+            },
+            data: {
+              status: "ACCEPTED",
+              arrangementStatus: "ACTIVE",
+              respondedAt: now,
+            },
+          });
+          if (restoredArrangement.count !== 1) {
+            throw new Error("The one-time arrangement could not be restored after rescheduling.");
+          }
+        }
+
         // Any other outstanding proposals for this session
         // can no longer be accepted.
         await tx.sessionRescheduleRequest.updateMany({
@@ -372,9 +486,8 @@ export async function PATCH(
           },
         });
 
-        const courseName =
-          proposal.session.request.offering.title ||
-          proposal.session.request.offering.course.name;
+        const course = proposal.session.request.offering.course;
+        const courseName = course.code ? `${course.code} · ${course.name}` : course.name;
 
         await tx.notification.createMany({
           data: [
@@ -435,11 +548,20 @@ export async function PATCH(
           { status: 409 },
         );
 
+      case "original-deadline-passed":
+        return NextResponse.json(
+          {
+            error:
+              "The original session's scheduled start time has passed. This proposal has expired, and the session was not moved.",
+          },
+          { status: 409 },
+        );
+
       case "session-unavailable":
         return NextResponse.json(
           {
             error:
-              "The session is no longer scheduled. The proposal has expired.",
+              "This arrangement or session is no longer eligible for rescheduling. The session was not moved.",
           },
           { status: 409 },
         );
@@ -448,8 +570,20 @@ export async function PATCH(
         return NextResponse.json(
           {
             error:
-              "The proposed time has passed. Submit a new proposal.",
+              "The proposed replacement time has passed. This proposal has expired, and the session was not moved.",
           },
+          { status: 409 },
+        );
+
+      case "slot-held":
+        return NextResponse.json(
+          { error: "Another occurrence in this tutoring arrangement already uses that exact start time. The proposal remains pending." },
+          { status: 409 },
+        );
+
+      case "arrangement-exists":
+        return NextResponse.json(
+          { error: "You already have another pending or accepted request for this Academic Mate offering. Resolve that arrangement before restoring this cancelled one-time arrangement." },
           { status: 409 },
         );
 

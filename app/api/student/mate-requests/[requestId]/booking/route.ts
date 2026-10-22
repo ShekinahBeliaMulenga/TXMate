@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { Weekday } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getRecurringOccurrencesOverlappingRange, type RecurringArrangementPlan } from "@/lib/recurring-arrangements";
+import { hasScheduleConflict } from "@/lib/recurring-arrangement-conflicts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +33,7 @@ const WEEKDAYS: Weekday[] = [
 const bookingRequestSelect = {
   id: true,
   status: true,
+  arrangementType: true,
   studentProfile: {
     select: {
       id: true,
@@ -488,41 +491,100 @@ export async function GET(
       return NextResponse.json({ slots: [] });
     }
 
-    const conflictingSessions = await prisma.tutoringSession.findMany({
-      where: {
-        status: { in: [...ACTIVE_SESSION_STATUSES] },
-        scheduledStart: { lt: horizonEnd },
-        scheduledEnd: { gt: now },
-        request: {
-          is: {
-            OR: [
-              { studentProfileId: student.id },
-              {
-                offering: {
-                  is: {
-                    academicMateProfileId: academicMate.id,
-                  },
-                },
-              },
-            ],
-          },
+    const [conflictingSessions, conflictingRequests, recurringRequests, releasedOccurrences] = await Promise.all([
+      prisma.tutoringSession.findMany({
+        where: {
+          status: { in: [...ACTIVE_SESSION_STATUSES] },
+          scheduledStart: { lt: horizonEnd },
+          scheduledEnd: { gt: now },
+          request: { is: { studentProfileId: student.id } },
         },
-      },
-      select: {
-        scheduledStart: true,
-        scheduledEnd: true,
-      },
-    });
+        select: { scheduledStart: true, scheduledEnd: true },
+      }),
+      prisma.mateRequest.findMany({
+        where: {
+          status: "REQUESTED",
+          arrangementStatus: "PENDING",
+          requestedStart: { lt: horizonEnd },
+          requestedEnd: { gt: now },
+          studentProfileId: student.id,
+        },
+        select: { requestedStart: true, requestedEnd: true },
+      }),
+      prisma.mateRequest.findMany({
+        where: {
+          status: { in: ["REQUESTED", "ACCEPTED"] },
+          arrangementStatus: { in: ["PENDING", "ACTIVE", "PAUSED"] },
+          arrangementType: "RECURRING",
+          requestedStart: { lt: horizonEnd },
+          studentProfileId: student.id,
+        },
+        select: {
+          id: true,
+          requestedStart: true,
+          recurrenceEveryWeeks: true,
+          recurrenceWeekday: true,
+          recurrenceLocalStartMinute: true,
+          recurrenceTimezone: true,
+          recurrenceEndsAt: true,
+          offering: { select: { sessionDurationMinutes: true } },
+        },
+      }),
+      prisma.tutoringSession.findMany({
+        where: {
+          occurrenceSlotStart: {
+            gte: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+            lt: horizonEnd,
+          },
+          request: { is: { studentProfileId: student.id } },
+        },
+        select: {
+          arrangementId: true,
+          occurrenceSlotStart: true,
+          scheduledStart: true,
+          status: true,
+        },
+      }),
+    ]);
+    const releasedOccurrenceKeys = new Set(
+      releasedOccurrences
+        .filter((item) =>
+          item.status === "CANCELLED" ||
+          item.scheduledStart.getTime() !== item.occurrenceSlotStart.getTime(),
+        )
+        .map((item) => `${item.arrangementId}:${item.occurrenceSlotStart.getTime()}`),
+    );
 
     const slots = candidates
-      .filter(
-        (candidate) =>
-          !conflictingSessions.some(
-            (existing) =>
-              candidate.start < existing.scheduledEnd &&
-              candidate.end > existing.scheduledStart,
-          ),
-      )
+      .filter((candidate) => {
+        if (conflictingSessions.some(
+          (existing) => candidate.start < existing.scheduledEnd && candidate.end > existing.scheduledStart,
+        )) return false;
+        if (conflictingRequests.some(
+          (existing) => existing.requestedStart && existing.requestedEnd &&
+            candidate.start < existing.requestedEnd && candidate.end > existing.requestedStart,
+        )) return false;
+        return !recurringRequests.some((recurring) => {
+          if (!recurring.requestedStart) return true;
+          const plan: RecurringArrangementPlan = {
+            anchorStart: recurring.requestedStart,
+            everyWeeks: recurring.recurrenceEveryWeeks,
+            weekday: recurring.recurrenceWeekday,
+            localStartMinute: recurring.recurrenceLocalStartMinute,
+            timezone: recurring.recurrenceTimezone,
+            endsAt: recurring.recurrenceEndsAt,
+          };
+          const projected = getRecurringOccurrencesOverlappingRange(
+            plan,
+            candidate.start,
+            candidate.end,
+            recurring.offering.sessionDurationMinutes,
+          );
+          return projected === null || projected.some((start) =>
+            !releasedOccurrenceKeys.has(`${recurring.id}:${start.getTime()}`),
+          );
+        });
+      })
       .sort(
         (a, b) => a.start.getTime() - b.start.getTime(),
       )
@@ -795,46 +857,23 @@ export async function POST(
             offering.sessionDurationMinutes * 60_000,
         );
 
-        /*
-         * The advisory locks ensure that another booking through this
-         * endpoint involving either participant cannot pass this check
-         * concurrently.
-         */
-        const conflictingSession =
-          await tx.tutoringSession.findFirst({
-            where: {
-              status: { in: [...ACTIVE_SESSION_STATUSES] },
-              scheduledStart: { lt: scheduledEnd },
-              scheduledEnd: { gt: scheduledStart },
-              request: {
-                is: {
-                  OR: [
-                    { studentProfileId: student.id },
-                    {
-                      offering: {
-                        is: {
-                          academicMateProfileId: academicMate.id,
-                        },
-                      },
-                    },
-                  ],
-                },
-              },
-            },
-            select: {
-              id: true,
-            },
-          });
-
-        if (conflictingSession) {
-          return { kind: "conflict" as const };
-        }
+        // The shared check also protects slots reserved by recurring arrangements
+        // whose future occurrences have not entered the materialized window yet.
+        const scheduleConflict = await hasScheduleConflict(tx, {
+          occurrenceStarts: [scheduledStart],
+          durationMinutes: offering.sessionDurationMinutes,
+          studentProfileId: student.id,
+          academicMateProfileId: academicMate.id,
+          excludeRequestId: currentRequest.id,
+        });
+        if (scheduleConflict) return { kind: "conflict" as const };
 
         const createdSession = await tx.tutoringSession.create({
           data: {
-            requestId: currentRequest.id,
+            arrangementId: currentRequest.id,
             scheduledStart,
             scheduledEnd,
+            occurrenceSlotStart: scheduledStart,
             meetingLocation: "To be agreed in conversation",
             status: "SCHEDULED",
           },
@@ -847,13 +886,19 @@ export async function POST(
           },
         });
 
-        const conversation = await tx.conversation.create({
+        await tx.mateRequest.update({
+          where: { id: currentRequest.id },
           data: {
-            requestId: currentRequest.id,
+            initialSessionId: createdSession.id,
+            arrangementStatus: "ACTIVE",
           },
-          select: {
-            id: true,
-          },
+        });
+
+        const conversation = await tx.conversation.upsert({
+          where: { requestId: currentRequest.id },
+          create: { requestId: currentRequest.id },
+          update: {},
+          select: { id: true },
         });
 
         await tx.notification.createMany({
@@ -935,7 +980,7 @@ export async function POST(
         return NextResponse.json(
           {
             error:
-              "You or the Academic Mate already has a session during that time. Select another slot.",
+              "That time overlaps with an existing session, pending request, or recurring occurrence for you or the Academic Mate. Select another slot.",
           },
           { status: 409 },
         );

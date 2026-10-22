@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import SessionRequestDialog from "@/components/student/session-request-dialog";
 
 type Course = { id: string; code: string; name: string };
 
@@ -44,10 +46,14 @@ type TutoringSessionSummary = {
 type ExistingRequest = {
   id: string;
   status: string;
+  arrangementType?: "ONE_TIME" | "RECURRING";
+  arrangementStatus?: "PENDING" | "ACTIVE" | "PAUSED" | string;
+  recurrenceEveryWeeks?: number | null;
+  requestedStart?: string | null;
+  requestedEnd?: string | null;
   tutoringSession?: TutoringSessionSummary | null;
 };
 type MatchingResponse = { academicMates: AcademicMateOffering[]; matchedCourses: Course[]; mode?: "suggestions" | "search"; truncated?: boolean; error?: string };
-type RequestResponse = { message?: string; error?: string; request?: { id: string; status: string } };
 
 function profileHref(mateId: string) {
   return `/student/academic-mate/${encodeURIComponent(mateId)}`;
@@ -152,8 +158,7 @@ function Spinner({ className = "" }: { className?: string }) {
 
 function Avatar({ name, image, className = "h-10 w-10" }: { name: string; image: string | null; className?: string }) {
   if (image) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={image} alt="" className={`${className} shrink-0 rounded-full bg-[#f3ece7] object-cover`} />;
+    return <Image src={image} alt="" width={64} height={64} unoptimized className={`${className} shrink-0 rounded-full bg-[#f3ece7] object-cover`} />;
   }
   return (
     <div aria-hidden="true" className={`flex ${className} shrink-0 items-center justify-center rounded-full bg-[#f3ece7] text-xs font-semibold text-[#7d1f2a]`}>
@@ -196,6 +201,135 @@ function SkeletonCard() {
   );
 }
 
+type RequestTone = "success" | "pending" | "info" | "neutral" | "danger";
+
+const TONE_TEXT: Record<RequestTone, string> = {
+  success: "text-emerald-700",
+  pending: "text-amber-700",
+  info: "text-sky-700",
+  neutral: "text-[#6d6260]",
+  danger: "text-red-700",
+};
+
+const TONE_PILL: Record<RequestTone, string> = {
+  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  pending: "border-amber-200 bg-amber-50 text-amber-700",
+  info: "border-sky-200 bg-sky-50 text-sky-700",
+  neutral: "border-[#e4dbd3] bg-[#faf8f6] text-[#6d6260]",
+  danger: "border-red-200 bg-red-50 text-red-700",
+};
+
+type RequestState = {
+  label: string;
+  tone: RequestTone;
+  session: TutoringSessionSummary | null;
+  /** Row label for the session time: "Starts", "Next session", "Last session" ... */
+  sessionLabel: string;
+};
+
+/**
+ * One place that turns a request (plus its current session) into the status the student sees.
+ * Both the card badge and the details dialog use it, so they cannot disagree.
+ */
+function getRequestState(request: ExistingRequest | null | undefined): RequestState | null {
+  if (!request) return null;
+  const session =
+    request.tutoringSession && request.tutoringSession.status !== "CANCELLED"
+      ? request.tutoringSession
+      : null;
+  const recurring = request.arrangementType === "RECURRING";
+
+  if (request.status === "REQUESTED") {
+    return { label: "Waiting for response", tone: "pending", session: null, sessionLabel: "" };
+  }
+  if (request.status !== "ACCEPTED") return null;
+
+  if (!session) {
+    return { label: "Accepted, awaiting booking", tone: "info", session: null, sessionLabel: "" };
+  }
+
+  if (request.arrangementStatus === "PAUSED") {
+    return { label: "Paused", tone: "pending", session, sessionLabel: recurring ? "Last session" : "Session" };
+  }
+
+  switch (session.status) {
+    case "SCHEDULED": {
+      const ended = new Date(session.scheduledEnd).getTime() < Date.now();
+      return ended
+        ? { label: "Awaiting confirmation", tone: "pending", session, sessionLabel: "Session" }
+        : { label: "Scheduled", tone: "success", session, sessionLabel: recurring ? "Next session" : "Starts" };
+    }
+    case "IN_PROGRESS":
+      return { label: "In progress", tone: "success", session, sessionLabel: "Current session" };
+    case "COMPLETED":
+      return { label: "Completed", tone: "neutral", session, sessionLabel: recurring ? "Last session" : "Session" };
+    case "NO_SHOW":
+      return { label: "No show", tone: "danger", session, sessionLabel: "Session" };
+    case "DISPUTED":
+      return { label: "Disputed", tone: "danger", session, sessionLabel: "Session" };
+    default:
+      return {
+        label: session.status.replace(/_/g, " ").toLowerCase().replace(/^./, (c) => c.toUpperCase()),
+        tone: "neutral",
+        session,
+        sessionLabel: "Session",
+      };
+  }
+}
+
+function formatLusaka(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleString("en-ZM", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Lusaka" });
+}
+
+function RequestStatusSection({ request }: { request: ExistingRequest | null | undefined }) {
+  const state = getRequestState(request);
+  if (!request || !state) return null;
+
+  const recurring = request.arrangementType === "RECURRING";
+  const every = request.recurrenceEveryWeeks;
+  const arrangement = recurring
+    ? every && every > 1
+      ? `Recurring, every ${every} weeks`
+      : "Recurring, weekly"
+    : "One-time";
+  const proposed = request.status === "REQUESTED" && request.requestedStart ? request : null;
+
+  return (
+    <section className="border-b border-[#efe8e1] py-3">
+      <div className="flex items-center gap-2">
+        <Icon name="clock" className="h-4 w-4 text-[#7d1f2a]" />
+        <h3 className="text-sm font-semibold text-[#282321]">
+          {state.session ? "Your session" : "Your request"}
+        </h3>
+      </div>
+
+      <dl className="mt-1.5">
+        <SpecRow label="Status">
+          <span className={`font-semibold ${TONE_TEXT[state.tone]}`}>{state.label}</span>
+        </SpecRow>
+        {request.arrangementType && <SpecRow label="Arrangement">{arrangement}</SpecRow>}
+
+        {proposed && (
+          <>
+            <SpecRow label="Proposed start">{formatLusaka(proposed.requestedStart as string)}</SpecRow>
+            {proposed.requestedEnd && <SpecRow label="Proposed end">{formatLusaka(proposed.requestedEnd)}</SpecRow>}
+          </>
+        )}
+
+        {state.session && (
+          <>
+            <SpecRow label={state.sessionLabel}>{formatLusaka(state.session.scheduledStart)}</SpecRow>
+            <SpecRow label="Ends">{formatLusaka(state.session.scheduledEnd)}</SpecRow>
+            <SpecRow label="Location">{state.session.meetingLocation || "Not specified"}</SpecRow>
+          </>
+        )}
+      </dl>
+    </section>
+  );
+}
+
 /**
  * The whole card is clickable (stretched link on the name). Anything interactive inside the card
  * (Details / Cancel / Request) sits on `relative z-10` so it keeps working on its own.
@@ -225,6 +359,7 @@ function OfferingRow({
     const years = mate.yearsExperience;
     const preview = previewText(offering);
     const showYears = years !== null && years > 0;
+    const requestState = getRequestState(offering.existingRequest);
     const topics = offering.topics.slice(0, 3);
     const extraTopics = offering.topics.length - topics.length;
   
@@ -315,11 +450,11 @@ function OfferingRow({
             )}
 
             {/* Compact Footer Actions */}
-            {offering.existingRequest?.tutoringSession && offering.existingRequest.tutoringSession.status !== "CANCELLED" ? (
+            {requestState?.session ? (
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#f1ebe5] pt-2">
-                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                  <Icon name="check" className="h-3.5 w-3.5" />
-                  Booked
+                <span className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${TONE_PILL[requestState.tone]}`}>
+                  {requestState.tone === "success" && <Icon name="check" className="h-3.5 w-3.5" />}
+                  {requestState.label}
                 </span>
 
                 <button
@@ -378,7 +513,7 @@ function OfferingRow({
                       {requestSent ? (
                         <>
                           <Icon name="check" className="h-3.5 w-3.5" />
-                          Sent
+                          {offering.existingRequest?.status === "ACCEPTED" ? "Accepted" : "Sent"}
                         </>
                       ) : (
                         "Request"
@@ -417,17 +552,12 @@ export default function FindAcademicMatePage() {
   const [retryCount, setRetryCount] = useState(0);
   const [selectedOffering, setSelectedOffering] = useState<AcademicMateOffering | null>(null);
   const [detailsOffering, setDetailsOffering] = useState<AcademicMateOffering | null>(null);
-  const [requestMessage, setRequestMessage] = useState("");
-  const [submittingRequest, setSubmittingRequest] = useState(false);
-  const [requestSubmitError, setRequestSubmitError] = useState<string | null>(null);
-  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
   const [requestedOfferingIds, setRequestedOfferingIds] = useState<Set<string>>(new Set());
   const [requestsByOffering, setRequestsByOffering] = useState<Record<string, ExistingRequest>>({});
   const [cancellingOfferingId, setCancellingOfferingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<{ offeringId: string; message: string } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<AcademicMateOffering | null>(null);
 
-  const requestDialogRef = useRef<HTMLDialogElement>(null);
   const detailsDialogRef = useRef<HTMLDialogElement>(null);
   const cancelDialogRef = useRef<HTMLDialogElement>(null);
 
@@ -504,13 +634,6 @@ export default function FindAcademicMatePage() {
   }, [detailsOffering]);
 
   useEffect(() => {
-    const dialog = requestDialogRef.current;
-    if (!dialog) return;
-    if (selectedOffering && !dialog.open) dialog.showModal();
-    else if (!selectedOffering && dialog.open) dialog.close();
-  }, [selectedOffering]);
-
-  useEffect(() => {
     const dialog = cancelDialogRef.current;
     if (!dialog) return;
     if (cancelTarget && !dialog.open) dialog.showModal();
@@ -579,21 +702,11 @@ export default function FindAcademicMatePage() {
 
   function openRequestDialog(offering: AcademicMateOffering) {
     if (requestedOfferingIds.has(offering.offeringId)) return;
-    setRequestMessage("");
-    setRequestSubmitError(null);
-    setRequestSuccess(null);
     setSelectedOffering(offering);
   }
 
   function openDetailsDialog(offering: AcademicMateOffering) {
     setDetailsOffering(offering);
-  }
-
-  function handleRequestDialogClose() {
-    setSelectedOffering(null);
-    setRequestMessage("");
-    setRequestSubmitError(null);
-    setRequestSuccess(null);
   }
 
   function handleDetailsDialogClose() {
@@ -605,47 +718,6 @@ export default function FindAcademicMatePage() {
     const offering = detailsOffering;
     setDetailsOffering(null);
     openRequestDialog(offering);
-  }
-
-  async function handleSubmitRequest(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedOffering || submittingRequest || requestSuccess) return;
-
-    try {
-      setSubmittingRequest(true);
-      setRequestSubmitError(null);
-
-      const response = await fetch("/api/student/mate-requests", {
-        method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          offeringId: selectedOffering.offeringId,
-          message: requestMessage.trim() || null,
-        }),
-      });
-
-      const body = (await response.json().catch(() => ({}))) as RequestResponse;
-      if (!response.ok) throw new Error(body.error || "Unable to submit your request. Please try again.");
-
-      const submittedOfferingId = selectedOffering.offeringId;
-      setRequestedOfferingIds((previous) => {
-        const updated = new Set(previous);
-        updated.add(submittedOfferingId);
-        return updated;
-      });
-
-      if (body.request) {
-        const createdRequest = { id: body.request.id, status: body.request.status };
-        setRequestsByOffering((previous) => ({ ...previous, [submittedOfferingId]: createdRequest }));
-      }
-
-      setCancelError(null);
-      setRequestSuccess(body.message || "Your academic support request has been submitted.");
-    } catch (err) {
-      setRequestSubmitError(err instanceof Error ? err.message : "Unable to submit your request. Please try again.");
-    } finally {
-      setSubmittingRequest(false);
-    }
   }
 
   async function handleCancelRequest(offering: AcademicMateOffering) {
@@ -686,6 +758,10 @@ export default function FindAcademicMatePage() {
   }
 
   const detailsRequestSent = detailsOffering ? requestedOfferingIds.has(detailsOffering.offeringId) : false;
+  // Read the live request, not the copy captured when the dialog opened, so the dialog
+  // matches the cards after a request is sent or cancelled.
+  const detailsRequest = detailsOffering ? requestsByOffering[detailsOffering.offeringId] ?? null : null;
+  const detailsHasSession = Boolean(getRequestState(detailsRequest)?.session);
 
   const fieldClass =
     "h-10 w-full rounded-lg border border-[#d8cec5] bg-white px-3 text-base text-[#282321] shadow-sm outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 sm:h-9 sm:text-sm";
@@ -858,13 +934,14 @@ export default function FindAcademicMatePage() {
                 {filteredOfferings.map((offering, index) => (
                   <OfferingRow
                     key={offering.offeringId}
-                    offering={offering}
+                    offering={{ ...offering, existingRequest: requestsByOffering[offering.offeringId] ?? null }}
                     index={index}
                     requestSent={requestsByOffering[offering.offeringId]?.status === "REQUESTED" || requestsByOffering[offering.offeringId]?.status === "ACCEPTED"
                     }
                     canCancel={
                       requestsByOffering[offering.offeringId]?.status === "REQUESTED" ||
-                      requestsByOffering[offering.offeringId]?.status === "ACCEPTED"
+                      (requestsByOffering[offering.offeringId]?.status === "ACCEPTED" &&
+                        !requestsByOffering[offering.offeringId]?.tutoringSession)
                     }
                     cancelling={cancellingOfferingId === offering.offeringId}
                     cancelError={cancelError?.offeringId === offering.offeringId ? cancelError.message : null}
@@ -941,51 +1018,7 @@ export default function FindAcademicMatePage() {
                 )}
               </dl>
 
-              {detailsOffering.existingRequest?.tutoringSession && detailsOffering.existingRequest.tutoringSession.status !== "CANCELLED" && (
-              <section className="border-b border-[#efe8e1] py-3">
-                <div className="flex items-center gap-2">
-                  <Icon name="clock" className="h-4 w-4 text-[#7d1f2a]" />
-                  <h3 className="text-sm font-semibold text-[#282321]">
-                    Booked session
-                  </h3>
-                </div>
-
-                <dl className="mt-1.5">
-                  <SpecRow label="Status">
-                    <span className="font-semibold capitalize text-emerald-700">
-                      {detailsOffering.existingRequest.tutoringSession.status
-                        .replace(/_/g, " ")
-                        .toLowerCase()}
-                    </span>
-                  </SpecRow>
-
-                  <SpecRow label="Starts">
-                    {new Date(
-                      detailsOffering.existingRequest.tutoringSession.scheduledStart
-                    ).toLocaleString("en-ZM", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                      timeZone: "Africa/Lusaka",
-                    })}
-                  </SpecRow>
-
-                  <SpecRow label="Ends">
-                    {new Date(
-                      detailsOffering.existingRequest.tutoringSession.scheduledEnd
-                    ).toLocaleString("en-ZM", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                      timeZone: "Africa/Lusaka",
-                    })}
-                  </SpecRow>
-
-                  <SpecRow label="Location">
-                    {detailsOffering.existingRequest.tutoringSession.meetingLocation ||
-                      "Not specified"}
-                  </SpecRow>
-                </dl>
-              </section>
-            )}
+              <RequestStatusSection request={detailsRequest} />
 
               {detailsOffering.description && <ProseBlock title="Offering details" text={detailsOffering.description} />}
               {detailsOffering.academicMate.bio && <ProseBlock title="About" text={detailsOffering.academicMate.bio} />}
@@ -998,7 +1031,7 @@ export default function FindAcademicMatePage() {
               </Link>
               <button type="button" onClick={() => detailsDialogRef.current?.close()} className="min-h-9 rounded-lg border border-[#d8cec5] bg-white px-4 py-2 text-sm font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]">Close</button>
              
-              {!detailsOffering.existingRequest?.tutoringSession && (
+              {!detailsHasSession && (
                 <button
                   type="button"
                   disabled={detailsRequestSent}
@@ -1012,7 +1045,7 @@ export default function FindAcademicMatePage() {
                   {detailsRequestSent ? (
                     <>
                       <Icon name="check" className="h-3 w-3" />
-                      Request Sent
+                      {detailsRequest?.status === "ACCEPTED" ? "Request accepted" : "Request sent"}
                     </>
                   ) : (
                     "Request academic support"
@@ -1025,152 +1058,27 @@ export default function FindAcademicMatePage() {
         )}
       </dialog>
 
-      {/* ---------- request dialog ---------- */}
-      <dialog
-        ref={requestDialogRef}
-        aria-labelledby="request-dialog-title"
-        onClose={handleRequestDialogClose}
-        onCancel={(event) => { if (submittingRequest) event.preventDefault(); }}
-        onClick={(event) => { if (event.target === event.currentTarget && !submittingRequest) event.currentTarget.close(); }}
-        className="fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-xl border border-[#e2d9d0] bg-white p-0 text-[#282321] shadow-2xl backdrop:bg-black/50"
-        >
-        {selectedOffering && (
-            <>
-            {/* Compact Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-[#eee7df] px-4 py-3">
-                <div>
-                <h2 id="request-dialog-title" className="text-base font-semibold tracking-tight text-[#282321]">Request academic support</h2>
-                <p className="mt-0.5 text-xs text-[#6d6260]">Send an enquiry to <span className="font-semibold text-[#282321]">{selectedOffering.academicMate.user.name}</span>.</p>
-                </div>
-                <button
-                type="button"
-                aria-label="Close request form"
-                disabled={submittingRequest}
-                onClick={() => requestDialogRef.current?.close()}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#6d6260] transition hover:bg-[#f6f1ec] hover:text-[#282321] disabled:opacity-50"
-                >
-                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="m6 6 12 12M18 6 6 18" strokeLinecap="round" />
-                </svg>
-                </button>
-            </div>
-
-            <div className="space-y-3 px-4 py-3">
-                {/* Compact Selected Offering Section */}
-                <section aria-label="Selected offering" className="rounded-lg border border-[#efe8e1] bg-[#fbf8f6] p-2.5">
-                <div className="flex items-start justify-between gap-2">
-                    <div>
-                    <p className="text-[11px] font-semibold text-[#7d1f2a]">{selectedOffering.course.code}</p>
-                    <h3 className="text-xs font-semibold text-[#282321]">{selectedOffering.course.name}</h3>
-                    {selectedOffering.title && <p className="mt-0.5 text-[11px] text-[#6d6260]">{selectedOffering.title}</p>}
-                    </div>
-                    <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold text-[#282321]">{formatRate(selectedOffering.rate, selectedOffering.currency)}</p>
-                    <p className="text-[10px] text-[#6d6260]">{formatRateType(selectedOffering.rateType)}</p>
-                    </div>
-                </div>
-                </section>
-
-                {!requestSuccess ? (
-                <form onSubmit={(event) => void handleSubmitRequest(event)} className="space-y-3">
-                    <div>
-                    <label htmlFor="request-message" className="text-xs font-semibold text-[#282321]">
-                        Message <span className="font-normal text-[#8a7f7a]">(optional)</span>
-                    </label>
-                    <p id="request-message-help" className="mt-0.5 text-[11px] text-[#6d6260]">
-                        Describe the topics you need help with or include relevant details.
-                    </p>
-                    <textarea
-                        id="request-message"
-                        name="message"
-                        value={requestMessage}
-                        onChange={(event) => setRequestMessage(event.target.value)}
-                        maxLength={1000}
-                        rows={3}
-                        aria-describedby="request-message-help request-message-count"
-                        placeholder="Hello, I would like help understanding..."
-                        disabled={submittingRequest}
-                        className="mt-1.5 w-full resize-y rounded-md border border-[#d8cec5] bg-white px-2.5 py-1.5 text-xs leading-5 text-[#282321] outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 disabled:bg-[#faf8f6]"
-                    />
-                    <div className="mt-0.5 flex justify-end">
-                        <p id="request-message-count" className="text-[10px] text-[#8a7f7a]" aria-live="polite">
-                        {requestMessage.length}/1000
-                        </p>
-                    </div>
-                    </div>
-
-                    {requestSubmitError && (
-                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-2.5">
-                        <p className="text-xs font-semibold text-red-800">Request not submitted</p>
-                        <p className="mt-0.5 text-[11px] leading-4 text-red-700">{requestSubmitError}</p>
-                    </div>
-                    )}
-
-                    <div className="border-t border-[#efe8e1] pt-2">
-                    <p className="text-[11px] leading-4 text-[#6d6260]">
-                        Sending this request does not confirm a session. The Academic Mate must respond first.
-                    </p>
-                    </div>
-
-                    {/* Compact Action Buttons */}
-                    <div className="flex flex-col-reverse gap-1.5 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        disabled={submittingRequest}
-                        onClick={() => requestDialogRef.current?.close()}
-                        className="min-h-8 rounded-md border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#4b423e] transition hover:bg-[#faf8f6] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={submittingRequest}
-                        className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {submittingRequest && <Spinner className="h-3 w-3" />}
-                        {submittingRequest ? "Sending..." : "Send request"}
-                    </button>
-                    </div>
-                </form>
-                ) : (
-                <div aria-live="polite" className="space-y-3">
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                    <div className="flex items-start gap-2.5">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-emerald-700 ring-1 ring-emerald-200">
-                        <Icon name="check" className="h-3.5 w-3.5" />
-                        </span>
-                        <div>
-                        <h3 className="text-xs font-semibold text-emerald-900">Request submitted</h3>
-                        <p className="mt-0.5 text-xs leading-4 text-emerald-800">{requestSuccess}</p>
-                        <p className="mt-1.5 text-[11px] leading-4 text-emerald-800">
-                            You can check its status from your student dashboard.
-                        </p>
-                        </div>
-                    </div>
-                    </div>
-                    
-                    {/* Success Footer Buttons */}
-                    <div className="flex flex-col-reverse gap-1.5 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        onClick={() => requestDialogRef.current?.close()}
-                        className="min-h-8 rounded-md border border-[#d8cec5] bg-white px-3 py-1.5 text-xs font-semibold text-[#4b423e] transition hover:bg-[#faf8f6]"
-                    >
-                        Done
-                    </button>
-                    <Link
-                        href="/student/dashboard"
-                        className="inline-flex min-h-8 items-center justify-center rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#681923]"
-                    >
-                        View dashboard
-                    </Link>
-                    </div>
-                </div>
-                )}
-            </div>
-            </>
-        )}
-    </dialog>
+      {selectedOffering && (
+        <SessionRequestDialog
+          offering={{
+            id: selectedOffering.offeringId,
+            course: selectedOffering.course,
+            title: selectedOffering.title,
+            rate: selectedOffering.rate,
+            currency: selectedOffering.currency,
+            rateType: selectedOffering.rateType,
+            sessionDurationMinutes: selectedOffering.sessionDurationMinutes,
+            academicMateName: selectedOffering.academicMate.user.name,
+          }}
+          onClose={() => setSelectedOffering(null)}
+          onSubmitted={(request) => {
+            const submittedOfferingId = selectedOffering.offeringId;
+            setRequestedOfferingIds((previous) => new Set(previous).add(submittedOfferingId));
+            setRequestsByOffering((previous) => ({ ...previous, [submittedOfferingId]: request }));
+            setCancelError(null);
+          }}
+        />
+      )}
 
       {/* ---------- cancel confirmation dialog ---------- */}
       <dialog

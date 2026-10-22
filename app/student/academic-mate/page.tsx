@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -242,7 +243,7 @@ function ProfileHeader({ data }: { data: ProfileData }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="relative z-10 -mt-12 flex items-end gap-4 sm:-mt-14">
             {user.image ? (
-              <img src={user.image} alt="" className="h-24 w-24 rounded-full object-cover ring-4 ring-white sm:h-28 sm:w-28" />
+              <Image src={user.image} alt="" width={64} height={64} unoptimized className="h-24 w-24 rounded-full object-cover ring-4 ring-white sm:h-28 sm:w-28" />
             ) : (
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#f1e4e6] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">
                 {getInitials(user.name)}

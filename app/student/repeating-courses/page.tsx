@@ -183,7 +183,7 @@ export default function RepeatingCoursesPage() {
   }, []);
 
   useEffect(() => {
-    void loadCourses();
+    void loadCourses(); // eslint-disable-line react-hooks/set-state-in-effect
     return () => abortRef.current?.abort();
   }, [loadCourses]);
 

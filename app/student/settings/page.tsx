@@ -1,11 +1,10 @@
 "use client";
-
-import { FormEvent, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import ImageCropModal from "@/components/ImageCropModal"; 
+import Image from "next/image";
+import { FormEvent, useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import ImageCropModal from "@/components/ImageCropModal";
+import { disableFirebasePush, enableAndSaveFirebasePush, getExistingFirebasePushToken } from "@/lib/firebase-client";
 import Link from "next/link";
-
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
-
 type ProfileResponse = {
   studentProfile: {
     id: string;
@@ -20,13 +19,12 @@ type ProfileResponse = {
   };
   user: { id: string; name: string; email: string; image: string | null };
 };
-
+type PhoneCheck = { phone: string; result: "available" | "taken" | "error" } | null;
 const visibilityOptions: Array<{ value: ProfileVisibility; label: string; description: string }> = [
   { value: "PUBLIC", label: "Public", description: "Your profile can be discovered by TXMate members." },
   { value: "MEMBERS_ONLY", label: "TXMate members", description: "Visible only to signed-in TXMate members." },
   { value: "PRIVATE", label: "Private", description: "Not available for member discovery." },
 ];
-
 const iconPaths = {
   user: "M12 14.25a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Zm7.25 5.25a7.25 7.25 0 0 0-14.5 0",
   phone: "M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z",
@@ -38,21 +36,33 @@ const iconPaths = {
   edit: "M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z",
   check: "m4.5 12.75 6 6 9-13.5",
   chevronLeft: "M15.75 19.5 8.25 12l7.5-7.5",
+  bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
 } as const;
-
 type IconName = keyof typeof iconPaths;
-
 const sections: Array<{ id: string; label: string; short: string; icon: IconName }> = [
   { id: "photo", label: "Profile photo", short: "Photo", icon: "camera" },
   { id: "personal", label: "Personal information", short: "Personal", icon: "user" },
   { id: "privacy", label: "Privacy", short: "Privacy", icon: "eye" },
   { id: "account", label: "Account record", short: "Account", icon: "id" },
+  { id: "notifications", label: "Notifications", short: "Alerts", icon: "bell" },
 ];
-
 const INPUT =
   "w-full rounded-lg border border-[#d9cec5] bg-white px-3.5 py-2.5 text-sm text-[#282321] outline-none transition placeholder:text-[#a79b95] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10";
 const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2";
-
+/*
+ * Zambian mobile numbers: +260 followed by 9 digits (prefixes 95/96/97,
+ * 75/76/77, 55/56/57). The field holds only the 9 local digits.
+ */
+const ZAMBIA_MOBILE_PATTERN = /^[579][567]\d{7}$/;
+const PHONE_TAKEN_MESSAGE = "This phone number is already registered to another account.";
+const PHONE_FORMAT_MESSAGE = "Enter a valid Zambian mobile number, for example 97 123 4567.";
+// Turns a stored value (+260971234567, 0971234567, 971234567) into the 9 local digits.
+function toLocalPhone(value: string | null | undefined) {
+  let digits = (value ?? "").replace(/\D/g, "");
+  if (digits.startsWith("260")) digits = digits.slice(3);
+  else if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits.slice(0, 9);
+}
 function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: string }) {
   return (
     <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -60,30 +70,25 @@ function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: str
     </svg>
   );
 }
-
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "TM";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
-
 async function requestJson<T>(url: string, init: RequestInit, fallback: string): Promise<T> {
   const response = await fetch(url, init);
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) throw new Error("The service returned an unexpected response.");
-
   let body: { error?: string };
   try {
     body = (await response.json()) as { error?: string };
   } catch {
     throw new Error("The service returned an unreadable response.");
   }
-
   if (!response.ok) throw new Error(body.error || fallback);
   return body as T;
 }
-
 async function resizeProfileImage(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
@@ -101,10 +106,9 @@ async function resizeProfileImage(file: File): Promise<string> {
   if (!dataUrl.startsWith("data:image/webp;base64,")) throw new Error("Your browser could not prepare the selected image.");
   return dataUrl;
 }
-
 function Card({ id, title, subtitle, icon, children }: { id: string; title: string; subtitle: string; icon: IconName; children: ReactNode }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24 overflow-hidden rounded-lg border border-[#e2d9d0] bg-white">
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-32 overflow-hidden rounded-lg border border-[#e2d9d0] bg-white">
       <div className="flex items-center gap-3 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#7d1f2a]/10 text-[#7d1f2a]">
           <Icon name={icon} className="h-4 w-4" />
@@ -118,7 +122,6 @@ function Card({ id, title, subtitle, icon, children }: { id: string; title: stri
     </section>
   );
 }
-
 function Toggle({ checked, onChange, label, description }: { checked: boolean; onChange: (value: boolean) => void; label: string; description: string }) {
   return (
     <div className="flex items-center justify-between gap-6 py-4 first:pt-0 last:pb-0">
@@ -139,10 +142,9 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
     </div>
   );
 }
-
 function SectionNav({ active, onSelect, compact = false }: { active: string; onSelect: (id: string) => void; compact?: boolean }) {
   return (
-    <nav aria-label="Settings sections" className={compact ? "grid grid-cols-4 gap-1" : "flex flex-col gap-1"}>
+    <nav aria-label="Settings sections" className={compact ? "grid grid-cols-5 gap-1" : "flex flex-col gap-1"}>
       {sections.map((section) => {
         const current = active === section.id;
         return (
@@ -166,11 +168,11 @@ function SectionNav({ active, onSelect, compact = false }: { active: string; onS
     </nav>
   );
 }
-
 export default function StudentSettingsPage() {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [name, setName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneCheck, setPhoneCheck] = useState<PhoneCheck>(null);
   const [bio, setBio] = useState("");
   const [profileVisibility, setProfileVisibility] = useState<ProfileVisibility>("PUBLIC");
   const [showStudentId, setShowStudentId] = useState(false);
@@ -185,25 +187,26 @@ export default function StudentSettingsPage() {
   const [imageInputKey, setImageInputKey] = useState(0);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [activeSection, setActiveSection] = useState(sections[0].id);
-
-  function applyProfile(data: ProfileResponse) {
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushChecking, setPushChecking] = useState(true);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushSuccess, setPushSuccess] = useState(false);
+  const applyProfile = useCallback((data: ProfileResponse) => {
     setProfile(data);
     setName(data.user.name);
-    setPhoneNumber(data.studentProfile.phoneNumber ?? "");
+    setPhoneNumber(toLocalPhone(data.studentProfile.phoneNumber));
     setBio(data.studentProfile.bio ?? "");
     setProfileVisibility(data.studentProfile.profileVisibility);
     setShowStudentId(data.studentProfile.showStudentId);
     setShowPhoneNumber(data.studentProfile.showPhoneNumber);
-  }
-
-  function validate(body: Partial<ProfileResponse>, message: string): ProfileResponse {
+  }, []);
+  const validate = useCallback((body: Partial<ProfileResponse>, message: string): ProfileResponse => {
     if (!body.studentProfile || !body.user) throw new Error(message);
     return body as ProfileResponse;
-  }
-
-  async function loadProfile(signal?: AbortSignal) {
-    setLoading(true);
-    setError(null);
+  }, []);
+  const loadProfile = useCallback(async (signal?: AbortSignal, showLoader = true, clearError = true) => {
+    if (showLoader) setLoading(true);
+    if (clearError) setError(null);
     try {
       const body = await requestJson<Partial<ProfileResponse>>(
         "/api/student/me",
@@ -217,54 +220,113 @@ export default function StudentSettingsPage() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }
-
+  }, [applyProfile, validate]);
   useEffect(() => {
     const controller = new AbortController();
-    void loadProfile(controller.signal);
+    void loadProfile(controller.signal, false, false);
     return () => controller.abort();
+  }, [loadProfile]);
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const token = await getExistingFirebasePushToken();
+        if (!active || !token) return;
+        const response = await fetch(`/api/push/subscribe?token=${encodeURIComponent(token)}`, { headers: { Accept: "application/json" }, credentials: "same-origin", cache: "no-store" });
+        const result = await response.json().catch(() => null) as { enabled?: boolean } | null;
+        if (active && response.ok) setPushSuccess(result?.enabled === true);
+      } catch {
+        if (active) setPushSuccess(false);
+      } finally {
+        if (active) setPushChecking(false);
+      }
+    })();
+    return () => { active = false; };
   }, []);
-
+  /*
+   * Live phone availability check. It only runs for a complete, valid number
+   * that differs from the one already saved on this account, and it is
+   * debounced. The server re-checks on save, so a failed lookup never blocks.
+   * These hooks stay above the early returns below.
+   */
+  const savedPhone = profile ? toLocalPhone(profile.studentProfile.phoneNumber) : "";
+  const phoneValid = ZAMBIA_MOBILE_PATTERN.test(phoneNumber);
+  const phoneChanged = phoneNumber !== savedPhone;
+  const phoneToCheck = phoneValid && phoneChanged ? phoneNumber : "";
+  useEffect(() => {
+    if (!phoneToCheck) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const body = await requestJson<{ available: boolean }>(
+          `/api/student/phone-check?phone=${encodeURIComponent(`+260${phoneToCheck}`)}`,
+          { method: "GET", headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal },
+          "Unable to check this phone number."
+        );
+        if (!controller.signal.aborted) setPhoneCheck({ phone: phoneToCheck, result: body.available ? "available" : "taken" });
+      } catch {
+        if (!controller.signal.aborted) setPhoneCheck({ phone: phoneToCheck, result: "error" });
+      }
+    }, 400);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [phoneToCheck]);
+  const phoneChecked = phoneToCheck !== "" && phoneCheck?.phone === phoneToCheck;
+  const phoneChecking = phoneToCheck !== "" && !phoneChecked;
+  const phoneTaken = phoneChecked && phoneCheck?.result === "taken";
+  const phoneAvailable = phoneChecked && phoneCheck?.result === "available";
+  const phoneFormatError = phoneChanged && phoneNumber.length === 9 && !phoneValid;
   useEffect(() => {
     if (!profile) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.find((entry) => entry.isIntersecting);
-        if (visible) setActiveSection(visible.target.id);
-      },
-      { rootMargin: "-20% 0px -65% 0px" }
-    );
-    sections.forEach(({ id }) => {
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    });
-    return () => observer.disconnect();
+    let frame = 0;
+    const updateActiveSection = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+        if (atBottom) {
+          setActiveSection(sections[sections.length - 1].id);
+          return;
+        }
+        const threshold = Math.min(160, window.innerHeight * 0.3);
+        let current = sections[0].id;
+        for (const { id } of sections) {
+          const element = document.getElementById(id);
+          if (element && element.getBoundingClientRect().top <= threshold) current = id;
+        }
+        setActiveSection(current);
+      });
+    };
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
   }, [profile]);
-
   useEffect(() => {
     if (!success) return;
     const timer = window.setTimeout(() => setSuccess(false), 4000);
     return () => window.clearTimeout(timer);
   }, [success]);
-
   function goToSection(id: string) {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-
   function openImagePicker() {
     document.getElementById("profile-image-input")?.click();
   }
-
   const dirty =
     !!profile &&
     (name !== profile.user.name ||
-      phoneNumber !== (profile.studentProfile.phoneNumber ?? "") ||
+      phoneNumber !== toLocalPhone(profile.studentProfile.phoneNumber) ||
       bio !== (profile.studentProfile.bio ?? "") ||
       profileVisibility !== profile.studentProfile.profileVisibility ||
       showStudentId !== profile.studentProfile.showStudentId ||
       showPhoneNumber !== profile.studentProfile.showPhoneNumber);
-
   // Step 1: validate the chosen file, then open the crop dialog instead of uploading
   function handleProfileImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -282,7 +344,6 @@ export default function StudentSettingsPage() {
     }
     setPendingFile(file);
   }
-
   // Step 2: upload the cropped result. On failure the dialog stays open and shows the error.
   async function uploadCroppedImage(file: File) {
     setImageError(null);
@@ -306,13 +367,11 @@ export default function StudentSettingsPage() {
       setImageUploading(false);
     }
   }
-
   function cancelCrop() {
     setPendingFile(null);
     setImageError(null);
     setImageInputKey((value) => value + 1);
   }
-
   async function handleRemoveProfileImage() {
     if (!profile?.user.image || imageUploading) return;
     setImageError(null);
@@ -328,33 +387,57 @@ export default function StudentSettingsPage() {
       setImageUploading(false);
     }
   }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
     setError(null);
     setSuccess(false);
+    if (phoneChanged && phoneNumber && !phoneValid) {
+      setError(PHONE_FORMAT_MESSAGE);
+      return;
+    }
+    if (phoneTaken) {
+      setError(PHONE_TAKEN_MESSAGE);
+      return;
+    }
+    setSaving(true);
     try {
       const body = await requestJson<Partial<ProfileResponse>>(
         "/api/student/me",
         {
           method: "PATCH",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ name, phoneNumber: phoneNumber || null, bio: bio || null, profileVisibility, showStudentId, showPhoneNumber }),
+          body: JSON.stringify({ name, phoneNumber: phoneChanged ? (phoneNumber ? `+260${phoneNumber}` : null) : (profile?.studentProfile.phoneNumber ?? null), bio: bio || null, profileVisibility, showStudentId, showPhoneNumber }),
         },
         "Unable to save your profile changes."
       );
       applyProfile(validate(body, "The profile service returned an incomplete saved profile."));
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save your profile changes.");
+      const message = err instanceof Error ? err.message : "Unable to save your profile changes.";
+      // Someone registered this number after the live check ran.
+      if (message.toLowerCase().includes("phone number is already registered")) {
+        setPhoneCheck({ phone: phoneNumber, result: "taken" });
+      }
+      setError(message);
     } finally {
       setSaving(false);
     }
   }
-
+  async function handlePushToggle(enabled: boolean) {
+    if (pushBusy || enabled === pushSuccess) return;
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (enabled) await enableAndSaveFirebasePush();
+      else await disableFirebasePush();
+      setPushSuccess(enabled);
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : `Unable to ${enabled ? "enable" : "disable"} notifications.`);
+    } finally {
+      setPushBusy(false);
+    }
+  }
   const pulse = "animate-pulse rounded-xl border border-[#e2d9d0] bg-white";
-
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-6 sm:px-6 lg:px-8">
@@ -372,7 +455,6 @@ export default function StudentSettingsPage() {
       </main>
     );
   }
-
   if (error && !profile) {
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-10 sm:px-6 lg:px-8">
@@ -386,11 +468,8 @@ export default function StudentSettingsPage() {
       </main>
     );
   }
-
   if (!profile) return null;
-
   const { user, studentProfile } = profile;
-
   return (
     <main className="min-h-screen bg-[#f4f1ed] text-[#282321]">
       <div className="mx-auto max-w-6xl px-4 pb-32 pt-6 sm:px-6 lg:px-8">
@@ -398,24 +477,21 @@ export default function StudentSettingsPage() {
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">Settings</h1>
           <p className="mt-1 text-sm text-[#6d6260]">Manage your photo, personal details and who can see them.</p>
         </header>
-
-        <div className="sticky top-16 z-20 -mx-4 mt-4 border-b border-[#e2d9d0] bg-[#f9f8f6]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
+        <div className="sticky top-[57px] z-20 -mx-4 mt-4 border-b border-[#e2d9d0] bg-[#f9f8f6]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden">
           <SectionNav compact active={activeSection} onSelect={goToSection} />
         </div>
-
         <div className="mt-5 grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-6">
           <div className="hidden border-r border-[#e2d9d0] pr-5 lg:block">
             <div className="sticky top-6">
               <SectionNav active={activeSection} onSelect={goToSection} />
             </div>
           </div>
-
           <form id="settings-form" onSubmit={handleSubmit} className="min-w-0 space-y-4">
             <Card id="photo" title="Profile photo" subtitle="Shown next to your name across TXMate." icon="camera">
               <div className="flex items-center gap-4">
                 <div className="relative shrink-0">
                   {user.image ? (
-                    <img src={user.image} alt={user.name} className="h-16 w-16 rounded-full object-cover ring-2 ring-[#f0e7e1]" />
+                    <Image src={user.image} alt={user.name} width={64} height={64} unoptimized className="h-16 w-16 rounded-full object-cover ring-2 ring-[#f0e7e1]" />
                   ) : (
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f2e9e4] text-xl font-semibold text-[#7d1f2a] ring-2 ring-[#f0e7e1]">
                       {initials(user.name)}
@@ -453,7 +529,6 @@ export default function StudentSettingsPage() {
               {!pendingFile && imageError ? <p role="alert" className="mt-4 text-xs leading-5 text-[#7d1f2a]">{imageError}</p> : null}
               {imageSuccess ? <p role="status" className="mt-4 text-xs leading-5 text-[#28633b]">Profile picture updated successfully.</p> : null}
             </Card>
-
             <Card id="personal" title="Personal information" subtitle="Details other members see on your profile." icon="user">
               <div className="space-y-5">
                 <div>
@@ -462,7 +537,11 @@ export default function StudentSettingsPage() {
                 </div>
                 <div>
                   <label htmlFor="phone" className="block text-sm font-semibold text-[#3f3734]">Phone number</label>
-                  <div className="mt-2 flex items-center overflow-hidden rounded-lg border border-[#d9cec5] bg-white focus-within:border-[#7d1f2a] focus-within:ring-2 focus-within:ring-[#7d1f2a]/10">
+                  <div className={`mt-2 flex items-center overflow-hidden rounded-lg border bg-white focus-within:ring-2 ${
+                    phoneTaken || phoneFormatError
+                      ? "border-[#7d1f2a] focus-within:border-[#7d1f2a] focus-within:ring-[#7d1f2a]/10"
+                      : "border-[#d9cec5] focus-within:border-[#7d1f2a] focus-within:ring-[#7d1f2a]/10"
+                  }`}>
                     <div className="flex items-center gap-2 border-r border-[#d9cec5] bg-[#fcfaf7] px-3.5 py-2.5 text-sm font-medium text-[#3f3734]">
                       <Icon name="phone" className="h-4 w-4 text-[#8a7f7a]" />
                       <span>+260</span>
@@ -475,6 +554,7 @@ export default function StudentSettingsPage() {
                       autoComplete="tel-national"
                       placeholder="97 1234567"
                       value={phoneNumber}
+                      aria-invalid={phoneTaken || phoneFormatError}
                       onChange={(e) => {
                         // Digits only; drop a pasted leading 260 or 0; max 9 digits
                         const clean = e.target.value.replace(/\D/g, "").replace(/^260|^0/, "").slice(0, 9);
@@ -483,6 +563,15 @@ export default function StudentSettingsPage() {
                       className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-sm outline-none placeholder:text-[#a79b95]"
                     />
                   </div>
+                  {phoneTaken ? (
+                    <p role="alert" className="mt-2 text-xs leading-5 text-[#7d1f2a]">{PHONE_TAKEN_MESSAGE}</p>
+                  ) : phoneFormatError ? (
+                    <p role="alert" className="mt-2 text-xs leading-5 text-[#7d1f2a]">{PHONE_FORMAT_MESSAGE}</p>
+                  ) : phoneChecking ? (
+                    <p role="status" className="mt-2 text-xs leading-5 text-[#7a6f6a]">Checking availability...</p>
+                  ) : phoneAvailable ? (
+                    <p role="status" className="mt-2 text-xs leading-5 text-[#28633b]">This number is available.</p>
+                  ) : null}
                 </div>
                 <div>
                   <div className="flex items-center justify-between gap-4">
@@ -493,7 +582,6 @@ export default function StudentSettingsPage() {
                 </div>
               </div>
             </Card>
-
             <Card id="privacy" title="Privacy" subtitle="Control what other TXMate members can see." icon="eye">
               <fieldset>
                 <legend className="text-sm font-semibold text-[#3f3734]">Profile visibility</legend>
@@ -518,19 +606,16 @@ export default function StudentSettingsPage() {
                 <Toggle checked={showPhoneNumber} onChange={setShowPhoneNumber} label="Show phone number" description="Let other members see your phone number on your profile." />
               </div>
             </Card>
-
             <Card id="account" title="Account record" subtitle="Managed by TXMate." icon="id">
               <dl className="grid gap-5 sm:grid-cols-3">
                 <div className="min-w-0">
                   <dt className="text-xs text-[#7a6f6a]">Email address</dt>
                   <dd className="mt-1 flex items-center gap-1.5 text-sm font-medium">
-                    <Icon name="mail" className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
-                    <span className="truncate">{user.email}</span>
+                    <Icon name="mail" className="h-4 w-4 shrink-0 text-[#8a7f7a]" /><span className="truncate">{user.email}</span>
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-[#7a6f6a]">Student ID</dt>
-                  <dd className="mt-1 text-sm font-medium">{studentProfile.studentId}</dd>
+                  <dt className="text-xs text-[#7a6f6a]">Student ID</dt><dd className="mt-1 text-sm font-medium">{studentProfile.studentId}</dd>
                 </div>
                 <div>
                   <dt className="text-xs text-[#7a6f6a]">Gender</dt>
@@ -550,12 +635,24 @@ export default function StudentSettingsPage() {
                 </Link>
               </div>
             </Card>
+            <Card id="notifications" title="Notifications" subtitle="Manage browser push notifications for TXMate." icon="bell">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#282321]">Browser push notifications</p>
+                  <p className="mt-1 text-xs leading-5 text-[#6d6260]">{pushChecking ? "Checking this browser..." : pushBusy ? "Updating notification settings..." : pushSuccess ? "Enabled for this browser." : "Disabled for this browser."}</p>
+                </div>
+                <button type="button" role="switch" aria-checked={pushSuccess} aria-label="Browser push notifications" onClick={() => void handlePushToggle(!pushSuccess)} disabled={pushBusy || pushChecking} className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60 ${FOCUS} ${pushSuccess ? "bg-[#16a34a] focus-visible:ring-[#16a34a]" : "bg-[#9ca3af] focus-visible:ring-[#6b7280]"}`}>
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${pushSuccess ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+              {pushError ? <p role="alert" className="mt-3 text-sm leading-5 text-[#7d1f2a]">{pushError}</p> : null}
+              {pushSuccess ? <p role="status" className="mt-3 text-sm leading-5 text-[#28633b]">Push notifications are enabled on this browser. Turning this off removes this browser’s registration.</p> : null}
+            </Card>
           </form>
         </div>
       </div>
-
       {dirty || saving ? (
-        <div className="tx-savebar-enter fixed bottom-0 left-0 right-0 z-40 border-t border-[#e2d9d0] bg-white/95 shadow-[0_-8px_24px_rgba(40,35,33,0.06)] backdrop-blur lg:left-64">
+        <div  className="tx-savebar-enter fixed left-0 right-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 ... lg:bottom-0 lg:left-72">
           <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
             <p role={error ? "alert" : undefined} className={`text-sm ${error ? "font-medium text-[#7d1f2a]" : "text-[#6d6260]"}`}>
               {error ?? "You have unsaved changes."}
@@ -581,14 +678,12 @@ export default function StudentSettingsPage() {
           </div>
         </div>
       ) : null}
-
       {success && !dirty ? (
-        <div role="status" className="fixed bottom-5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-[#28633b] px-4 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div role="status" className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-[#28633b] px-4 py-2.5 text-sm font-medium text-white shadow-lg lg:bottom-5">
           <Icon name="check" className="h-4 w-4" />
           Changes saved
         </div>
       ) : null}
-
       {pendingFile ? (
         <ImageCropModal
           file={pendingFile}

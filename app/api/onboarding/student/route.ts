@@ -2,585 +2,219 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { uniqueViolationTarget } from "@/lib/db-errors";
+import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, normalizeZambianMobile, zambianPhoneVariants } from "@/lib/zambia-phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type StudentOnboardingInput = {
-  universityId?: unknown;
-  schoolId?: unknown;
-  departmentId?: unknown;
-  programmeId?: unknown;
-  programmeYearId?: unknown;
-  studentId?: unknown;
-  gender?: unknown;
-  phoneNumber?: unknown;
-  informationConfirmed?: unknown;
-  selectedElectiveCourseIds?: unknown;
+  universityId?: unknown; schoolId?: unknown; departmentId?: unknown; programmeId?: unknown;
+  programmeYearId?: unknown; studentId?: unknown; gender?: unknown; phoneNumber?: unknown;
+  informationConfirmed?: unknown; selectedElectiveCourseIds?: unknown;
 };
 
 const MAX_BODY_SIZE = 10_000;
+const STUDENT_ID_TAKEN = "That student ID is already registered at this university.";
+const HAS_PROFILE = "This account already has a student profile.";
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function normalizeString(value: string): string {
-  return value.trim();
-}
+const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
+const isNonEmptyString = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0;
+const courses = (n: number) => `${n} course${n === 1 ? "" : "s"}`;
 
 function validateStudentId(
   studentId: string,
-  settings: {
-    studentIdMinLength: number;
-    studentIdMaxLength: number;
-    studentIdPrefix: string | null;
-    studentIdPattern: string | null;
-  }
+  s: { studentIdMinLength: number; studentIdMaxLength: number; studentIdPrefix: string | null; studentIdPattern: string | null }
 ): string | null {
-  if (
-    studentId.length < settings.studentIdMinLength ||
-    studentId.length > settings.studentIdMaxLength
-  ) {
-    if (settings.studentIdMinLength === settings.studentIdMaxLength) {
-      return `Student ID must be exactly ${settings.studentIdMinLength} characters.`;
-    }
-
-    return `Student ID must be between ${settings.studentIdMinLength} and ${settings.studentIdMaxLength} characters.`;
+  if (studentId.length < s.studentIdMinLength || studentId.length > s.studentIdMaxLength) {
+    return s.studentIdMinLength === s.studentIdMaxLength
+      ? `Student ID must be exactly ${s.studentIdMinLength} characters.`
+      : `Student ID must be between ${s.studentIdMinLength} and ${s.studentIdMaxLength} characters.`;
   }
-
-  if (
-    settings.studentIdPrefix &&
-    !studentId.startsWith(settings.studentIdPrefix)
-  ) {
-    return `Student ID must start with ${settings.studentIdPrefix}.`;
-  }
-
-  if (settings.studentIdPattern) {
+  if (s.studentIdPrefix && !studentId.startsWith(s.studentIdPrefix)) return `Student ID must start with ${s.studentIdPrefix}.`;
+  if (s.studentIdPattern) {
     let pattern: RegExp;
-
     try {
-      pattern = new RegExp(settings.studentIdPattern);
+      pattern = new RegExp(s.studentIdPattern);
     } catch {
       return "The university student ID validation pattern is invalid. Contact an administrator.";
     }
-
-    if (!pattern.test(studentId)) {
-      return "Student ID format is not valid for this university.";
-    }
+    if (!pattern.test(studentId)) return "Student ID format is not valid for this university.";
   }
-
   return null;
 }
 
 function normalizeIdArray(value: unknown): string[] | null {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const ids = value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0
-  );
-
-  if (ids.length !== value.length) {
-    return null;
-  }
-
-  return [...new Set(ids.map((id) => id.trim()))];
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return null;
+  const ids = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return ids.length === value.length ? [...new Set(ids.map((id) => id.trim()))] : null;
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return fail("You must be signed in to complete onboarding.", 401);
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "You must be signed in to complete onboarding." },
-        { status: 401 }
-      );
-    }
-
-    const contentLength = request.headers.get("content-length");
-
-    if (contentLength) {
-      const parsedContentLength = Number(contentLength);
-
-      if (
-        Number.isFinite(parsedContentLength) &&
-        parsedContentLength > MAX_BODY_SIZE
-      ) {
-        return NextResponse.json(
-          { error: "Request body is too large." },
-          { status: 413 }
-        );
-      }
-    }
+    const contentLength = Number(request.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_SIZE) return fail("Request body is too large.", 413);
 
     let body: StudentOnboardingInput;
-
     try {
       body = (await request.json()) as StudentOnboardingInput;
     } catch {
-      return NextResponse.json(
-        { error: "Request body must contain valid JSON." },
-        { status: 400 }
-      );
+      return fail("Request body must contain valid JSON.", 400);
     }
+    if (!body || typeof body !== "object") return fail("Request body must contain valid JSON.", 400);
 
     if (body.informationConfirmed !== true) {
-      return NextResponse.json(
-        {
-          error:
-            "You must confirm that the information you provided is accurate before completing onboarding.",
-        },
-        { status: 400 }
-      );
+      return fail("You must confirm that the information you provided is accurate before completing onboarding.", 400);
     }
 
     const requiredFields: Array<[string, unknown]> = [
-      ["universityId", body.universityId],
-      ["schoolId", body.schoolId],
-      ["departmentId", body.departmentId],
-      ["programmeId", body.programmeId],
-      ["programmeYearId", body.programmeYearId],
-      ["studentId", body.studentId],
-      ["gender", body.gender],
+      ["universityId", body.universityId], ["schoolId", body.schoolId], ["departmentId", body.departmentId],
+      ["programmeId", body.programmeId], ["programmeYearId", body.programmeYearId],
+      ["studentId", body.studentId], ["gender", body.gender],
     ];
-
     for (const [field, value] of requiredFields) {
-      if (!isNonEmptyString(value)) {
-        return NextResponse.json(
-          { error: `${field} is required.` },
-          { status: 400 }
-        );
-      }
+      if (!isNonEmptyString(value)) return fail(`${field} is required.`, 400);
     }
 
-    const universityId = normalizeString(body.universityId as string);
-    const schoolId = normalizeString(body.schoolId as string);
-    const departmentId = normalizeString(body.departmentId as string);
-    const programmeId = normalizeString(body.programmeId as string);
-    const programmeYearId = normalizeString(body.programmeYearId as string);
-    const studentId = normalizeString(body.studentId as string);
-    const gender = normalizeString(body.gender as string);
+    const universityId = (body.universityId as string).trim();
+    const schoolId = (body.schoolId as string).trim();
+    const departmentId = (body.departmentId as string).trim();
+    const programmeId = (body.programmeId as string).trim();
+    const programmeYearId = (body.programmeYearId as string).trim();
+    const studentId = (body.studentId as string).trim();
+    const gender = (body.gender as string).trim();
 
-    if (gender !== "MALE" && gender !== "FEMALE") {
-      return NextResponse.json(
-        { error: "Gender must be either MALE or FEMALE." },
-        { status: 400 }
-      );
-    }
+    if (gender !== "MALE" && gender !== "FEMALE") return fail("Gender must be either MALE or FEMALE.", 400);
 
     let phoneNumber: string | null = null;
-
     if (body.phoneNumber !== undefined && body.phoneNumber !== null) {
-      if (!isNonEmptyString(body.phoneNumber)) {
-        return NextResponse.json(
-          {
-            error: "Phone number must be a non-empty string when provided.",
-          },
-          { status: 400 }
-        );
-      }
-
-      phoneNumber = normalizeString(body.phoneNumber as string);
-
-      if (phoneNumber.length > 30) {
-        return NextResponse.json(
-          { error: "Phone number is too long." },
-          { status: 400 }
-        );
-      }
+      if (!isNonEmptyString(body.phoneNumber)) return fail("Phone number must be a non-empty string when provided.", 400);
+      if (body.phoneNumber.trim().length > 30) return fail("Phone number is too long.", 400);
+      phoneNumber = normalizeZambianMobile(body.phoneNumber);
+      if (!phoneNumber) return fail(PHONE_FORMAT_MESSAGE, 400);
     }
 
-    const selectedElectiveCourseIds = normalizeIdArray(
-      body.selectedElectiveCourseIds
-    );
-
-    if (selectedElectiveCourseIds === null) {
-      return NextResponse.json(
-        {
-          error: "selectedElectiveCourseIds must be an array of course IDs.",
-        },
-        { status: 400 }
-      );
-    }
+    const selectedElectiveCourseIds = normalizeIdArray(body.selectedElectiveCourseIds);
+    if (selectedElectiveCourseIds === null) return fail("selectedElectiveCourseIds must be an array of course IDs.", 400);
 
     // Prevent a user from creating more than one student profile.
-    const existingProfile = await prisma.studentProfile.findUnique({
-      where: {
-        userId: session.user.id,
-      },
-      select: {
-        id: true,
-      },
-    });
+    const existingProfile = await prisma.studentProfile.findUnique({ where: { userId: session.user.id }, select: { id: true } });
+    if (existingProfile) return fail(HAS_PROFILE, 409);
 
-    if (existingProfile) {
-      return NextResponse.json(
-        { error: "This account already has a student profile." },
-        { status: 409 }
-      );
-    }
-
-    // Load university configuration.
     const university = await prisma.university.findUnique({
-      where: {
-        id: universityId,
-      },
+      where: { id: universityId },
       select: {
-        id: true,
-        name: true,
-        status: true,
-        settings: {
-          select: {
-            studentIdMinLength: true,
-            studentIdMaxLength: true,
-            studentIdPrefix: true,
-            studentIdPattern: true,
-          },
-        },
+        id: true, name: true, status: true,
+        settings: { select: { studentIdMinLength: true, studentIdMaxLength: true, studentIdPrefix: true, studentIdPattern: true } },
       },
     });
+    if (!university || university.status !== "ACTIVE") return fail("Selected university does not exist or is inactive.", 400);
+    if (!university.settings) return fail("University onboarding settings are not configured.", 409);
 
-    if (!university || university.status !== "ACTIVE") {
-      return NextResponse.json(
-        { error: "Selected university does not exist or is inactive." },
-        { status: 400 }
-      );
-    }
-
-    if (!university.settings) {
-      return NextResponse.json(
-        { error: "University onboarding settings are not configured." },
-        { status: 409 }
-      );
-    }
-
-    // Validate the student ID against university configuration.
     const studentIdError = validateStudentId(studentId, university.settings);
+    if (studentIdError) return fail(studentIdError, 400);
 
-    if (studentIdError) {
-      return NextResponse.json({ error: studentIdError }, { status: 400 });
-    }
-
-    // Ensure the student ID is unique within the university.
     const duplicateStudentId = await prisma.studentProfile.findUnique({
-      where: {
-        universityId_studentId: {
-          universityId: university.id,
-          studentId,
-        },
-      },
-      select: {
-        id: true,
-      },
+      where: { universityId_studentId: { universityId: university.id, studentId } },
+      select: { id: true },
     });
+    if (duplicateStudentId) return fail(STUDENT_ID_TAKEN, 409);
 
-    if (duplicateStudentId) {
-      return NextResponse.json(
-        { error: "That student ID is already registered at this university." },
-        { status: 409 }
-      );
+    // The phone number must not already belong to another account.
+    if (phoneNumber) {
+      const duplicatePhone = await prisma.studentProfile.findFirst({
+        where: { phoneNumber: { in: zambianPhoneVariants(phoneNumber) } },
+        select: { id: true },
+      });
+      if (duplicatePhone) return fail(PHONE_TAKEN_MESSAGE, 409);
     }
 
-    // Validate school -> university.
+    // Validate school -> department -> programme -> university.
     const school = await prisma.school.findFirst({
-      where: {
-        id: schoolId,
-        universityId: university.id,
-      },
-      select: {
-        id: true,
-        name: true,
-      },
+      where: { id: schoolId, universityId: university.id },
+      select: { id: true, name: true },
     });
+    if (!school) return fail("Selected school does not belong to this university.", 400);
 
-    if (!school) {
-      return NextResponse.json(
-        { error: "Selected school does not belong to this university." },
-        { status: 400 }
-      );
-    }
-
-    // Validate department -> school.
     const department = await prisma.department.findFirst({
-      where: {
-        id: departmentId,
-        schoolId: school.id,
-      },
-      select: {
-        id: true,
-        name: true,
-      },
+      where: { id: departmentId, schoolId: school.id },
+      select: { id: true, name: true },
     });
+    if (!department) return fail("Selected department does not belong to this school.", 400);
 
-    if (!department) {
-      return NextResponse.json(
-        { error: "Selected department does not belong to this school." },
-        { status: 400 }
-      );
-    }
-
-    // Validate programme -> department -> school -> university.
     const programme = await prisma.programme.findFirst({
-      where: {
-        id: programmeId,
-        universityId: university.id,
-        schoolId: school.id,
-        departmentId: department.id,
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-      },
+      where: { id: programmeId, universityId: university.id, schoolId: school.id, departmentId: department.id },
+      select: { id: true, code: true, name: true },
     });
-
-    if (!programme) {
-      return NextResponse.json(
-        {
-          error:
-            "Selected programme does not belong to this department, school, and university.",
-        },
-        { status: 400 }
-      );
-    }
+    if (!programme) return fail("Selected programme does not belong to this department, school, and university.", 400);
 
     // Load the programme year and its complete curriculum.
     const programmeYear = await prisma.programmeYear.findFirst({
-      where: {
-        id: programmeYearId,
-        programmeId: programme.id,
-      },
+      where: { id: programmeYearId, programmeId: programme.id },
       select: {
         id: true,
         yearNumber: true,
         programmeCourses: {
           orderBy: [{ isCompulsory: "desc" }, { course: { code: "asc" } }],
           select: {
-            id: true,
-            courseId: true,
-            semester: true,
-            isCompulsory: true,
-            electiveGroupId: true,
-            electiveGroup: {
-              select: {
-                id: true,
-                name: true,
-                minSelections: true,
-                maxSelections: true,
-              },
-            },
-            course: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                description: true,
-                credits: true,
-                isActive: true,
-              },
-            },
+            id: true, courseId: true, semester: true, isCompulsory: true, electiveGroupId: true,
+            electiveGroup: { select: { id: true, name: true, minSelections: true, maxSelections: true } },
+            course: { select: { id: true, code: true, name: true, description: true, credits: true, isActive: true } },
           },
         },
       },
     });
-
-    if (!programmeYear) {
-      return NextResponse.json(
-        { error: "Selected programme year does not belong to this programme." },
-        { status: 400 }
-      );
+    if (!programmeYear) return fail("Selected programme year does not belong to this programme.", 400);
+    if (programmeYear.programmeCourses.length === 0) return fail("The selected programme year has no configured courses.", 409);
+    if (programmeYear.programmeCourses.some((pc) => !pc.course.isActive)) {
+      return fail("The programme curriculum contains an inactive course.", 409);
     }
 
-    if (programmeYear.programmeCourses.length === 0) {
-      return NextResponse.json(
-        { error: "The selected programme year has no configured courses." },
-        { status: 409 }
-      );
-    }
+    const programmeCourseByCourseId = new Map(programmeYear.programmeCourses.map((pc) => [pc.courseId, pc]));
 
-    // Make sure every curriculum course is active.
-    const inactiveCourse = programmeYear.programmeCourses.find(
-      (programmeCourse) => !programmeCourse.course.isActive
-    );
-
-    if (inactiveCourse) {
-      return NextResponse.json(
-        { error: "The programme curriculum contains an inactive course." },
-        { status: 409 }
-      );
-    }
-
-    // Map course IDs to ProgrammeCourse records.
-    const programmeCourseByCourseId = new Map(
-      programmeYear.programmeCourses.map((programmeCourse) => [
-        programmeCourse.courseId,
-        programmeCourse,
-      ])
-    );
-
-    // Validate elective selections.
+    // Validate elective selections and group them.
+    const selectedByGroup = new Map<string, number>();
     for (const courseId of selectedElectiveCourseIds) {
-      const programmeCourse = programmeCourseByCourseId.get(courseId);
-
-      if (!programmeCourse) {
-        return NextResponse.json(
-          {
-            error:
-              "One or more selected elective courses do not belong to the selected programme year.",
-          },
-          { status: 400 }
-        );
-      }
-
-      if (programmeCourse.isCompulsory) {
-        return NextResponse.json(
-          {
-            error:
-              "A compulsory course cannot be submitted as an elective selection.",
-          },
-          { status: 400 }
-        );
-      }
-
-      if (!programmeCourse.electiveGroup) {
-        return NextResponse.json(
-          {
-            error:
-              "One or more selected elective courses are not assigned to an elective group.",
-          },
-          { status: 409 }
-        );
-      }
+      const pc = programmeCourseByCourseId.get(courseId);
+      if (!pc) return fail("One or more selected elective courses do not belong to the selected programme year.", 400);
+      if (pc.isCompulsory) return fail("A compulsory course cannot be submitted as an elective selection.", 400);
+      if (!pc.electiveGroup) return fail("One or more selected elective courses are not assigned to an elective group.", 409);
+      selectedByGroup.set(pc.electiveGroup.id, (selectedByGroup.get(pc.electiveGroup.id) ?? 0) + 1);
     }
 
-    // Group selected electives.
-    const selectedByGroup = new Map<string, string[]>();
-
-    for (const courseId of selectedElectiveCourseIds) {
-      const programmeCourse = programmeCourseByCourseId.get(courseId);
-
-      if (!programmeCourse?.electiveGroup) {
-        continue;
-      }
-
-      const groupId = programmeCourse.electiveGroup.id;
-      const current = selectedByGroup.get(groupId) ?? [];
-
-      current.push(courseId);
-      selectedByGroup.set(groupId, current);
-    }
-
-    // Collect all elective groups in the curriculum.
-    const electiveGroups = new Map<
-      string,
-      {
-        id: string;
-        name: string;
-        minSelections: number;
-        maxSelections: number;
-      }
-    >();
-
-    for (const programmeCourse of programmeYear.programmeCourses) {
-      if (!programmeCourse.electiveGroup) {
-        if (!programmeCourse.isCompulsory) {
-          return NextResponse.json(
-            {
-              error:
-                "The curriculum contains a non-compulsory course without an elective group.",
-            },
-            { status: 409 }
-          );
-        }
-
-        continue;
-      }
-
-      electiveGroups.set(
-        programmeCourse.electiveGroup.id,
-        programmeCourse.electiveGroup
-      );
+    // Collect every elective group in the curriculum.
+    const electiveGroups = new Map<string, { id: string; name: string; minSelections: number; maxSelections: number }>();
+    for (const pc of programmeYear.programmeCourses) {
+      if (pc.electiveGroup) electiveGroups.set(pc.electiveGroup.id, pc.electiveGroup);
+      else if (!pc.isCompulsory) return fail("The curriculum contains a non-compulsory course without an elective group.", 409);
     }
 
     // Enforce the selection rules for every group.
     for (const group of electiveGroups.values()) {
-      const selectedCount = selectedByGroup.get(group.id)?.length ?? 0;
-
-      if (selectedCount < group.minSelections) {
-        return NextResponse.json(
-          {
-            error: `${group.name}: select at least ${group.minSelections
-              } course${group.minSelections === 1 ? "" : "s"}.`,
-          },
-          { status: 400 }
-        );
-      }
-
-      if (selectedCount > group.maxSelections) {
-        return NextResponse.json(
-          {
-            error: `${group.name}: select no more than ${group.maxSelections
-              } course${group.maxSelections === 1 ? "" : "s"}.`,
-          },
-          { status: 400 }
-        );
-      }
+      const count = selectedByGroup.get(group.id) ?? 0;
+      if (count < group.minSelections) return fail(`${group.name}: select at least ${courses(group.minSelections)}.`, 400);
+      if (count > group.maxSelections) return fail(`${group.name}: select no more than ${courses(group.maxSelections)}.`, 400);
     }
 
-    // Include all compulsory courses and selected electives.
-    const enrolledProgrammeCourses = programmeYear.programmeCourses.filter(
-      (programmeCourse) =>
-        programmeCourse.isCompulsory ||
-        selectedElectiveCourseIds.includes(programmeCourse.courseId)
-    );
+    // All compulsory courses plus the selected electives.
+    const selected = new Set(selectedElectiveCourseIds);
+    const enrolledProgrammeCourses = programmeYear.programmeCourses.filter((pc) => pc.isCompulsory || selected.has(pc.courseId));
 
-    // Find the university's current academic year.
+    // The university's current academic year (there must be exactly one).
     const currentAcademicYears = await prisma.academicYear.findMany({
-      where: {
-        universityId: university.id,
-        isCurrent: true,
-      },
-      orderBy: {
-        startDate: "desc",
-      },
+      where: { universityId: university.id, isCurrent: true },
+      orderBy: { startDate: "desc" },
       take: 2,
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-      },
+      select: { id: true, name: true, startDate: true, endDate: true },
     });
-
-    if (currentAcademicYears.length === 0) {
-      return NextResponse.json(
-        {
-          error:
-            "This university does not have a current academic year configured.",
-        },
-        { status: 409 }
-      );
-    }
-
+    if (currentAcademicYears.length === 0) return fail("This university does not have a current academic year configured.", 409);
     if (currentAcademicYears.length > 1) {
-      return NextResponse.json(
-        {
-          error:
-            "This university has more than one current academic year. An administrator must resolve the configuration.",
-        },
-        { status: 409 }
-      );
+      return fail("This university has more than one current academic year. An administrator must resolve the configuration.", 409);
     }
-
     const academicYear = currentAcademicYears[0];
 
     // Create the profile and enrolled courses atomically.
@@ -597,78 +231,50 @@ export async function POST(request: Request) {
             phoneNumber,
           },
           select: {
-            id: true,
-            studentId: true,
-            gender: true,
-            status: true,
-            programme: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-              },
-            },
-            programmeYear: {
-              select: {
-                id: true,
-                yearNumber: true,
-              },
-            },
+            id: true, studentId: true, gender: true, status: true,
+            programme: { select: { id: true, code: true, name: true } },
+            programmeYear: { select: { id: true, yearNumber: true } },
           },
         });
-
         await tx.studentCourse.createMany({
-          data: enrolledProgrammeCourses.map((programmeCourse) => ({
+          data: enrolledProgrammeCourses.map((pc) => ({
             studentProfileId: profile.id,
-            courseId: programmeCourse.courseId,
+            courseId: pc.courseId,
             academicYearId: academicYear.id,
-            semester: programmeCourse.semester,
+            semester: pc.semester,
           })),
         });
-
         return profile;
       },
-      {
-        timeout: 15000,
-        maxWait: 10000,
-      }
+      { timeout: 15000, maxWait: 10000 }
     );
 
-    // Return the structure expected by the onboarding form.
-    const courses = enrolledProgrammeCourses.map((programmeCourse) => ({
-      id: programmeCourse.id,
-      semester: programmeCourse.semester,
-      isCompulsory: programmeCourse.isCompulsory,
-      electiveGroup: programmeCourse.electiveGroup,
-      course: {
-        id: programmeCourse.course.id,
-        code: programmeCourse.course.code,
-        name: programmeCourse.course.name,
-        description: programmeCourse.course.description,
-        credits: programmeCourse.course.credits,
-      },
-    }));
-
+    // The structure expected by the onboarding form.
     return NextResponse.json(
       {
         message: "Student onboarding completed successfully.",
         studentProfile: result,
-        academicYear: {
-          id: academicYear.id,
-          name: academicYear.name,
-        },
-        courses,
+        academicYear: { id: academicYear.id, name: academicYear.name },
+        courses: enrolledProgrammeCourses.map((pc) => ({
+          id: pc.id,
+          semester: pc.semester,
+          isCompulsory: pc.isCompulsory,
+          electiveGroup: pc.electiveGroup,
+          course: { id: pc.course.id, code: pc.course.code, name: pc.course.name, description: pc.course.description, credits: pc.course.credits },
+        })),
       },
       { status: 201 }
     );
   } catch (error) {
+    // A concurrent request can pass the checks above and hit a database unique constraint.
+    const target = uniqueViolationTarget(error);
+    if (target !== null) {
+      if (target.includes("phone")) return fail(PHONE_TAKEN_MESSAGE, 409);
+      if (/student_?id/.test(target)) return fail(STUDENT_ID_TAKEN, 409);
+      if (/user_?id/.test(target)) return fail(HAS_PROFILE, 409);
+      return fail("Some of the details you entered are already registered to another account.", 409);
+    }
     console.error("Student onboarding failed:", error);
-
-    return NextResponse.json(
-      {
-        error: "An unexpected error occurred while completing onboarding.",
-      },
-      { status: 500 }
-    );
+    return fail("An unexpected error occurred while completing onboarding.", 500);
   }
 }

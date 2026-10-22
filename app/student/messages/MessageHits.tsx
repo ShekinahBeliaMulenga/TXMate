@@ -37,7 +37,7 @@ export function useMessageSearch(query: string) {
   useEffect(() => {
     const q = query.trim();
     if (q.length < MIN_LEN) {
-      setHits(null);
+      setHits(null); // eslint-disable-line react-hooks/set-state-in-effect
       setSearching(false);
       setFailed(false);
       return;

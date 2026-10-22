@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { expirePendingRescheduleProposals } from "@/lib/reschedule-proposal-expiry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,8 @@ async function getSessionConversation(sessionId: string) {
         select: {
           id: true,
           status: true,
+          arrangementType: true,
+          arrangementStatus: true,
           studentProfile: {
             select: {
               userId: true,
@@ -112,11 +115,17 @@ function getEffectiveSessionStatus(
     Awaited<ReturnType<typeof getSessionConversation>>
   >,
 ) {
-  const requestCancelled = String(booking.request.status)
-    .toUpperCase()
-    .includes("CANCEL");
-
-  return requestCancelled ? "CANCELLED" : booking.status;
+  // A cancelled arrangement should not rewrite the history of completed or
+  // already-started sessions. Only a still-scheduled future occurrence can be
+  // treated as cancelled by the arrangement's terminal state.
+  if (
+    booking.request.arrangementStatus === "CANCELLED" &&
+    booking.status === "SCHEDULED" &&
+    booking.scheduledStart > new Date()
+  ) {
+    return "CANCELLED";
+  }
+  return booking.status;
 }
 
 export async function GET(
@@ -142,7 +151,7 @@ export async function GET(
       );
     }
 
-    const booking = await getSessionConversation(sessionId);
+    let booking = await getSessionConversation(sessionId);
 
     if (!booking) {
       return NextResponse.json(
@@ -156,6 +165,33 @@ export async function GET(
         { error: "You are not authorised to access this conversation." },
         { status: 403 },
       );
+    }
+
+    // Only query expiry when this session has pending proposals and its original
+    // start has passed. The scheduler also expires stale proposals in the
+    // background; this read-path check covers local development and active chats.
+    if (booking.scheduledStart <= new Date() && booking.rescheduleRequests.length > 0) {
+      try {
+        const expiry = await expirePendingRescheduleProposals(new Date(), {
+          sessionId,
+          limit: 20,
+        });
+
+        if (expiry.expired > 0) {
+          const refreshedBooking = await getSessionConversation(sessionId);
+          if (!refreshedBooking) {
+            return NextResponse.json(
+              { error: "Session not found." },
+              { status: 404 },
+            );
+          }
+          booking = refreshedBooking;
+        }
+      } catch (expiryError) {
+        // Expiry processing must not make an otherwise valid conversation fail
+        // to load. The response endpoint still refuses late acceptance.
+        console.error("Unable to expire stale reschedule proposals on conversation read:", expiryError);
+      }
     }
 
     if (!booking.request.conversation) {
@@ -181,6 +217,8 @@ export async function GET(
       },
       conversation: {
         id: booking.request.conversation.id,
+        arrangementType: booking.request.arrangementType,
+        arrangementStatus: booking.request.arrangementStatus,
         courseName: booking.request.offering.course.name,
         studentMessagingEnabled:
           booking.request.conversation.studentMessagingEnabled,
@@ -305,11 +343,11 @@ export async function PATCH(
       );
     }
 
-    if (getEffectiveSessionStatus(booking) === "CANCELLED") {
+    if (booking.request.arrangementStatus === "CANCELLED") {
       return NextResponse.json(
         {
           error:
-            "This session has been cancelled. Messaging settings can no longer be changed. Submit a new session request to arrange another session.",
+            "This tutoring arrangement has been cancelled. Messaging settings can no longer be changed.",
         },
         { status: 409 },
       );
@@ -322,7 +360,7 @@ export async function PATCH(
           status: true,
           request: {
             select: {
-              status: true,
+              arrangementStatus: true,
               conversation: {
                 select: {
                   id: true,
@@ -337,15 +375,9 @@ export async function PATCH(
         return { kind: "not-found" as const };
       }
 
-      const sessionStatus = String(currentSession.status).toUpperCase();
-      const requestStatus = String(
-        currentSession.request.status,
-      ).toUpperCase();
+      const arrangementStatus = String(currentSession.request.arrangementStatus).toUpperCase();
 
-      if (
-        sessionStatus.includes("CANCEL") ||
-        requestStatus.includes("CANCEL")
-      ) {
+      if (arrangementStatus === "CANCELLED") {
         return { kind: "cancelled" as const };
       }
 
@@ -383,7 +415,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           error:
-            "This session has been cancelled. Messaging settings can no longer be changed. Submit a new session request to arrange another session.",
+            "This tutoring arrangement has been cancelled. Messaging settings can no longer be changed.",
         },
         { status: 409 },
       );

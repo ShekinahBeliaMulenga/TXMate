@@ -60,6 +60,19 @@ enum MateRequestStatus {
   EXPIRED
 }
 
+enum TutoringArrangementType {
+  ONE_TIME
+  RECURRING
+}
+
+enum TutoringArrangementStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 enum TutoringSessionStatus {
   SCHEDULED
   IN_PROGRESS
@@ -183,27 +196,29 @@ enum AdminRole {
 }
 
 model User {
-  id                         String                     @id
-  name                       String
-  email                      String                     @unique
-  emailVerified              Boolean
-  image                      String?
-  createdAt                  DateTime
-  updatedAt                  DateTime
-  username                   String?                    @unique
-  sessions                   Session[]
-  accounts                   Account[]
-  studentProfile             StudentProfile?            @relation("UserStudentProfile")
-  academicMate               AcademicMateProfile?       @relation("UserAcademicMateProfile")
-  adminProfile               AdminProfile?              @relation("UserAdminProfile")
-  notifications              Notification[]             @relation("UserNotifications")
-  sentMessages               Message[]                  @relation("UserSentMessages")
-  conversationReads          ConversationRead[]
-  reviewsWritten             Review[]                   @relation("UserReviewsWritten")
-  paymentsMade               Payment[]                  @relation("UserPaymentsMade")
-  subscriptions              UserSubscription[]
-  rescheduleRequestsProposed SessionRescheduleRequest[] @relation("RescheduleProposer")
-  rescheduleRequestsReceived SessionRescheduleRequest[] @relation("RescheduleResponder")
+  id                            String                     @id
+  name                          String
+  email                         String                     @unique
+  emailVerified                 Boolean
+  image                         String?
+  createdAt                     DateTime
+  updatedAt                     DateTime
+  username                      String?                    @unique
+  sessions                      Session[]
+  accounts                      Account[]
+  studentProfile                StudentProfile?            @relation("UserStudentProfile")
+  academicMate                  AcademicMateProfile?       @relation("UserAcademicMateProfile")
+  adminProfile                  AdminProfile?              @relation("UserAdminProfile")
+  notifications                 Notification[]             @relation("UserNotifications")
+  sentMessages                  Message[]                  @relation("UserSentMessages")
+  conversationReads             ConversationRead[]
+  reviewsWritten                Review[]                   @relation("UserReviewsWritten")
+  paymentsMade                  Payment[]                  @relation("UserPaymentsMade")
+  subscriptions                 UserSubscription[]
+  rescheduleRequestsProposed    SessionRescheduleRequest[] @relation("RescheduleProposer")
+  rescheduleRequestsReceived    SessionRescheduleRequest[] @relation("RescheduleResponder")
+  tutoringArrangementsCancelled MateRequest[]              @relation("TutoringArrangementCancelledBy")
+  pushSubscriptions             PushSubscription[]
 }
 
 model Session {
@@ -435,7 +450,7 @@ model StudentProfile {
   programmeId       String
   programmeYearId   String
   status            StudentStatus        @default(ACTIVE)
-  phoneNumber       String?
+ phoneNumber       String?              @unique
   bio               String?
   profileVisibility ProfileVisibility    @default(PUBLIC)
   showStudentId     Boolean              @default(false)
@@ -656,49 +671,69 @@ model AcademicMateQualification {
 }
 
 model MateRequest {
-  id               String            @id @default(uuid())
-  studentProfileId String
-  offeringId       String
-  universityId     String
-  message          String?
-  requestedStart   DateTime?
-  requestedEnd     DateTime?
-  status           MateRequestStatus @default(REQUESTED)
-  respondedAt      DateTime?
-  studentSeenAt    DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  studentProfile   StudentProfile    @relation(fields: [studentProfileId, universityId], references: [id, universityId], onDelete: Restrict)
-  offering         MateOffering      @relation(fields: [offeringId, universityId], references: [id, universityId], onDelete: Restrict)
-  university       University        @relation(fields: [universityId], references: [id], onDelete: Restrict)
-  tutoringSession  TutoringSession?
-  conversation     Conversation?
-  payments         Payment[]
+  id                            String                    @id @default(uuid())
+  studentProfileId              String
+  offeringId                    String
+  universityId                  String
+  message                       String?
+  requestedStart                DateTime?
+  requestedEnd                  DateTime?
+  status                        MateRequestStatus         @default(REQUESTED)
+  respondedAt                   DateTime?
+  studentSeenAt                 DateTime?
+  initialSessionId              String?                   @unique
+  arrangementType               TutoringArrangementType   @default(ONE_TIME)
+  arrangementStatus             TutoringArrangementStatus @default(PENDING)
+  recurrenceEveryWeeks          Int?
+  recurrenceWeekday             Weekday?
+  recurrenceLocalStartMinute    Int?
+  recurrenceTimezone            String?
+  recurrenceEndsAt              DateTime?
+  arrangementCancelledAt        DateTime?
+  arrangementCancelledByUserId  String?
+  arrangementCancellationReason String?
+  createdAt                     DateTime                  @default(now())
+  updatedAt                     DateTime                  @updatedAt
+  studentProfile                StudentProfile            @relation(fields: [studentProfileId, universityId], references: [id, universityId], onDelete: Restrict)
+  offering                      MateOffering              @relation(fields: [offeringId, universityId], references: [id, universityId], onDelete: Restrict)
+  university                    University                @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  arrangementCancelledBy        User?                     @relation("TutoringArrangementCancelledBy", fields: [arrangementCancelledByUserId], references: [id], onDelete: SetNull)
+  tutoringSession               TutoringSession?          @relation("InitialSession", fields: [initialSessionId], references: [id], onDelete: Restrict)
+  sessions                      TutoringSession[]         @relation("ArrangementSessions")
+  conversation                  Conversation?
+  payments                      Payment[]
 
   @@index([universityId, status, createdAt])
   @@index([studentProfileId, status])
   @@index([offeringId, status])
+  @@index([arrangementType, arrangementStatus])
+  @@index([arrangementCancelledByUserId])
 }
 
 model TutoringSession {
-  id                 String                     @id @default(uuid())
-  requestId          String                     @unique
-  scheduledStart     DateTime
-  scheduledEnd       DateTime
-  meetingLocation    String
-  status             TutoringSessionStatus      @default(SCHEDULED)
-  completedAt        DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
-  reminderSentAt     DateTime?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  request            MateRequest                @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  attendance         Attendance?
-  review             Review?
-  payments           Payment[]
-  rescheduleRequests SessionRescheduleRequest[]
+  id                    String                     @id @default(uuid())
+  arrangementId         String
+  scheduledStart        DateTime
+  scheduledEnd          DateTime
+  meetingLocation       String
+  status                TutoringSessionStatus      @default(SCHEDULED)
+  completedAt           DateTime?
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  reminderSentAt        DateTime?
+  // Stable identity of this occurrence, retained when its actual time is rescheduled.
+  occurrenceSlotStart   DateTime
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  request               MateRequest                @relation("ArrangementSessions", fields: [arrangementId], references: [id], onDelete: Restrict)
+  initialForArrangement MateRequest?               @relation("InitialSession")
+  attendance            Attendance?
+  review                Review?
+  payments              Payment[]
+  rescheduleRequests    SessionRescheduleRequest[]
 
+  @@unique([arrangementId, scheduledStart])
+  @@unique([arrangementId, occurrenceSlotStart])
   @@index([scheduledStart, status])
   @@index([status, reminderSentAt, scheduledStart])
 }
@@ -808,6 +843,7 @@ model Notification {
   updatedAt  DateTime               @updatedAt
   user       User                   @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   deliveries NotificationDelivery[]
+  pushDeliveries  PushNotificationDelivery[]
 
   @@index([userId, readAt, createdAt])
 }
@@ -828,6 +864,41 @@ model NotificationDelivery {
 
   @@unique([notificationId, channel])
   @@index([channel, status])
+}
+
+model PushSubscription {
+  id         String                     @id @default(uuid())
+  userId     String
+  fid        String                     @unique
+  userAgent  String?
+  lastSeenAt DateTime                   @default(now())
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
+  user       User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries PushNotificationDelivery[]
+
+  @@index([userId, lastSeenAt])
+}
+
+model PushNotificationDelivery {
+  id                 String            @id @default(uuid())
+  notificationId     String
+  pushSubscriptionId String?
+  status             DeliveryStatus    @default(PENDING)
+  attemptCount       Int               @default(0)
+  nextAttemptAt      DateTime          @default(now())
+  claimedAt          DateTime?
+  sentAt             DateTime?
+  failureReason      String?
+  providerReference  String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  notification       Notification      @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  pushSubscription   PushSubscription? @relation(fields: [pushSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@unique([notificationId, pushSubscriptionId])
+  @@index([status, nextAttemptAt])
+  @@index([pushSubscriptionId, status])
 }
 
 model Payment {

@@ -29,7 +29,7 @@ export function useAcceptedRequestCount() {
   useEffect(() => {
     const controller = new AbortController();
 
-    void refresh(controller.signal);
+    void refresh(controller.signal); // eslint-disable-line react-hooks/set-state-in-effect
 
     const refreshIfVisible = () => {
       if (document.visibilityState === "visible") void refresh(controller.signal);

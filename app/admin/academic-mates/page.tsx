@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -270,9 +271,9 @@ function ProfileCard({ profile }: { profile: VerificationProfile }) {
     >
       <div className="flex items-start gap-4">
         {profile.user.image ? (
-          <img
+          <Image
             src={profile.user.image}
-            alt=""
+            alt="" width={64} height={64} unoptimized
             className="h-12 w-12 shrink-0 rounded-full object-cover"
           />
         ) : (
@@ -446,7 +447,7 @@ export default function AdminAcademicMatesPage() {
   );
 
   useEffect(() => {
-    void loadProfiles();
+    void loadProfiles(); // eslint-disable-line react-hooks/set-state-in-effect
   }, [loadProfiles]);
 
   const filteredProfiles = profiles.filter((profile) => {

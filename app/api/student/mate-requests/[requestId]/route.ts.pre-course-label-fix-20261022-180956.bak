@@ -1,0 +1,157 @@
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * PATCH /api/student/mate-requests/[requestId]
+ * Cancels the authenticated student's request before a tutoring session exists.
+ */
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ requestId: string }> },
+) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "You must be signed in to cancel a request." },
+        { status: 401 },
+      );
+    }
+
+    const { requestId } = await context.params;
+    if (typeof requestId !== "string" || !requestId.trim() || requestId.length > 100) {
+      return NextResponse.json({ error: "A valid request ID is required." }, { status: 400 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 });
+    }
+
+    if (!isPlainObject(body) || Object.keys(body).length !== 1 || body.action !== "CANCELLED") {
+      return NextResponse.json(
+        { error: 'The only supported action is "CANCELLED".' },
+        { status: 400 },
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const ownedRequest = await tx.mateRequest.findFirst({
+        where: {
+          id: requestId,
+          studentProfile: { is: { userId: session.user.id } },
+        },
+        select: {
+          id: true,
+          status: true,
+          tutoringSession: { select: { id: true } },
+          studentProfile: { select: { user: { select: { name: true } } } },
+          offering: {
+            select: {
+              title: true,
+              course: { select: { name: true } },
+              academicMateProfile: { select: { userId: true } },
+            },
+          },
+        },
+      });
+
+      if (!ownedRequest) {
+        return {
+          error: "Request not found or you are not authorised to cancel it.",
+          status: 404 as const,
+        };
+      }
+
+      if (ownedRequest.tutoringSession) {
+        return {
+          error: "This request already has a tutoring session. Use the session cancellation flow instead.",
+          status: 409 as const,
+        };
+      }
+
+      if (ownedRequest.status !== "REQUESTED" && ownedRequest.status !== "ACCEPTED") {
+        return {
+          error: "Only pending or accepted requests without a scheduled session can be cancelled.",
+          status: 409 as const,
+          currentStatus: ownedRequest.status,
+        };
+      }
+
+      const cancelledAt = new Date();
+      const updated = await tx.mateRequest.updateMany({
+        where: {
+          id: ownedRequest.id,
+          status: { in: ["REQUESTED", "ACCEPTED"] },
+          tutoringSession: { is: null },
+        },
+        data: {
+          status: "CANCELLED",
+          arrangementStatus: "CANCELLED",
+          respondedAt: cancelledAt,
+        },
+      });
+
+      if (updated.count !== 1) {
+        return {
+          error: "The request has changed or a session has been booked. Refresh and try again.",
+          status: 409 as const,
+        };
+      }
+
+      const courseName = ownedRequest.offering.title || ownedRequest.offering.course.name;
+      await tx.notification.create({
+        data: {
+          userId: ownedRequest.offering.academicMateProfile.userId,
+          type: "MATE_REQUEST",
+          title: "Academic support request cancelled",
+          body: `${ownedRequest.studentProfile.user.name} cancelled their request for ${courseName}.`,
+          data: { requestId: ownedRequest.id },
+        },
+      });
+
+      return {
+        request: {
+          id: ownedRequest.id,
+          status: "CANCELLED" as const,
+          respondedAt: cancelledAt.toISOString(),
+        },
+      };
+    });
+
+    if ("error" in result) {
+      return NextResponse.json(
+        {
+          error: result.error,
+          ...("currentStatus" in result && result.currentStatus
+            ? { currentStatus: result.currentStatus }
+            : {}),
+        },
+        { status: result.status },
+      );
+    }
+
+    return NextResponse.json({
+      message: "Your academic support request has been cancelled.",
+      request: result.request,
+    });
+  } catch (error) {
+    console.error("PATCH /api/student/mate-requests/[requestId] failed:", error);
+    return NextResponse.json(
+      { error: "Unable to cancel this academic support request." },
+      { status: 500 },
+    );
+  }
+}

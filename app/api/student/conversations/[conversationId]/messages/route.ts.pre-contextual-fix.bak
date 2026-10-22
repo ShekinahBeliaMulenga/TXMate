@@ -1,0 +1,149 @@
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type RouteContext = { params: Promise<{ conversationId: string }> };
+type ParticipantUser = { id: string; name: string | null };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function getUser() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  return session?.user ?? null;
+}
+
+function conversationWhere(conversationId: string, userId: string) {
+  return {
+    id: conversationId,
+    request: {
+      OR: [
+        { studentProfile: { userId } },
+        { offering: { academicMateProfile: { userId } } },
+      ],
+    },
+  };
+}
+
+function previewText(value: string) {
+  const compact = value.replace(/\s+/g, " ").trim();
+  return compact.length > 140 ? `${compact.slice(0, 137)}…` : compact;
+}
+
+function formatConversationUrl(sessionId: string | null, conversationId: string) {
+  return sessionId
+    ? `/student/sessions/${encodeURIComponent(sessionId)}/conversation`
+    : `/student/messages?conversationId=${encodeURIComponent(conversationId)}`;
+}
+
+export async function GET(_request: Request, context: RouteContext) {
+  try {
+    const user = await getUser();
+    if (!user) return NextResponse.json({ error: "You must be signed in to view messages." }, { status: 401 });
+    const { conversationId } = await context.params;
+    if (!conversationId?.trim() || conversationId.length > 100) return NextResponse.json({ error: "A valid conversation ID is required." }, { status: 400 });
+    const conversation = await prisma.conversation.findFirst({ where: conversationWhere(conversationId, user.id), select: { id: true } });
+    if (!conversation) return NextResponse.json({ error: "Conversation not found or you are not authorised to access it." }, { status: 404 });
+    const messages = await prisma.message.findMany({ where: { conversationId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, conversationId: true, senderUserId: true, body: true, createdAt: true } });
+    return NextResponse.json({ currentUserId: user.id, messages: messages.map((message) => ({ ...message, createdAt: message.createdAt.toISOString() })) });
+  } catch (error) {
+    console.error("GET /api/student/conversations/[conversationId]/messages failed:", error);
+    return NextResponse.json({ error: "Unable to load messages." }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    const user = await getUser();
+    if (!user) return NextResponse.json({ error: "You must be signed in to send messages." }, { status: 401 });
+    const { conversationId } = await context.params;
+    if (!conversationId?.trim() || conversationId.length > 100) return NextResponse.json({ error: "A valid conversation ID is required." }, { status: 400 });
+    let input: unknown;
+    try { input = await request.json(); } catch { return NextResponse.json({ error: "Request body must contain valid JSON." }, { status: 400 }); }
+    if (!isPlainObject(input) || typeof input.body !== "string") return NextResponse.json({ error: "A message body is required." }, { status: 400 });
+    const body = input.body.trim();
+    if (!body) return NextResponse.json({ error: "A message cannot be empty." }, { status: 400 });
+    if (body.length > 4000) return NextResponse.json({ error: "Messages cannot exceed 4,000 characters." }, { status: 400 });
+
+    const conversation = await prisma.conversation.findFirst({
+      where: conversationWhere(conversationId, user.id),
+      select: {
+        id: true,
+        studentMessagingEnabled: true,
+        request: {
+          select: {
+            id: true,
+            status: true,
+            arrangementStatus: true,
+            arrangementType: true,
+            studentProfile: { select: { userId: true, user: { select: { name: true } } } },
+            offering: { select: { course: { select: { code: true, name: true } }, academicMateProfile: { select: { userId: true, user: { select: { name: true } } } } } },
+            tutoringSession: { select: { id: true, scheduledStart: true, status: true } },
+            sessions: {
+              where: { status: { in: ["SCHEDULED", "IN_PROGRESS"] }, scheduledEnd: { gte: new Date() } },
+              orderBy: [{ scheduledStart: "asc" }, { id: "asc" }],
+              take: 1,
+              select: { id: true, scheduledStart: true, status: true },
+            },
+          },
+        },
+      },
+    });
+    if (!conversation) return NextResponse.json({ error: "Conversation not found or you are not authorised to access it." }, { status: 404 });
+    if (!conversation.studentMessagingEnabled) return NextResponse.json({ error: "Messaging is currently disabled for this conversation." }, { status: 403 });
+    if (conversation.request.arrangementStatus === "CANCELLED" || conversation.request.status === "CANCELLED" || conversation.request.status === "DECLINED" || conversation.request.status === "EXPIRED") {
+      return NextResponse.json({ error: "This tutoring arrangement is no longer available for messaging." }, { status: 409 });
+    }
+
+    const requestData = conversation.request;
+    const isStudent = requestData.studentProfile.userId === user.id;
+    const participantName = isStudent ? requestData.studentProfile.user.name : requestData.offering.academicMateProfile.user.name;
+    const senderName = participantName?.trim() || user.name?.trim() || (isStudent ? "Student" : "Academic Mate");
+    const recipient: ParticipantUser = isStudent
+      ? { id: requestData.offering.academicMateProfile.userId, name: requestData.offering.academicMateProfile.user.name }
+      : { id: requestData.studentProfile.userId, name: requestData.studentProfile.user.name };
+    const courseName = requestData.offering.course.name;
+    const courseCode = requestData.offering.course.code;
+    const routeSessionId = requestData.sessions[0]?.id ?? requestData.tutoringSession?.id ?? null;
+    const url = formatConversationUrl(routeSessionId, conversation.id);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const message = await tx.message.create({
+        data: { conversationId, senderUserId: user.id, body },
+        select: { id: true, conversationId: true, senderUserId: true, body: true, createdAt: true },
+      });
+      await tx.conversation.update({ where: { id: conversationId }, data: { updatedAt: message.createdAt } });
+      await tx.notification.create({
+        data: {
+          userId: recipient.id,
+          type: "NEW_MESSAGE",
+          title: `New message from ${senderName}`,
+          body: `${courseCode} · ${courseName}: ${previewText(body)}`,
+          data: {
+            conversationId,
+            messageId: message.id,
+            senderUserId: user.id,
+            senderName,
+            recipientName: recipient.name || "TXMate member",
+            courseCode,
+            courseName,
+            ...(routeSessionId ? { sessionId: routeSessionId } : {}),
+            url,
+            conversationUrl: url,
+          },
+        },
+      });
+      return { message };
+    });
+
+    return NextResponse.json({ message: { ...created.message, createdAt: created.message.createdAt.toISOString() } }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/student/conversations/[conversationId]/messages failed:", error);
+    return NextResponse.json({ error: "Unable to send this message." }, { status: 500 });
+  }
+}

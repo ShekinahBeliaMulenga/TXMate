@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "tsx server.ts",
     "build": "next build",
-    "start": "next start",
+    "start": "tsx server.ts --production",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },
@@ -18,13 +18,16 @@
     "@prisma/client": "^7.10.0",
     "better-auth": "^1.7.7",
     "dotenv": "^18.0.5",
+    "firebase": "^13.1.0",
     "firebase-admin": "^14.5.0",
     "next": "16.3.8",
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-easy-crop": "^6.2.4",
-    "react-onesignal": "^3.5.6"
+    "react-onesignal": "^3.5.6",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -38,5 +41,13 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "@firebase/util@1.15.3": true,
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.0": true,
+    "protobufjs@7.6.6": true,
+    "unrs-resolver@1.12.2": true
   }
 }

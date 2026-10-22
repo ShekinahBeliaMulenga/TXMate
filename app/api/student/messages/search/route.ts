@@ -62,9 +62,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unable to search messages." }, { status: 500 });
   }
 }
-
-/*
- * Performance: this query is served by the trigram index on Message.body
- * (see prisma/migrations/*_message_body_trgm_idx). Trigram indexes need at least
- * 3 characters, which is why MIN_LEN is 3. Do not lower it.
- */

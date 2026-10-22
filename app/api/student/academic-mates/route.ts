@@ -176,19 +176,28 @@ export async function GET(request: Request) {
 
     const existingRequests = offeringIds.length
       ? await prisma.mateRequest.findMany({
-        where: {
-          studentProfileId: student.id,
-          offeringId: { in: offeringIds },
-          status: { in: ["REQUESTED", "ACCEPTED"] },
-          tutoringSession: {
-            isNot: { status: "CANCELLED" },
+          where: {
+            studentProfileId: student.id,
+            offeringId: { in: offeringIds },
+            status: { in: ["REQUESTED", "ACCEPTED"] },
+            arrangementStatus: { in: ["PENDING", "ACTIVE", "PAUSED"] },
           },
-        },
           select: {
             id: true,
             offeringId: true,
             status: true,
-            tutoringSession: {
+            arrangementType: true,
+            arrangementStatus: true,
+            recurrenceEveryWeeks: true,
+            // A pending request has no session yet; the proposed time lives here.
+            requestedStart: true,
+            requestedEnd: true,
+            // Every non-cancelled session of the arrangement. The first session booked
+            // is often long past on a recurring arrangement, so the one to show is
+            // picked below instead of reading the initial session.
+            sessions: {
+              where: { status: { not: "CANCELLED" } },
+              orderBy: { scheduledStart: "asc" },
               select: {
                 id: true,
                 status: true,
@@ -201,13 +210,33 @@ export async function GET(request: Request) {
         })
       : [];
 
+    const now = new Date();
+
+    // The session that matters to the student: the next one still to happen (or in
+    // progress). If nothing is upcoming, the most recent one so the status stays truthful.
+    function pickCurrentSession<
+      T extends { status: string; scheduledEnd: Date },
+    >(sessions: T[]): T | null {
+      const upcoming = sessions.find(
+        (item) =>
+          (item.status === "SCHEDULED" || item.status === "IN_PROGRESS") &&
+          item.scheduledEnd >= now,
+      );
+      return upcoming ?? sessions[sessions.length - 1] ?? null;
+    }
+
     const requestsByOffering = new Map(
       existingRequests.map((item) => [
         item.offeringId,
         {
           id: item.id,
           status: item.status,
-          tutoringSession: item.tutoringSession,
+          arrangementType: item.arrangementType,
+          arrangementStatus: item.arrangementStatus,
+          recurrenceEveryWeeks: item.recurrenceEveryWeeks,
+          requestedStart: item.requestedStart,
+          requestedEnd: item.requestedEnd,
+          tutoringSession: pickCurrentSession(item.sessions),
         },
       ]),
     );

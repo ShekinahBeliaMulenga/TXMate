@@ -61,7 +61,7 @@ export async function PATCH(
           offering: {
             select: {
               title: true,
-              course: { select: { name: true } },
+              course: { select: { code: true, name: true } },
               academicMateProfile: { select: { userId: true } },
             },
           },
@@ -99,6 +99,7 @@ export async function PATCH(
         },
         data: {
           status: "CANCELLED",
+          arrangementStatus: "CANCELLED",
           respondedAt: cancelledAt,
         },
       });
@@ -110,7 +111,8 @@ export async function PATCH(
         };
       }
 
-      const courseName = ownedRequest.offering.title || ownedRequest.offering.course.name;
+      const course = ownedRequest.offering.course;
+      const courseName = course.code ? `${course.code} · ${course.name}` : course.name;
       await tx.notification.create({
         data: {
           userId: ownedRequest.offering.academicMateProfile.userId,

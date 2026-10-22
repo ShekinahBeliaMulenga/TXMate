@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Weekday = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
@@ -168,14 +168,9 @@ export default function AcademicMateAvailabilityPage() {
   const activeSlotsCount = useMemo(() => availability.filter((item) => item.isActive).length, [availability]);
   const inactiveSlotsCount = availability.length - activeSlotsCount;
 
-  useEffect(() => {
-    setTimezone(getBrowserTimezone());
-    void loadData();
-  }, []);
-
-  async function loadData(showLoader = true) {
+  const loadData = useCallback(async (showLoader = true, clearError = true) => {
     if (showLoader) setLoading(true);
-    setError("");
+    if (clearError) setError("");
 
     try {
       const [offeringsResponse, availabilityResponse] = await Promise.all([
@@ -195,16 +190,22 @@ export default function AcademicMateAvailabilityPage() {
       setOfferings(Array.isArray(loadedOfferings) ? loadedOfferings : []);
       setAvailability(Array.isArray(loadedAvailability) ? loadedAvailability : []);
 
-      if (!selectedOfferingId && Array.isArray(loadedOfferings) && loadedOfferings.length > 0) {
+      if (Array.isArray(loadedOfferings) && loadedOfferings.length > 0) {
         const activeOffering = loadedOfferings.find((offering) => offering.status === "ACTIVE");
-        setSelectedOfferingId(activeOffering?.id ?? loadedOfferings[0].id);
+        const defaultOfferingId = activeOffering?.id ?? loadedOfferings[0].id;
+        setSelectedOfferingId((currentId) => currentId || defaultOfferingId);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while loading availability.");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    setTimezone(getBrowserTimezone()); // eslint-disable-line react-hooks/set-state-in-effect
+    void loadData(false, false);
+  }, [loadData]);
 
   function resetForm(clearMessages = true) {
     setEditingId(null);

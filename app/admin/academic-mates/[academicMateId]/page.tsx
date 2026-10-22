@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -861,7 +862,7 @@ export default function AcademicMateVerificationDetailPage() {
   );
 
   useEffect(() => {
-    void loadProfile();
+    void loadProfile(); // eslint-disable-line react-hooks/set-state-in-effect
 
     return () => {
       abortRef.current?.abort();
@@ -1126,9 +1127,9 @@ export default function AcademicMateVerificationDetailPage() {
             <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 {user.image ? (
-                  <img
+                  <Image
                     src={user.image}
-                    alt=""
+                    alt="" width={64} height={64} unoptimized
                     className="h-16 w-16 rounded-full border-2 border-white/30 object-cover"
                   />
                 ) : (

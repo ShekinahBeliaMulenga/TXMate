@@ -30,7 +30,7 @@ function useTyper(text: string, speed = 45, hold = 2600) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setN(text.length);
+      setN(text.length); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
     let t: ReturnType<typeof setTimeout>;

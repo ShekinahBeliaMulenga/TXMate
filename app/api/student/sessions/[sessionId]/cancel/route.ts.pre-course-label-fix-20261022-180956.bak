@@ -1,0 +1,277 @@
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type RouteContext = {
+  params: Promise<{ sessionId: string }>;
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export async function POST(request: Request, { params }: RouteContext) {
+  try {
+    const authSession = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!authSession?.user) {
+      return NextResponse.json(
+        { error: "You must be signed in to cancel a session." },
+        { status: 401 },
+      );
+    }
+
+    const { sessionId } = await params;
+
+    if (!sessionId?.trim() || sessionId.length > 100) {
+      return NextResponse.json(
+        { error: "A valid session ID is required." },
+        { status: 400 },
+      );
+    }
+
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Request body must contain valid JSON." },
+        { status: 400 },
+      );
+    }
+
+    if (
+      !isPlainObject(body) ||
+      Object.keys(body).some((key) => key !== "reason") ||
+      (body.reason !== undefined && typeof body.reason !== "string")
+    ) {
+      return NextResponse.json(
+        { error: 'Provide an optional string field named "reason".' },
+        { status: 400 },
+      );
+    }
+
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+
+    if (reason.length > 500) {
+      return NextResponse.json(
+        { error: "The cancellation reason cannot exceed 500 characters." },
+        { status: 400 },
+      );
+    }
+
+    const booking = await prisma.tutoringSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        arrangementId: true,
+        status: true,
+        scheduledStart: true,
+        request: {
+          select: {
+            status: true,
+            arrangementType: true,
+            arrangementStatus: true,
+            studentProfile: {
+              select: {
+                userId: true,
+                user: { select: { name: true } },
+              },
+            },
+            offering: {
+              select: {
+                title: true,
+                course: { select: { name: true } },
+                academicMateProfile: {
+                  select: { userId: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return NextResponse.json(
+        { error: "Session not found." },
+        { status: 404 },
+      );
+    }
+
+    const student = booking.request.studentProfile;
+    const mate = booking.request.offering.academicMateProfile;
+
+    const isStudent = student.userId === authSession.user.id;
+    const isAcademicMate = mate.userId === authSession.user.id;
+    
+    if (!isStudent && !isAcademicMate) {
+      return NextResponse.json(
+        {
+          error: "You are not authorised to cancel this session.",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (booking.request.arrangementStatus !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "Only sessions in an active tutoring arrangement can be cancelled." },
+        { status: 409 },
+      );
+    }
+
+    if (booking.status !== "SCHEDULED") {
+      return NextResponse.json(
+        {
+          error:
+            "Only scheduled sessions can be cancelled. Refresh to see the current status.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const now = new Date();
+
+    if (booking.scheduledStart <= now) {
+      return NextResponse.json(
+        {
+          error:
+            "This session can no longer be cancelled because its scheduled start time has arrived.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const courseName =
+      booking.request.offering.title ||
+      booking.request.offering.course.name;
+    const actorName = authSession.user.name || (isStudent ? "the student" : "the Academic Mate");
+    const isRecurringArrangement = booking.request.arrangementType === "RECURRING";
+    const arrangementStateLabel = booking.request.arrangementStatus.toLowerCase();
+    const cancellationBody = isRecurringArrangement
+      ? `${actorName} cancelled one session for ${courseName}. The recurring tutoring arrangement remains ${arrangementStateLabel}.`
+      : `${actorName} cancelled the session for ${courseName}. The one-time tutoring arrangement has been cancelled. Submit a new request if you need another session.`;
+    const notificationData = {
+      sessionId: booking.id,
+      requestId: booking.arrangementId,
+      courseName,
+      cancelledAt: now.toISOString(),
+      cancelledByUserId: authSession.user.id,
+    };
+
+    const cancelled = await prisma.$transaction(
+      async (tx) => {
+        const updated = await tx.tutoringSession.updateMany({
+          where: {
+            id: booking.id,
+            status: "SCHEDULED",
+            scheduledStart: { gt: now },
+          },
+          data: {
+            status: "CANCELLED",
+            cancelledAt: now,
+            cancellationReason: reason || null,
+          },
+        });
+
+        if (updated.count !== 1) {
+          return false;
+        }
+
+        if (!isRecurringArrangement) {
+          await tx.mateRequest.updateMany({
+            where: {
+              id: booking.arrangementId,
+              arrangementStatus: "ACTIVE",
+            },
+            data: {
+              status: "CANCELLED",
+              arrangementStatus: "CANCELLED",
+              respondedAt: now,
+              arrangementCancelledAt: now,
+              arrangementCancelledByUserId: authSession.user.id,
+              arrangementCancellationReason: reason || null,
+            },
+          });
+        }
+
+        await tx.sessionRescheduleRequest.updateMany({
+          where: {
+            sessionId: booking.id,
+            status: "PENDING",
+          },
+          data: {
+            status: "CANCELLED",
+            respondedAt: now,
+          },
+        });
+
+        await tx.notification.createMany({
+          data: [
+            {
+              userId: student.userId,
+              type: "SESSION_CANCELLED",
+              title: "Tutoring session cancelled",
+              body: cancellationBody,
+              data: notificationData,
+            },
+            {
+              userId: mate.userId,
+              type: "SESSION_CANCELLED",
+              title: "Tutoring session cancelled",
+              body: cancellationBody,
+              data: notificationData,
+            },
+          ],
+        });
+
+        return true;
+      },
+      { maxWait: 10_000, timeout: 15_000 },
+    );
+
+    if (!cancelled) {
+      return NextResponse.json(
+        {
+          error:
+            "The session has changed and could not be cancelled. Refresh and try again.",
+        },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({
+      message: isRecurringArrangement
+        ? `This session has been cancelled. The recurring tutoring arrangement remains ${arrangementStateLabel}.`
+        : "The session and one-time tutoring arrangement have been cancelled. Both participants have been notified. You can submit a new request if you need another session.",
+      session: {
+        id: booking.id,
+        status: "CANCELLED" as const,
+        cancelledAt: now.toISOString(),
+        cancellationReason: reason || null,
+      },
+      arrangement: {
+        id: booking.arrangementId,
+        status: isRecurringArrangement ? booking.request.arrangementStatus : ("CANCELLED" as const),
+      },
+    });
+  } catch (error) {
+    console.error(
+      "POST /api/student/sessions/[sessionId]/cancel failed:",
+      error,
+    );
+
+    return NextResponse.json(
+      { error: "Unable to cancel this session." },
+      { status: 500 },
+    );
+  }
+}

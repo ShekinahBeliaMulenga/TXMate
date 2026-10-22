@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useCallback,
   useEffect,
@@ -13,6 +14,7 @@ import { authClient } from "@/lib/auth-client";
 import { usePendingRequestCount } from "./use-pending-requests";
 import { useUnreadMessageCount } from "./use-unread-messages";
 import { useAcceptedRequestCount } from "./use-accepted-requests";
+import { usePendingRescheduleCount } from "./use-pending-reschedule-count";
 
 type IconName =
   | "dashboard"
@@ -46,6 +48,8 @@ type NavigationItem = {
   showUnreadBadge?: boolean;
   /** Shows a green count of newly accepted requests (not yet opened) next to this item. */
   showAcceptedBadge?: boolean;
+  /** Shows pending rescheduling proposals assigned to this Academic Mate. */
+  showRescheduleBadge?: boolean;
 };
 
 const NAVIGATION_GROUPS: {
@@ -125,6 +129,12 @@ const NAVIGATION_GROUPS: {
         href: "/student/academic-mate/requests",
         icon: "list",
         showPendingBadge: true,
+      },
+      {
+        label: "Reschedules",
+        href: "/student/academic-mate/sessions",
+        icon: "calendar",
+        showRescheduleBadge: true,
       },
       {
         label: "Availability",
@@ -382,6 +392,7 @@ function NavigationGroups({
   pendingCount = 0,
   unreadCount = 0,
   acceptedCount = 0,
+  rescheduleCount = 0,
   excludeHrefs = [],
 }: {
   pathname: string;
@@ -389,6 +400,7 @@ function NavigationGroups({
   pendingCount?: number;
   unreadCount?: number;
   acceptedCount?: number;
+  rescheduleCount?: number;
 
   /* Items already shown elsewhere (the mobile bottom bar) and so hidden here. */
   excludeHrefs?: string[];
@@ -410,7 +422,14 @@ function NavigationGroups({
             <ul className="mt-2 space-y-1">
               {items.map((item) => {
                 const active = isActivePath(pathname, item.href);
-                const badge = item.showPendingBadge
+                const badge = item.showRescheduleBadge
+                  ? {
+                      count: rescheduleCount,
+                      singular: "pending rescheduling proposal",
+                      plural: "pending rescheduling proposals",
+                      tone: "brand" as const,
+                    }
+                  : item.showPendingBadge
                   ? {
                       count: pendingCount,
                       singular: "pending request",
@@ -525,10 +544,9 @@ function ProfileCard({
       className="flex items-center gap-3 border-b border-[#eee8e2] px-5 py-4 transition-colors hover:bg-[#f8f5f2] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40"
     >
       {user?.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+            <Image
           src={user.image}
-          alt=""
+          alt="" width={64} height={64} unoptimized
           className="h-12 w-12 shrink-0 rounded-full object-cover"
         />
       ) : (
@@ -568,6 +586,7 @@ function SidebarContents({
   pendingCount = 0,
   unreadCount = 0,
   acceptedCount = 0,
+  rescheduleCount = 0,
   user,
 }: {
   pathname: string;
@@ -580,6 +599,7 @@ function SidebarContents({
   pendingCount?: number;
   unreadCount?: number;
   acceptedCount?: number;
+  rescheduleCount?: number;
   user?: ProfileUser;
 }) {
   return (
@@ -610,6 +630,7 @@ function SidebarContents({
           pendingCount={pendingCount}
           unreadCount={unreadCount}
           acceptedCount={acceptedCount}
+          rescheduleCount={rescheduleCount}
           excludeHrefs={mobile ? BOTTOM_TAB_HREFS : []}
         />
       </div>
@@ -679,6 +700,7 @@ export default function StudentAppShell({
   const pendingCount = usePendingRequestCount();
   const unreadCount = useUnreadMessageCount();
   const acceptedCount = useAcceptedRequestCount();
+  const rescheduleCount = usePendingRescheduleCount();
 
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileDrawerRef = useRef<HTMLElement>(null);
@@ -688,7 +710,7 @@ export default function StudentAppShell({
   }, []);
 
   useEffect(() => {
-    setMobileOpen(false);
+    setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
   }, [pathname]);
 
   useEffect(() => {
@@ -698,6 +720,7 @@ export default function StudentAppShell({
     document.body.style.overflow = "hidden";
 
     const drawer = mobileDrawerRef.current;
+    const menuButton = menuButtonRef.current;
 
     drawer
       ?.querySelector<HTMLButtonElement>("[data-drawer-close]")
@@ -707,7 +730,7 @@ export default function StudentAppShell({
       if (event.key === "Escape") {
         event.preventDefault();
         setMobileOpen(false);
-        menuButtonRef.current?.focus();
+        menuButton?.focus();
         return;
       }
 
@@ -738,7 +761,7 @@ export default function StudentAppShell({
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", handleKeyDown);
-      menuButtonRef.current?.focus();
+      menuButton?.focus();
     };
   }, [mobileOpen]);
 
@@ -774,6 +797,15 @@ export default function StudentAppShell({
     accepted: { count: acceptedCount, tone: "green" as const },
   };
 
+  const menuAttention = [
+    pendingCount > 0
+      ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
+      : "",
+    rescheduleCount > 0
+      ? `${rescheduleCount} pending rescheduling ${rescheduleCount === 1 ? "proposal" : "proposals"}`
+      : "",
+  ].filter(Boolean).join(", ");
+
   return (
     <div className="min-h-screen bg-[#f9f8f6] text-[#282321] antialiased">
       <a
@@ -784,7 +816,7 @@ export default function StudentAppShell({
       </a>
 
       {/* Persistent desktop sidebar (with entrance fade-in & slide-in) */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-[#e2d9d0] bg-white lg:flex animate-in fade-in slide-in-from-left duration-300">
         <SidebarContents
           pathname={pathname}
           onSignOut={handleSignOut}
@@ -793,6 +825,7 @@ export default function StudentAppShell({
           pendingCount={pendingCount}
           unreadCount={unreadCount}
           acceptedCount={acceptedCount}
+          rescheduleCount={rescheduleCount}
         />
       </aside>
 
@@ -849,13 +882,7 @@ export default function StudentAppShell({
             <button
               ref={menuButtonRef}
               type="button"
-              aria-label={
-                pendingCount > 0
-                  ? `Open menu, ${pendingCount} pending ${
-                      pendingCount === 1 ? "request" : "requests"
-                    }`
-                  : "Open menu"
-              }
+              aria-label={menuAttention ? `Open menu, ${menuAttention}` : "Open menu"}
               aria-controls="student-mobile-navigation"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(true)}
@@ -864,7 +891,7 @@ export default function StudentAppShell({
               <span className="relative">
                 <Icon name="menu" className="h-[22px] w-[22px]" />
                 {/* Mate requests live inside the drawer, so flag them here */}
-                {pendingCount > 0 && (
+                {(pendingCount > 0 || rescheduleCount > 0) && (
                   <span
                     aria-hidden="true"
                     className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"
@@ -912,6 +939,7 @@ export default function StudentAppShell({
             pendingCount={pendingCount}
             unreadCount={unreadCount}
             acceptedCount={acceptedCount}
+            rescheduleCount={rescheduleCount}
             user={session?.user}
           />
         </aside>
@@ -921,7 +949,7 @@ export default function StudentAppShell({
           Bottom padding keeps content clear of the mobile tab bar. */}
       <div
         id="main-content"
-        className="min-w-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-64"
+        className="min-w-0 pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-72"
       >
         {children}
       </div>

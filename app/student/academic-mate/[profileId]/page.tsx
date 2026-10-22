@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import SessionRequestDialog from "@/components/student/session-request-dialog";
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 type AcademicMateStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -174,6 +176,7 @@ export default function PublicAcademicMateProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyOfferingId, setBusyOfferingId] = useState<string | null>(null);
+  const [requestingOffering, setRequestingOffering] = useState<Offering | null>(null);
 
   const loadProfile = useCallback(async (signal?: AbortSignal) => {
     const response = await fetch(`/api/student/academic-mates/${encodeURIComponent(profileId)}`, {
@@ -186,7 +189,7 @@ export default function PublicAcademicMateProfilePage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
+    setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
     setError(null);
     loadProfile(controller.signal)
       .catch((err) => {
@@ -206,34 +209,10 @@ export default function PublicAcademicMateProfilePage() {
   }, [sortedAvailability]);
   const offeringById = useMemo(() => new Map((data?.offerings ?? []).map((offering) => [offering.id, offering])), [data]);
 
-  async function handleRequest(offering: Offering) {
+  function handleRequest(offering: Offering) {
     if (!data?.viewer.canRequest || busyOfferingId) return;
-    setBusyOfferingId(offering.id);
     setActionError(null);
-    try {
-      const response = await fetch("/api/student/mate-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ offeringId: offering.id, message: "" }),
-      });
-      const body = await response.json().catch(() => ({} as ApiError));
-      if (!response.ok) throw new Error((body as ApiError).error || "Unable to submit the request.");
-      const created = (body as { request?: { id: string; status: RequestStatus } }).request;
-      if (created) {
-        setData((current) => current ? {
-          ...current,
-          requestsByOffering: {
-            ...current.requestsByOffering,
-            [offering.id]: { id: created.id, status: created.status, hasSession: false },
-          },
-        } : current);
-      }
-      await loadProfile().catch(() => undefined);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Unable to submit the request.");
-    } finally {
-      setBusyOfferingId(null);
-    }
+    setRequestingOffering(offering);
   }
 
   async function handleCancel(offering: Offering) {
@@ -301,7 +280,7 @@ export default function PublicAcademicMateProfilePage() {
 
             <div className="relative inline-block">
               {user.image ? (
-                <img src={user.image} alt={user.name} className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
+                <Image src={user.image} alt={user.name} width={64} height={64} unoptimized className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
               ) : (
                 <div aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">
                   {initials(user.name)}
@@ -384,7 +363,7 @@ export default function PublicAcademicMateProfilePage() {
 
           <Section title="Reviews" subtitle="Feedback from students" icon="star" aside={reviews.length > 0 ? <span className="text-xs font-medium text-[#6d6260]">{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</span> : null}>
             {reviews.length === 0 ? <Empty text="No reviews yet." /> : <ul className="divide-y divide-[#ece5de]">{reviews.map((review) => <li key={review.id} className="flex items-start gap-3.5 py-4 first:pt-0 last:pb-0">
-              {review.reviewerUser.image ? <img src={review.reviewerUser.image} alt={review.reviewerUser.name} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-xs font-semibold text-[#7d1f2a]">{initials(review.reviewerUser.name)}</div>}
+              {review.reviewerUser.image ? <Image src={review.reviewerUser.image} alt={review.reviewerUser.name} width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-xs font-semibold text-[#7d1f2a]">{initials(review.reviewerUser.name)}</div>}
               <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-x-3"><p className="text-sm font-semibold text-[#282321]">{review.reviewerUser.name}</p><p className="text-xs text-[#7a6f6a]">{formatDate(review.createdAt)}</p></div><div className="mt-1"><Stars rating={review.rating} /></div>{review.comment && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#514844]">{review.comment}</p>}</div>
             </li>)}</ul>}
           </Section>
@@ -408,5 +387,34 @@ export default function PublicAcademicMateProfilePage() {
         </aside>
       </div>
     </div>
+      {requestingOffering && (
+        <SessionRequestDialog
+          offering={{
+            id: requestingOffering.id,
+            course: requestingOffering.course,
+            title: requestingOffering.title,
+            rate: requestingOffering.rate,
+            currency: requestingOffering.currency,
+            rateType: requestingOffering.rateType,
+            sessionDurationMinutes: requestingOffering.sessionDurationMinutes,
+            academicMateName: user.name,
+          }}
+          onClose={() => setRequestingOffering(null)}
+          onSubmitted={(request) => {
+            setData((current) => current ? {
+              ...current,
+              requestsByOffering: {
+                ...current.requestsByOffering,
+                [requestingOffering.id]: {
+                  id: request.id,
+                  status: request.status as RequestStatus,
+                  hasSession: false,
+                },
+              },
+            } : current);
+            void loadProfile().catch(() => undefined);
+          }}
+        />
+      )}
   </main>;
 }

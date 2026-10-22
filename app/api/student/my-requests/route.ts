@@ -40,6 +40,13 @@ export async function GET() {
         respondedAt: true,
         requestedStart: true,
         requestedEnd: true,
+        arrangementType: true,
+        arrangementStatus: true,
+        recurrenceEveryWeeks: true,
+        recurrenceWeekday: true,
+        recurrenceLocalStartMinute: true,
+        recurrenceTimezone: true,
+        recurrenceEndsAt: true,
         offering: {
           select: {
             id: true,
@@ -70,6 +77,16 @@ export async function GET() {
             meetingLocation: true,
           },
         },
+        sessions: {
+          orderBy: { scheduledStart: "asc" },
+          select: {
+            id: true,
+            status: true,
+            scheduledStart: true,
+            scheduledEnd: true,
+            meetingLocation: true,
+          },
+        },
       },
     });
 
@@ -82,6 +99,13 @@ export async function GET() {
         respondedAt: request.respondedAt?.toISOString() ?? null,
         requestedStart: request.requestedStart?.toISOString() ?? null,
         requestedEnd: request.requestedEnd?.toISOString() ?? null,
+        arrangementType: request.arrangementType,
+        arrangementStatus: request.arrangementStatus,
+        recurrenceEveryWeeks: request.recurrenceEveryWeeks,
+        recurrenceWeekday: request.recurrenceWeekday,
+        recurrenceLocalStartMinute: request.recurrenceLocalStartMinute,
+        recurrenceTimezone: request.recurrenceTimezone,
+        recurrenceEndsAt: request.recurrenceEndsAt?.toISOString() ?? null,
         offering: {
           id: request.offering.id,
           title: request.offering.title,
@@ -103,6 +127,11 @@ export async function GET() {
                 request.tutoringSession.scheduledEnd.toISOString(),
             }
           : null,
+        sessions: request.sessions.map((item) => ({
+          ...item,
+          scheduledStart: item.scheduledStart.toISOString(),
+          scheduledEnd: item.scheduledEnd.toISOString(),
+        })),
       })),
     });
   } catch (error) {

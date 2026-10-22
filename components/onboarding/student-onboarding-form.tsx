@@ -78,6 +78,11 @@ type SuccessCourse = {
   };
 };
 
+type PhoneCheck = {
+  phone: string;
+  result: "available" | "taken" | "error";
+} | null;
+
 type Props = {
   userName: string;
 };
@@ -132,6 +137,10 @@ async function getJson<T>(url: string): Promise<T> {
  * 75/76/77 or 55/56/57. The leading 0 is replaced by +260.
  */
 const ZAMBIA_MOBILE_PATTERN = /^[579][567]\d{7}$/;
+
+const PHONE_TAKEN_MESSAGE = "This number is already registered.";
+const PHONE_TAKEN_FORM_MESSAGE =
+  "This phone number is already registered to another account.";
 
 function normalizeZambianInput(raw: string): string {
   let digits = raw.replace(/\D/g, "");
@@ -449,6 +458,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   const [gender, setGender] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const [phoneCheck, setPhoneCheck] = useState<PhoneCheck>(null);
   const [selectedElectiveCourseIds, setSelectedElectiveCourseIds] = useState<
     string[]
   >([]);
@@ -711,9 +721,55 @@ export default function StudentOnboardingForm({ userName }: Props) {
     }
   }, [success, alreadyOnboarded]);
 
+  /*
+   * Live phone availability check. It only runs once the number is a complete,
+   * valid Zambian mobile number, and it is debounced. This is a convenience:
+   * the server re-checks on submit, so a failed lookup never blocks the user.
+   */
+  const phoneValid =
+    phoneNumber.length === 9 && ZAMBIA_MOBILE_PATTERN.test(phoneNumber);
+
+  useEffect(() => {
+    if (!phoneValid) return;
+
+    const controller = new AbortController();
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await getJson<{ available: boolean }>(
+          `/api/student/phone-check?phone=${encodeURIComponent(
+            `+260${phoneNumber}`
+          )}`
+        );
+
+        if (!controller.signal.aborted) {
+          setPhoneCheck({
+            phone: phoneNumber,
+            result: data.available ? "available" : "taken",
+          });
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setPhoneCheck({ phone: phoneNumber, result: "error" });
+        }
+      }
+    }, 400);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [phoneNumber, phoneValid]);
+
+  const phoneChecked = phoneValid && phoneCheck?.phone === phoneNumber;
+  const phoneChecking = phoneValid && !phoneChecked;
+  const phoneTaken = phoneChecked && phoneCheck?.result === "taken";
+  const phoneAvailable = phoneChecked && phoneCheck?.result === "available";
+
   const phoneError = getPhoneError(phoneNumber);
   const showPhoneError =
     phoneError !== "" && (phoneTouched || phoneNumber.length >= 9);
+  const phoneInvalid = showPhoneError || phoneTaken;
 
   const studentIdHint = useMemo(() => {
     if (!settings) {
@@ -924,6 +980,13 @@ export default function StudentOnboardingForm({ userName }: Props) {
       return;
     }
 
+    if (phoneTaken) {
+      setPhoneTouched(true);
+      setError(PHONE_TAKEN_FORM_MESSAGE);
+
+      return;
+    }
+
     const electiveError = validateElectiveSelections();
 
     if (electiveError) {
@@ -994,6 +1057,14 @@ export default function StudentOnboardingForm({ userName }: Props) {
           setAlreadyOnboarded(true);
 
           return;
+        }
+
+        // Someone registered this phone number after the live check ran.
+        if (
+          response.status === 409 &&
+          data.error?.toLowerCase().includes("phone")
+        ) {
+          setPhoneCheck({ phone: phoneNumber, result: "taken" });
         }
 
         throw new Error(data.error || "Unable to complete onboarding.");
@@ -1132,7 +1203,9 @@ export default function StudentOnboardingForm({ userName }: Props) {
   const academicDone = Boolean(
     universityId && schoolId && departmentId && programmeId && programmeYearId
   );
-  const personalDone = Boolean(studentId && gender && !phoneError);
+  const personalDone = Boolean(
+    studentId && gender && !phoneError && !phoneTaken
+  );
   const coursesDone =
     Boolean(programmeYearId) &&
     !loadingCourses &&
@@ -1387,8 +1460,20 @@ export default function StudentOnboardingForm({ userName }: Props) {
 
               <Field
                 label="Phone number"
-                hint="Zambian mobile number. Kept private by default."
-                error={showPhoneError ? phoneError : undefined}
+                hint={
+                  phoneChecking
+                    ? "Checking availability..."
+                    : phoneAvailable
+                      ? "This number is available."
+                      : "Zambian mobile number. Kept private by default."
+                }
+                error={
+                  showPhoneError
+                    ? phoneError
+                    : phoneTaken
+                      ? PHONE_TAKEN_MESSAGE
+                      : undefined
+                }
               >
                 <div className="flex w-full min-w-0">
                   <span className="inline-flex h-12 shrink-0 items-center gap-2 rounded-l-lg border border-r-0 border-stone-300 bg-stone-50 px-3 text-base font-medium text-stone-700 md:h-11 md:text-sm">
@@ -1404,11 +1489,11 @@ export default function StudentOnboardingForm({ userName }: Props) {
                     type="tel"
                     inputMode="numeric"
                     autoComplete="tel-national"
-                    aria-invalid={showPhoneError}
+                    aria-invalid={phoneInvalid}
                     disabled={submitting}
                     placeholder="97 123 4567"
                     className={`h-12 min-w-0 flex-1 rounded-r-lg border bg-white px-3.5 text-base text-stone-900 outline-none transition placeholder:text-stone-400 disabled:cursor-not-allowed disabled:bg-stone-100 md:h-11 md:text-sm ${
-                      showPhoneError
+                      phoneInvalid
                         ? "border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                         : "border-stone-300 focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10"
                     }`}

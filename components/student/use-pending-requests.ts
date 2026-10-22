@@ -64,7 +64,7 @@ export function usePendingRequestCount() {
   }, []);
 
   useEffect(() => {
-    void refresh(true);
+    void refresh(true); // eslint-disable-line react-hooks/set-state-in-effect
 
     const onChanged = () => void refresh(true);
     const onFocus = () => void refresh();

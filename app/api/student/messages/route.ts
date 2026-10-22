@@ -11,6 +11,7 @@ export async function GET() {
     }
 
     const userId = session.user.id;
+    const now = new Date();
     const conversations = await prisma.conversation.findMany({
       where: {
         request: {
@@ -28,6 +29,8 @@ export async function GET() {
         request: {
           select: {
             status: true,
+            arrangementType: true,
+            arrangementStatus: true,
             studentProfile: {
               select: {
                 userId: true,
@@ -53,6 +56,21 @@ export async function GET() {
                 status: true,
               },
             },
+            // One inbox row per arrangement, with the nearest live occurrence as its date/context.
+            sessions: {
+              where: {
+                status: { in: ["SCHEDULED", "IN_PROGRESS"] },
+                scheduledEnd: { gte: now },
+              },
+              orderBy: [{ scheduledStart: "asc" }, { id: "asc" }],
+              take: 1,
+              select: {
+                id: true,
+                scheduledStart: true,
+                scheduledEnd: true,
+                status: true,
+              },
+            },
           },
         },
         messages: {
@@ -62,6 +80,8 @@ export async function GET() {
             body: true,
             createdAt: true,
             senderUserId: true,
+            // Set when the other participant opens the chat; drives the sent/seen ticks in the inbox.
+            readAt: true,
           },
         },
       },
@@ -103,32 +123,41 @@ export async function GET() {
       const otherUser = isStudent
         ? request.offering.academicMateProfile.user
         : request.studentProfile.user;
-      const tutoringSession = request.tutoringSession;
-
-      // A cancelled request means the session is cancelled, even if the session row still has its old status.
-      const requestCancelled = String(request.status).toUpperCase().includes("CANCEL");
+      const initialSession = request.tutoringSession;
+      const nextSession =
+        request.arrangementStatus === "COMPLETED" || request.arrangementStatus === "CANCELLED"
+          ? null
+          : request.sessions[0] ?? null;
+      // The date shown in an active recurring arrangement is the next live occurrence,
+      // not the first session forever. One-time arrangements retain their sole session
+      // as context after it finishes or is cancelled.
+      const displaySession = nextSession ?? (request.arrangementType === "ONE_TIME" ? initialSession : null);
+      // The shared conversation is arrangement-level. The route's session ID only selects
+      // which occurrence's controls/details are shown, and falls back to the initial one
+      // so a completed/cancelled arrangement can still open its message history.
+      const routeSession = nextSession ?? initialSession;
 
       return {
         id: conversation.id,
+        updatedAt: conversation.updatedAt.toISOString(),
+        arrangementStatus: request.arrangementStatus,
+        arrangementType: request.arrangementType,
         otherUserName: otherUser.name || "TXMate member",
         otherUserImage: otherUser.image,
         courseName: request.offering.course.name,
         studentMessagingEnabled: conversation.studentMessagingEnabled,
         unreadCount: unreadByConversation.get(conversation.id) ?? 0,
         lastMessage: conversation.messages[0] ?? null,
-        session: tutoringSession
-          ? {
-              ...tutoringSession,
-              status: requestCancelled ? "CANCELLED" : tutoringSession.status,
-            }
-          : null,
-        conversationUrl: tutoringSession
-          ? `/student/sessions/${encodeURIComponent(tutoringSession.id)}/conversation`
+        session: displaySession,
+        sessionLabel: nextSession ? (nextSession.status === "IN_PROGRESS" ? "IN_PROGRESS" : "NEXT") : displaySession ? "SESSION" : null,
+        conversationUrl: routeSession
+          ? `/student/sessions/${encodeURIComponent(routeSession.id)}/conversation`
           : null,
       };
     });
 
-    return NextResponse.json({ conversations: items });
+    // currentUserId lets the inbox tell which last messages are the viewer's own (for sent/seen ticks).
+    return NextResponse.json({ currentUserId: userId, conversations: items });
   } catch (error) {
     console.error("Failed to load messages inbox:", error);
     return NextResponse.json(

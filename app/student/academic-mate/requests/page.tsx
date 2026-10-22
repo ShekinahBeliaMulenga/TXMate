@@ -1,5 +1,7 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 type RequestStatus =
   | "REQUESTED"
   | "ACCEPTED"
@@ -208,10 +210,13 @@ function RequestActions({
           Open conversation
         </button>
       )}
+
+      
     </div>
   );
 }
 export default function AcademicMateRequestsPage() {
+  const router = useRouter();
   const [data, setData] = useState<RequestsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -564,7 +569,7 @@ export default function AcademicMateRequestsPage() {
                   <li key={item.id} className="space-y-3 px-4 py-4 sm:px-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        {item.student.image ? <img src={item.student.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
+                        {item.student.image ? <Image src={item.student.image} alt="" width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{item.student.name}</p>
                           <p className="mt-0.5 text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</p>
@@ -599,8 +604,7 @@ export default function AcademicMateRequestsPage() {
                       onOpenConversation={() => {
                         const sessionId = item.tutoringSession?.id;
                         if (sessionId) {
-                          window.location.href =
-                            `/student/sessions/${encodeURIComponent(sessionId)}/conversation`;
+                          router.push(`/student/sessions/${encodeURIComponent(sessionId)}/conversation`);
                         }
                       }}
                     />
@@ -653,7 +657,7 @@ export default function AcademicMateRequestsPage() {
                     >
                       <td className="px-5 py-4">
                         <button type="button" onClick={() => setSelectedRequest(item)} className="flex w-full items-start gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
-                            {item.student.image ? <img src={item.student.image} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</span>}
+                            {item.student.image ? <Image src={item.student.image} alt="" width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</span>}
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold hover:text-[#7d1f2a]">{item.student.name}</span>
                               <span className="mt-1 block truncate text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</span>
@@ -690,8 +694,7 @@ export default function AcademicMateRequestsPage() {
                           onOpenConversation={() => {
                             const sessionId = item.tutoringSession?.id;
                             if (sessionId) {
-                              window.location.href =
-                                `/student/sessions/${encodeURIComponent(sessionId)}/conversation`;
+                              router.push(`/student/sessions/${encodeURIComponent(sessionId)}/conversation`);
                             }
                           }}
                         />
@@ -763,7 +766,7 @@ export default function AcademicMateRequestsPage() {
           >
             <div className="flex items-start justify-between gap-4 border-b border-[#e8e1da] px-5 py-4 sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
-                {selectedRequest.student.image ? <img src={selectedRequest.student.image} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-base font-semibold text-white">{selectedRequest.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
+                {selectedRequest.student.image ? <Image src={selectedRequest.student.image} alt="" width={64} height={64} unoptimized className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-base font-semibold text-white">{selectedRequest.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-[#877a72]">Request details</p>
                   <h2 id="request-details-title" className="mt-1 truncate text-xl font-semibold tracking-tight">{selectedRequest.student.name}</h2>
@@ -957,7 +960,7 @@ export default function AcademicMateRequestsPage() {
                   ? "Saving..."
                   : confirmation.action === "ACCEPTED"
                     ? "Confirm acceptance"
-                    : "Confirm decline"}
+                    : "Decline"}
               </button>
             </div>
           </section>
