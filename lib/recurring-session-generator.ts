@@ -92,6 +92,7 @@ async function generateOneOccurrence(
     if (existing) return "exists";
 
     const lockKeys = [
+      `arrangement:${arrangement.id}`,
       `student:${arrangement.studentProfileId}`,
       `academic-mate:${arrangement.offering.academicMateProfile.id}`,
     ].sort();
@@ -101,13 +102,14 @@ async function generateOneOccurrence(
 
     const latestArrangement = await tx.mateRequest.findUnique({
       where: { id: arrangement.id },
-      select: { status: true, arrangementType: true, arrangementStatus: true },
+      select: { status: true, arrangementType: true, arrangementStatus: true, recurrenceEndsAt: true },
     });
     if (
       !latestArrangement ||
       latestArrangement.status !== "ACCEPTED" ||
       latestArrangement.arrangementType !== "RECURRING" ||
-      latestArrangement.arrangementStatus !== "ACTIVE"
+      latestArrangement.arrangementStatus !== "ACTIVE" ||
+      (latestArrangement.recurrenceEndsAt !== null && scheduledStart > latestArrangement.recurrenceEndsAt)
     ) {
       return "inactive";
     }

@@ -165,6 +165,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         data: {
           status: "CANCELLED",
           cancelledAt: now,
+          cancelledByUserId: actorId,
           cancellationReason: `Arrangement cancelled by ${actorName}${reason ? `: ${reason}` : "."}`.slice(0, 500),
         },
       });

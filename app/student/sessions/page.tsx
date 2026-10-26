@@ -1,654 +1,290 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import GroupCard from "@/components/student/group-card";
+import GroupSheetDialog from "@/components/student/group-sheet-dialog";
+import SessionDetailDialog from "@/components/student/session-detail-dialog";
+import SessionCard from "@/components/student/session-card";
+import { Glyph, dayLabel, dateKey, isClosed, resolutionOf, tabOf, useNow } from "@/components/student/session-ui";
+import { availableActions, type ResolutionStatus, type TimeStatus } from "@/lib/session-lifecycle-rules";
+import { snapshotOf } from "@/lib/session-lifecycle-serialize";
+import type { SessionLifecycleApiResponse, SessionLifecycleItem } from "@/lib/session-lifecycle-types";
 
-type Filter = "UPCOMING" | "COMPLETED" | "CANCELLED" | "ALL";
+type Entry =
+  | { kind: "group"; key: string; groupId: string; sessions: SessionLifecycleItem[]; start: number }
+  | { kind: "session"; key: string; session: SessionLifecycleItem; start: number };
+type Filter = "ALL" | Exclude<ResolutionStatus, "NONE" | "NO_SHOW">;
 
-type RequestItem = {
-  id: string;
-  offering: {
-    title: string | null;
-    course: { code: string; name: string };
-    academicMate: { name: string; image: string | null };
-  };
-  tutoringSession: {
-    id: string;
-    status: string;
-    scheduledStart: string;
-    scheduledEnd: string;
-    meetingLocation: string;
-  } | null;
-  sessions?: Array<{
-    id: string;
-    status: string;
-    scheduledStart: string;
-    scheduledEnd: string;
-    meetingLocation: string;
-  }>;
-};
+const TABS: { id: TimeStatus; label: string }[] = [
+  { id: "UPCOMING", label: "Upcoming" },
+  { id: "IN_PROGRESS", label: "In progress" },
+  { id: "PAST", label: "Past" },
+];
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "ALL", label: "All" },
+  { id: "AWAITING_CONFIRMATION", label: "Awaiting confirmation" },
+  { id: "NEEDS_REVIEW", label: "Needs review" },
+  { id: "NO_RESPONSE", label: "No response" },
+  { id: "COMPLETED", label: "Completed" },
+  { id: "CANCELLED", label: "Cancelled" },
+];
 
-type SessionItem = {
-  requestId: string;
-  id: string;
-  status: string;
-  scheduledStart: string;
-  scheduledEnd: string;
-  meetingLocation: string;
-  course: { code: string; name: string };
-  academicMate: { name: string; image: string | null };
-};
-
-type ApiResponse = {
-  requests?: RequestItem[];
-  error?: string;
-};
-
-const TIME_ZONE = "Africa/Lusaka";
-
-const DATE_FORMAT = new Intl.DateTimeFormat("en-ZM", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: TIME_ZONE,
-});
-
-const TIME_FORMAT = new Intl.DateTimeFormat("en-ZM", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: TIME_ZONE,
-});
-
-const MONTH_FORMAT = new Intl.DateTimeFormat("en-ZM", {
-  month: "short",
-  timeZone: TIME_ZONE,
-});
-
-const DAY_FORMAT = new Intl.DateTimeFormat("en-ZM", {
-  day: "numeric",
-  timeZone: TIME_ZONE,
-});
-
-const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-ZM", {
-  weekday: "short",
-  timeZone: TIME_ZONE,
-});
-
-// YYYY-MM-DD in the Lusaka time zone, used for "today / tomorrow" comparisons.
-const DAY_KEY_FORMAT = new Intl.DateTimeFormat("en-CA", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  timeZone: TIME_ZONE,
-});
-
-// Shared by SessionCard and SkeletonCard so the loading state can never drift from the real layout.
-const CARD_PAD = "p-3 sm:p-4";
-const CARD_GAP = "gap-3 sm:gap-4";
-const TILE_SIZE = "h-12 w-12 sm:h-14 sm:w-14";
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : DATE_FORMAT.format(date);
+function startOf(session: SessionLifecycleItem) {
+  const value = new Date(session.scheduledStart).getTime();
+  return Number.isFinite(value) ? value : 0;
 }
 
-function formatTime(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : TIME_FORMAT.format(date);
-}
-
-function formatStatus(value: string) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-function statusClass(status: string) {
-  switch (status.toUpperCase()) {
-    case "COMPLETED":
-      return "bg-emerald-50 text-emerald-800 ring-emerald-200";
-    case "IN_PROGRESS":
-      return "bg-blue-50 text-blue-800 ring-blue-200";
-    case "CANCELLED":
-    case "NO_SHOW":
-      return "bg-stone-100 text-stone-600 ring-stone-200";
-    case "DISPUTED":
-      return "bg-red-50 text-red-800 ring-red-200";
-    case "SCHEDULED":
-      return "bg-amber-50 text-amber-800 ring-amber-200";
-    default:
-      return "bg-stone-100 text-stone-700 ring-stone-200";
+function buildEntries(sessions: SessionLifecycleItem[]): Entry[] {
+  const groups = new Map<string, SessionLifecycleItem[]>();
+  const entries: Entry[] = [];
+  for (const session of sessions) {
+    if (session.viewerRole === "ACADEMIC_MATE" && session.groupId && !isClosed(session) && session.arrangementStatus !== "EXPIRED") {
+      groups.set(session.groupId, [...(groups.get(session.groupId) ?? []), session]);
+    } else {
+      entries.push({ kind: "session", key: session.id, session, start: startOf(session) });
+    }
   }
+  for (const [groupId, members] of groups) {
+    entries.push({ kind: "group", key: `group:${groupId}`, groupId, sessions: members, start: startOf(members[0]) });
+  }
+  return entries;
+}
+const membersOf = (entry: Entry) => entry.kind === "group" ? entry.sessions : [entry.session];
+
+function SearchIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
 }
 
-function isUpcoming(session: SessionItem, now: number) {
-  const status = session.status.toUpperCase();
-  const end = new Date(session.scheduledEnd).getTime();
+function SessionsView() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const now = useNow();
+  // Which pop-up is open lives in the URL, so notification links and the back button work.
+  const openSessionId = searchParams.get("session");
+  const openGroupId = searchParams.get("group");
+  const openPopup = useCallback((key: "session" | "group", id: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("session"); params.delete("group"); params.set(key, id);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [router, pathname, searchParams]);
+  const closePopup = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("session"); params.delete("group");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [router, pathname, searchParams]);
+  const [sessions, setSessions] = useState<SessionLifecycleItem[]>([]);
+  const [tab, setTab] = useState<TimeStatus>("UPCOMING");
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [openLimitReached, setOpenLimitReached] = useState(false);
+  const pickedTab = useRef(false);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch("/api/student/sessions", { cache: "no-store", signal });
+      const body = await response.json() as SessionLifecycleApiResponse;
+      if (!response.ok || !body.sessions) throw new Error(body.error || "We couldn't load your sessions.");
+      setSessions((current) => {
+        const merged = new Map<string, SessionLifecycleItem>();
+        // Keep any extra history pages already loaded; replace everything the server just sent.
+        for (const item of current) if (isClosed(item)) merged.set(item.id, item);
+        for (const item of body.sessions ?? []) merged.set(item.id, item);
+        return [...merged.values()];
+      });
+      setHistoryCursor((current) => current ?? body.nextHistoryCursor ?? null);
+      setHasMoreHistory((current) => current || !!body.hasMoreHistory);
+      setOpenLimitReached(!!body.openLimitReached);
+      setError("");
+    } catch (err) {
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : "We couldn't load your sessions.");
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const timer = window.setInterval(refresh, 30_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [load]);
+
+  async function loadMoreHistory() {
+    if (!historyCursor || loadingHistory) return;
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`/api/student/sessions?historyCursor=${encodeURIComponent(historyCursor)}`, { cache: "no-store" });
+      const body = await response.json() as SessionLifecycleApiResponse;
+      if (!response.ok || !body.sessions) throw new Error(body.error || "We couldn't load older sessions.");
+      setSessions((current) => {
+        const merged = new Map(current.map((item) => [item.id, item]));
+        for (const item of body.sessions ?? []) if (isClosed(item)) merged.set(item.id, item);
+        return [...merged.values()];
+      });
+      setHistoryCursor(body.nextHistoryCursor ?? null);
+      setHasMoreHistory(!!body.hasMoreHistory);
+    } catch (err) { setError(err instanceof Error ? err.message : "We couldn't load older sessions."); }
+    finally { setLoadingHistory(false); }
+  }
+
+  const search = query.trim().toLowerCase();
+  const entries = useMemo(() => buildEntries(sessions).filter((entry) => {
+    if (!search) return true;
+    return membersOf(entry).some((s) => [s.course.code, s.course.name, s.otherParticipantName, s.studentName, s.academicMateName, s.meetingLocation].some((value) => value.toLowerCase().includes(search)));
+  }), [sessions, search]);
+
+  const tabOfEntry = useCallback((entry: Entry) => tabOf(membersOf(entry)[0], now), [now]);
+  const matchesFilter = useCallback((entry: Entry) => {
+    if (filter === "ALL") return true;
+    return membersOf(entry).some((s) => resolutionOf(s, now) === filter);
+  }, [filter, now]);
+
+  const counts = useMemo(() => {
+    const result: Record<TimeStatus, number> = { UPCOMING: 0, IN_PROGRESS: 0, PAST: 0 };
+    for (const entry of entries) result[tabOfEntry(entry)]++;
+    return result;
+  }, [entries, tabOfEntry]);
+
+  // People who must answer something right now.
+  const needAnswer = useMemo(() => entries.filter((entry) => membersOf(entry).some((s) => {
+    const actions = availableActions(snapshotOf(s), s.viewerRole, now);
+    return actions.attendance || actions.completion;
+  })), [entries, now]);
+
+  // Open on the tab that matters: what is happening now, else what is coming up.
+  useEffect(() => {
+    if (loading || pickedTab.current) return;
+    pickedTab.current = true;
+    const live = entries.some((entry) => tabOfEntry(entry) === "IN_PROGRESS");
+    const upcoming = entries.some((entry) => tabOfEntry(entry) === "UPCOMING");
+    if (needAnswer.length > 0) setTab(tabOfEntry(needAnswer[0]));
+    else if (live) setTab("IN_PROGRESS");
+    else if (!upcoming) setTab("PAST");
+  }, [loading, entries, needAnswer, tabOfEntry]);
+
+  const visible = useMemo(() => entries
+    .filter((entry) => tabOfEntry(entry) === tab && matchesFilter(entry))
+    .sort((a, b) => tab === "PAST" ? b.start - a.start : a.start - b.start), [entries, tab, matchesFilter, tabOfEntry]);
+
+  const days = useMemo(() => {
+    const result: { key: string; label: string; entries: Entry[] }[] = [];
+    for (const entry of visible) {
+      const iso = new Date(entry.start).toISOString();
+      const key = dateKey(iso);
+      const last = result[result.length - 1];
+      if (last && last.key === key) last.entries.push(entry);
+      else result.push({ key, label: dayLabel(iso, now), entries: [entry] });
+    }
+    return result;
+  }, [visible, now]);
+
+  function showAnswers() {
+    setFilter("AWAITING_CONFIRMATION");
+    if (needAnswer[0]) setTab(tabOfEntry(needAnswer[0]));
+  }
+
+  const empty = {
+    UPCOMING: ["No upcoming sessions", "When you book a session or an Academic Mate accepts your request, it shows up here."],
+    IN_PROGRESS: ["Nothing in progress", "Sessions that are happening right now appear here."],
+    PAST: ["No past sessions yet", "Completed, cancelled and finished sessions are kept here."],
+  }[tab];
 
   return (
-    ["SCHEDULED", "IN_PROGRESS"].includes(status) &&
-    Number.isFinite(end) &&
-    end >= now
-  );
-}
+    <main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-4 pb-10 pt-5 text-[#282321] sm:px-6 lg:px-8 lg:pt-8">
+      <div className="mx-auto max-w-3xl">
+        <header>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Sessions</h1>
+          <p className="mt-1 text-sm text-[#756b65]">Your tutoring sessions, and anything waiting on your answer.</p>
+        </header>
 
-function matchesFilter(session: SessionItem, filter: Filter, now: number) {
-  const status = session.status.toUpperCase();
+        <div className="relative mt-4">
+          <label htmlFor="session-search" className="sr-only">Search by course, person or place</label>
+          <SearchIcon />
+          <input id="session-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" className="h-11 w-full rounded-xl border border-[#e2d8d0] bg-white pl-10 pr-10 text-sm outline-none placeholder:text-[#a3978f] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
+        </div>
 
-  switch (filter) {
-    case "UPCOMING":
-      return isUpcoming(session, now);
-    case "COMPLETED":
-      return status === "COMPLETED";
-    case "CANCELLED":
-      return status === "CANCELLED";
-    case "ALL":
-      return true;
-  }
-}
+        {needAnswer.length > 0 && filter !== "AWAITING_CONFIRMATION" && (
+          <button type="button" onClick={showAnswers} role="status" aria-label={`${needAnswer.length} ${needAnswer.length === 1 ? "session needs" : "sessions need"} your answer. Show`} className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-[#f8efec] px-3 text-[11px] font-medium text-[#6b3b36] transition hover:bg-[#f3e4df] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#7d1f2a]" />
+            {needAnswer.length} awaiting your answer
+            <Glyph name="chevronRight" className="h-3.5 w-3.5 text-[#9a6a64]" />
+          </button>
+        )}
 
-function dayDifference(target: Date, now: number) {
-  const toUtc = (key: string) => {
-    const [y, m, d] = key.split("-").map(Number);
-    return Date.UTC(y, m - 1, d);
-  };
-  return Math.round(
-    (toUtc(DAY_KEY_FORMAT.format(target)) -
-      toUtc(DAY_KEY_FORMAT.format(new Date(now)))) /
-      86_400_000
-  );
-}
+        <div role="tablist" aria-label="Session time" className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-[#efeae5] p-1">
+          {TABS.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
+              {item.label}
+              <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${tab === item.id ? "bg-[#f4e5e2] text-[#7d1f2a]" : "bg-[#e3dcd6] text-[#6f655f]"}`}>{counts[item.id]}{item.id === "PAST" && hasMoreHistory ? "+" : ""}</span>
+            </button>
+          ))}
+        </div>
 
-/** Short, human timing hint shown on upcoming sessions. */
-function timingLabel(session: SessionItem, now: number) {
-  const start = new Date(session.scheduledStart);
-  const end = new Date(session.scheduledEnd);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-
-  if (start.getTime() <= now && end.getTime() >= now) {
-    return { text: "Happening now", live: true };
-  }
-
-  const minutes = Math.round((start.getTime() - now) / 60_000);
-  if (minutes < 0) return null;
-  if (minutes < 60) {
-    return { text: `Starts in ${Math.max(minutes, 1)} min`, live: false };
-  }
-
-  const days = dayDifference(start, now);
-  if (days === 0) {
-    const hours = Math.round(minutes / 60);
-    return { text: `Today, in ${hours} ${hours === 1 ? "hour" : "hours"}`, live: false };
-  }
-  if (days === 1) return { text: "Tomorrow", live: false };
-  return { text: `In ${days} days`, live: false };
-}
-
-function durationLabel(startValue: string, endValue: string) {
-  const minutes = Math.round(
-    (new Date(endValue).getTime() - new Date(startValue).getTime()) / 60_000
-  );
-  if (!Number.isFinite(minutes) || minutes <= 0) return null;
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} hr ${rest} min` : `${hours} hr`;
-}
-
-function SessionCard({ session, now }: { session: SessionItem; now: number }) {
-  const start = new Date(session.scheduledStart);
-  const validDate = !Number.isNaN(start.getTime());
-  const upcoming = isUpcoming(session, now);
-  const timing = upcoming ? timingLabel(session, now) : null;
-  const duration = durationLabel(session.scheduledStart, session.scheduledEnd);
-  const inactive = ["CANCELLED", "NO_SHOW"].includes(session.status.toUpperCase());
-
-  return (
-    <article className={`rounded-xl border border-[#e8e0d9] bg-white ${CARD_PAD} transition-colors hover:border-[#d3c5bd]`}>
-      <div className={`flex ${CARD_GAP}`}>
-        <div
-          title={validDate ? formatDate(session.scheduledStart) : undefined}
-          className={`flex ${TILE_SIZE} shrink-0 flex-col items-center justify-center rounded-lg ${
-            inactive ? "bg-stone-100 text-stone-500" : "bg-[#f7f1ee] text-[#7d1f2a]"
-          }`}
-        >
-          {validDate ? (
-            <>
-              <span className="text-[11px] font-medium leading-none">
-                {MONTH_FORMAT.format(start)}
-              </span>
-              <span className="mt-1 text-lg font-semibold leading-none tabular-nums sm:text-xl">
-                {DAY_FORMAT.format(start)}
-              </span>
-            </>
-          ) : (
-            <span className="text-xs">Date</span>
+        <div className="mt-3">
+          <button type="button" onClick={() => setFilterOpen((open) => !open)} aria-expanded={filterOpen} aria-controls="session-filter-panel" aria-label={`Filter sessions by status. Showing: ${FILTERS.find((item) => item.id === filter)?.label ?? "All"}`} className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter !== "ALL" ? "border-[#7d1f2a] bg-[#fdf6f3] text-[#7d1f2a]" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" /></svg>
+            {filter === "ALL" ? "Filter" : FILTERS.find((item) => item.id === filter)?.label}
+            <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          {filter !== "ALL" && <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter" title="Clear filter" className="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
+          {filterOpen && (
+            <div id="session-filter-panel" role="group" aria-label="Filter by status" className="mt-2 flex flex-wrap gap-2 rounded-xl border border-[#e8e0d9] bg-white p-3">
+              {FILTERS.map((item) => (
+                <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); setFilterOpen(false); }} className={`min-h-9 rounded-full border px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter === item.id ? "border-[#7d1f2a] bg-[#7d1f2a] text-white" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>{item.label}</button>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Stacked on phones (details, then a footer row); side by side from sm up. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:gap-3">
-          <div className="min-w-0 flex-1">
-            <h2
-              className={`break-words text-[15px] font-semibold leading-5 ${
-                inactive ? "text-[#756b65]" : "text-[#282321]"
-              }`}
-            >
-              {session.course.name}
-              <span className="ml-2 text-xs font-medium text-[#94877e]">
-                {session.course.code}
-              </span>
-            </h2>
+        {error && <div role="alert" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => void load()} className="shrink-0 font-semibold underline">Try again</button></div>}
 
-            <div className="mt-1.5 flex items-center gap-2">
-              {session.academicMate.image ? (
-                <Image
-                  src={session.academicMate.image}
-                  alt="" width={64} height={64} unoptimized
-                  className="h-5 w-5 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f4eceb] text-[10px] font-semibold text-[#7d1f2a]"
-                >
-                  {session.academicMate.name.trim().charAt(0).toUpperCase() || "A"}
-                </span>
-              )}
-              <p className="truncate text-[13px] text-[#756b65]">
-                With{" "}
-                <span className="font-medium text-[#282321]">
-                  {session.academicMate.name}
-                </span>
-              </p>
+        <div className="mt-5">
+          {loading ? (
+            <div className="space-y-3" role="status" aria-busy="true"><span className="sr-only">Loading your sessions…</span>{[1, 2, 3].map((key) => <div key={key} className="h-36 animate-pulse rounded-2xl border border-[#e8e0d9] bg-white motion-reduce:animate-none" />)}</div>
+          ) : visible.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#d9cec5] bg-white px-5 py-10 text-center">
+              <h2 className="text-sm font-semibold">{search || filter !== "ALL" ? "No sessions match" : empty[0]}</h2>
+              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-[#81766f]">{search || filter !== "ALL" ? "Try a different search, or clear the filter to see everything in this tab." : empty[1]}</p>
+              {(search || filter !== "ALL") && <button type="button" onClick={() => { setQuery(""); setFilter("ALL"); }} className="mt-4 min-h-10 rounded-lg border border-[#ded4cd] bg-white px-4 text-xs font-semibold text-[#584c45] hover:bg-[#faf7f5]">Clear search and filter</button>}
+              {!search && filter === "ALL" && tab === "UPCOMING" && <Link href="/student/find-academic-mate" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-[#7d1f2a] px-4 text-xs font-semibold text-white hover:bg-[#681923]">Find an Academic Mate</Link>}
             </div>
-
-            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-[#756b65]">
-              <p className="flex items-center gap-1.5">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 shrink-0 text-[#a99d94]"
-                >
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
-                <span className="tabular-nums">
-                  {validDate ? `${WEEKDAY_FORMAT.format(start)}, ` : ""}
-                  {formatTime(session.scheduledStart)} to {formatTime(session.scheduledEnd)}
-                  {duration ? ` (${duration})` : ""}
-                </span>
-              </p>
-
-              <p className="flex min-w-0 items-center gap-1.5">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4 shrink-0 text-[#a99d94]"
-                >
-                  <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
-                  <circle cx="12" cy="10" r="2.5" />
-                </svg>
-                <span className="break-words">{session.meetingLocation}</span>
-              </p>
+          ) : (
+            <div className="space-y-6">
+              {days.map((day) => (
+                <section key={day.key} aria-label={day.label}>
+                  <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#8a7d74]">{day.label}</h2>
+                  <div className="space-y-3">
+                    {day.entries.map((entry) => entry.kind === "group"
+                      ? <GroupCard key={entry.key} groupId={entry.groupId} sessions={entry.sessions} now={now} onOpen={(id) => openPopup("group", id)} />
+                      : <SessionCard key={entry.key} session={entry.session} now={now} onOpen={(id) => openPopup("session", id)} onChanged={() => load()} />)}
+                  </div>
+                </section>
+              ))}
             </div>
-          </div>
+          )}
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#f3ece8] pt-2 sm:shrink-0 sm:flex-col sm:items-end sm:justify-between sm:border-t-0 sm:pt-0">
-            <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
-              {timing && (
-                <span
-                  className={`truncate text-xs ${
-                    timing.live ? "font-medium text-blue-700" : "text-[#94877e]"
-                  }`}
-                >
-                  {timing.text}
-                </span>
-              )}
-              <span
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${statusClass(session.status)}`}
-              >
-                {timing?.live && (
-                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                )}
-                {formatStatus(session.status)}
-              </span>
-            </div>
-
-            <Link
-              href={`/student/sessions/${encodeURIComponent(session.id)}/conversation`}
-              aria-label="Open conversation"
-              title="Open conversation"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#e1d8d0] text-[#625954] transition hover:border-[#7d1f2a]/40 hover:bg-[#faf5f3] hover:text-[#7d1f2a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-1"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-[18px] w-[18px]"
-              >
-                <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z" />
-              </svg>
-            </Link>
-          </div>
+          {tab === "PAST" && hasMoreHistory && <button type="button" onClick={() => void loadMoreHistory()} disabled={loadingHistory} className="mt-5 min-h-11 w-full rounded-xl border border-[#e2d8d0] bg-white px-4 text-sm font-semibold text-[#625954] hover:bg-[#faf7f5] disabled:opacity-50">{loadingHistory ? "Loading…" : "Show older sessions"}</button>}
+          {openLimitReached && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">You have a lot of active sessions, so only the next 250 are shown. Use search to find a specific one.</p>}
         </div>
       </div>
-    </article>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className={`flex ${CARD_GAP} rounded-xl border border-[#eee5df] bg-white ${CARD_PAD}`}>
-      <div className={`${TILE_SIZE} shrink-0 animate-pulse rounded-lg bg-[#f3ece8] motion-reduce:animate-none`} />
-      <div className="flex-1 space-y-3">
-        <div className="h-4 w-1/2 animate-pulse rounded bg-[#f3ece8] motion-reduce:animate-none" />
-        <div className="h-4 w-1/3 animate-pulse rounded bg-[#f8f3f0] motion-reduce:animate-none" />
-        <div className="h-4 w-2/3 animate-pulse rounded bg-[#f8f3f0] motion-reduce:animate-none" />
-      </div>
-    </div>
+      {openGroupId ? <GroupSheetDialog key={openGroupId} groupId={openGroupId} onClose={closePopup} onChanged={() => load()} />
+        : openSessionId ? <SessionDetailDialog key={openSessionId} sessionId={openSessionId} onClose={closePopup} onChanged={() => load()} /> : null}
+    </main>
   );
 }
 
 export default function SessionsPage() {
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
-  const [filter, setFilter] = useState<Filter>("UPCOMING");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [now, setNow] = useState(() => Date.now());
-  const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    // loading starts as true and error as "", so nothing is set synchronously here.
-    async function loadSessions() {
-      try {
-        const response = await fetch("/api/student/my-requests", {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        const body = (await response.json()) as ApiResponse;
-
-        if (!response.ok) {
-          throw new Error(body.error || "Unable to load your sessions.");
-        }
-
-        const mapped: SessionItem[] = (body.requests ?? []).flatMap((request) => {
-          const occurrences = request.sessions?.length
-            ? request.sessions
-            : request.tutoringSession
-              ? [request.tutoringSession]
-              : [];
-
-          return occurrences.map((session) => ({
-            requestId: request.id,
-            id: session.id,
-            status: session.status,
-            scheduledStart: session.scheduledStart,
-            scheduledEnd: session.scheduledEnd,
-            meetingLocation: session.meetingLocation,
-            course: request.offering.course,
-            academicMate: request.offering.academicMate,
-          }));
-        });
-
-        if (!controller.signal.aborted) setSessions(mapped);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : "Unable to load your sessions.");
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    }
-
-    void loadSessions();
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const counts = useMemo(() => ({
-    UPCOMING: sessions.filter((session) => isUpcoming(session, now)).length,
-    COMPLETED: sessions.filter((session) => session.status.toUpperCase() === "COMPLETED").length,
-    CANCELLED: sessions.filter((session) => session.status.toUpperCase() === "CANCELLED").length,
-    ALL: sessions.length,
-  }), [sessions, now]);
-
-  const normalizedQuery = query.trim().toLowerCase();
-
-  const visibleSessions = useMemo(() => {
-    return sessions
-      .filter((session) => matchesFilter(session, filter, now))
-      .filter((session) => {
-        if (!normalizedQuery) return true;
-        return [session.course.code, session.course.name, session.academicMate.name]
-          .some((value) => value.toLowerCase().includes(normalizedQuery));
-      })
-      .sort((a, b) => {
-        const first = new Date(a.scheduledStart).getTime();
-        const second = new Date(b.scheduledStart).getTime();
-
-        return filter === "UPCOMING"
-          ? first - second
-          : second - first;
-      });
-  }, [sessions, filter, now, normalizedQuery]);
-
-  const tabs: { value: Filter; label: string }[] = [
-    { value: "UPCOMING", label: "Upcoming" },
-    { value: "COMPLETED", label: "Completed" },
-    { value: "CANCELLED", label: "Cancelled" },
-    { value: "ALL", label: "All" },
-  ];
-
-  return (
-    <main className="min-h-screen bg-[#fcfbfa] px-4 py-6 text-[#282321] sm:px-6 sm:py-10 lg:px-8">
-      <div className="mx-auto max-w-3xl">
-        <header>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-[28px]">
-            Sessions
-          </h1>
-          <p className="mt-1 max-w-xl text-sm leading-6 text-[#756b65] sm:mt-1.5">
-            Keep track of your booked tutoring sessions.
-          </p>
-        </header>
-
-        {/* Tabs from sm up; on phones the same filter is a dropdown next to the search box (below). */}
-        <div
-          role="tablist"
-          aria-label="Filter sessions"
-          className="mt-6 hidden gap-6 border-b border-[#e8e0d9] sm:flex"
-        >
-          {tabs.map((tab) => {
-            const active = filter === tab.value;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setFilter(tab.value)}
-                className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${
-                  active
-                    ? "border-[#7d1f2a] text-[#7d1f2a]"
-                    : "border-transparent text-[#756b65] hover:text-[#282321]"
-                }`}
-              >
-                {tab.label}
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-xs tabular-nums ${
-                    active ? "bg-[#f4e6e3] text-[#7d1f2a]" : "bg-[#f3ece8] text-[#756b65]"
-                  }`}
-                >
-                  {counts[tab.value]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <label htmlFor="session-search" className="sr-only">
-            Search sessions by course or Academic Mate
-          </label>
-          <div className="relative min-w-0 flex-1">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94877e]"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              id="session-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setQuery("");
-              }}
-              placeholder="Search sessions"
-              autoComplete="off"
-              className="h-10 w-full rounded-lg border border-[#e1d8d0] bg-white pl-9 pr-9 text-base text-[#282321] placeholder:text-[#94877e] focus:border-[#7d1f2a] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/15 sm:text-sm [&::-webkit-search-cancel-button]:hidden"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-[#94877e] hover:bg-[#f3ece8] hover:text-[#282321] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  className="h-3.5 w-3.5"
-                >
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          <select
-            aria-label="Filter sessions"
-            value={filter}
-            onChange={(event) => setFilter(event.target.value as Filter)}
-            className="h-10 w-32 shrink-0 rounded-lg border border-[#e1d8d0] bg-white pl-2.5 pr-1 text-xs font-medium text-[#282321] focus:border-[#7d1f2a] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/15 sm:hidden"
-          >
-            {tabs.map((tab) => (
-              <option key={tab.value} value={tab.value}>
-                {tab.label} ({counts[tab.value]})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {error && (
-          <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-2 font-semibold underline"
-            >
-              Try again
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          <div aria-busy="true" className="mt-4 space-y-3">
-            {[1, 2, 3].map((item) => (
-              <SkeletonCard key={item} />
-            ))}
-          </div>
-        ) : !error && visibleSessions.length === 0 ? (
-          <section className="mt-4 rounded-xl border border-dashed border-[#dcd1c8] bg-white px-5 py-10 text-center sm:py-12">
-            <h2 className="text-sm font-semibold">
-              {normalizedQuery
-                ? "No sessions match your search"
-                : filter === "UPCOMING"
-                  ? "No upcoming sessions"
-                  : filter === "COMPLETED"
-                    ? "No completed sessions yet"
-                    : filter === "CANCELLED"
-                      ? "No cancelled sessions"
-                      : "No sessions yet"}
-            </h2>
-            <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-[#756b65]">
-              {normalizedQuery
-                ? "Check the spelling, try a different course or Academic Mate, or switch to another tab."
-                : filter === "UPCOMING"
-                  ? "Once you book a session with an Academic Mate, the details will appear here."
-                  : "Sessions in this category will remain available here for your reference."}
-            </p>
-            {normalizedQuery ? (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="mt-4 inline-flex h-9 items-center justify-center rounded-md border border-[#7d1f2a]/30 px-3.5 text-[13px] font-semibold text-[#7d1f2a] transition hover:bg-[#f8efed] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
-              >
-                Clear search
-              </button>
-            ) : (
-              filter === "UPCOMING" && (
-                <Link
-                  href="/student/find-academic-mate"
-                  className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-[#7d1f2a] px-4 text-[13px] font-semibold text-white transition hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
-                >
-                  Find an Academic Mate
-                </Link>
-              )
-            )}
-          </section>
-        ) : !error ? (
-          <section className="mt-4 space-y-3" aria-label="Sessions">
-            <p className="text-xs text-[#82776f]" aria-live="polite">
-              Showing {visibleSessions.length}{" "}
-              {visibleSessions.length === 1 ? "session" : "sessions"}
-              {normalizedQuery ? ` matching "${query.trim()}"` : ""}
-            </p>
-            {visibleSessions.map((session) => (
-              <SessionCard key={session.id} session={session} now={now} />
-            ))}
-          </section>
-        ) : null}
-      </div>
-    </main>
-  );
+  return <Suspense fallback={<main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-4 py-8"><div className="mx-auto max-w-3xl"><div className="h-8 w-40 animate-pulse rounded bg-[#e8e0d9]" /></div></main>}><SessionsView /></Suspense>;
 }

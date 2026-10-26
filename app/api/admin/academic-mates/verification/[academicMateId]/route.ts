@@ -1,56 +1,11 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authorizeAdmin, type AdminContext } from "@/lib/admin/guard";
+import { recordAudit } from "@/lib/admin/audit";
+import { canAccessUniversity as adminCanAccessUniversity } from "@/lib/admin/permissions";
 import { prisma } from "@/lib/prisma";
 type VerificationDecision = "VERIFIED" | "REJECTED";
-const REVIEWER_ROLES = new Set([
-    "PLATFORM_ADMIN",
-    "UNIVERSITY_ADMIN",
-    "MODERATOR",
-]);
-async function getAuthenticatedAdmin() {
-    const session = await auth.api.getSession({
-        headers: await import("next/headers").then(({ headers }) =>
-            headers(),
-        ),
-    });
-    if (!session?.user?.id) {
-        return null;
-    }
-    const admin = await prisma.adminProfile.findUnique({
-        where: {
-            userId: session.user.id,
-        },
-        select: {
-            id: true,
-            role: true,
-            universityAccess: {
-                select: {
-                    universityId: true,
-                },
-            },
-        },
-    });
-    if (!admin) {
-        return null;
-    }
-    return admin;
-}
-function canReviewVerification(role: string) {
-    return REVIEWER_ROLES.has(role);
-}
-function canAccessUniversity(
-    admin: Awaited<ReturnType<typeof getAuthenticatedAdmin>>,
-    universityId: string,
-) {
-    if (!admin) {
-        return false;
-    }
-    if (admin.role === "PLATFORM_ADMIN") {
-        return true;
-    }
-    return admin.universityAccess.some(
-        (access) => access.universityId === universityId,
-    );
+function canAccessUniversity(admin: AdminContext, universityId: string) {
+    return adminCanAccessUniversity(admin.scope, universityId);
 }
 function isValidAcademicMateId(value: string) {
     return value.trim().length > 0 && value.length <= 100;
@@ -73,23 +28,11 @@ export async function GET(
     },
 ) {
     try {
-        const admin = await getAuthenticatedAdmin();
-        if (!admin) {
-            return NextResponse.json(
-                {
-                    error: "Unauthorized.",
-                },
-                { status: 401 },
-            );
+        const authResult = await authorizeAdmin("verification:review");
+        if (!authResult.ok) {
+            return authResult.response;
         }
-        if (!canReviewVerification(admin.role)) {
-            return NextResponse.json(
-                {
-                    error: "You do not have permission to review Academic Mate verification.",
-                },
-                { status: 403 },
-            );
-        }
+        const admin = authResult.admin;
         const { academicMateId } = await context.params;
         if (!isValidAcademicMateId(academicMateId)) {
             return NextResponse.json(
@@ -564,24 +507,12 @@ export async function PATCH(
     },
 ) {
     try {
-        const admin = await getAuthenticatedAdmin();
-        if (!admin) {
-            return NextResponse.json(
-                {
-                    error: "Unauthorized.",
-                },
-                { status: 401 },
-            );
+        const authResult = await authorizeAdmin("verification:review");
+        if (!authResult.ok) {
+            return authResult.response;
         }
-        if (!canReviewVerification(admin.role)) {
-            return NextResponse.json(
-                {
-                    error:
-                        "You do not have permission to review Academic Mate verification.",
-                },
-                { status: 403 },
-            );
-        }
+        const admin = authResult.admin;
+        const requestContext = authResult.context;
         const { academicMateId } = await context.params;
         if (!isValidAcademicMateId(academicMateId)) {
             return NextResponse.json(
@@ -792,7 +723,7 @@ export async function PATCH(
                                         ? reviewedAt
                                         : null,
                                 verifiedByAdminId:
-                                    admin.id,
+                                    admin.adminId,
                             },
                             select: {
                                 id: true,
@@ -813,7 +744,7 @@ export async function PATCH(
                                     decision as VerificationDecision,
                                 notes,
                                 reviewedByAdminId:
-                                    admin.id,
+                                    admin.adminId,
                                 reviewedAt,
                             },
                             select: {
@@ -825,6 +756,25 @@ export async function PATCH(
                             },
                         },
                     );
+                await recordAudit(tx, {
+                    actor: admin,
+                    action:
+                        decision === "VERIFIED"
+                            ? "VERIFICATION_APPROVED"
+                            : "VERIFICATION_REJECTED",
+                    targetType: "ACADEMIC_MATE",
+                    targetId: academicMate.id,
+                    universityId: academicMate.universityId,
+                    summary:
+                        decision === "VERIFIED"
+                            ? "Approved an Academic Mate profile"
+                            : "Rejected an Academic Mate profile",
+                    metadata: {
+                        decision,
+                        notes: notes ?? null,
+                    },
+                    context: requestContext,
+                });
                 return {
                     updated,
                     history,

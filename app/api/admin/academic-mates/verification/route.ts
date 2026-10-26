@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { authorizeAdmin } from "@/lib/admin/guard";
+import { universityScopeFilter } from "@/lib/admin/permissions";
 import { prisma } from "@/lib/prisma";
 
 type VerificationQueueStatus =
@@ -9,54 +10,12 @@ type VerificationQueueStatus =
   | "REJECTED"
   | "UNVERIFIED";
 
-async function getAuthenticatedAdmin() {
-  const session = await auth.api.getSession({
-    headers: await import("next/headers").then(({ headers }) => headers()),
-  });
-
-  if (!session?.user) return null;
-
-  return prisma.adminProfile.findUnique({
-    where: { userId: session.user.id },
-    select: {
-      id: true,
-      role: true,
-      universityAccess: {
-        select: { universityId: true },
-      },
-    },
-  });
-}
-
-function canReviewVerification(role: string) {
-  return (
-    role === "PLATFORM_ADMIN" ||
-    role === "UNIVERSITY_ADMIN" ||
-    role === "MODERATOR"
-  );
-}
-
 /** GET /api/admin/academic-mates/verification */
 export async function GET(request: Request) {
   try {
-    const admin = await getAuthenticatedAdmin();
-
-    if (!admin) {
-      return NextResponse.json(
-        { error: "Admin access required." },
-        { status: 403 },
-      );
-    }
-
-    if (!canReviewVerification(admin.role)) {
-      return NextResponse.json(
-        {
-          error:
-            "You do not have permission to review Academic Mate verification.",
-        },
-        { status: 403 },
-      );
-    }
+    const authResult = await authorizeAdmin("verification:review");
+    if (!authResult.ok) return authResult.response;
+    const admin = authResult.admin;
 
     const url = new URL(request.url);
     const requestedStatus = url.searchParams.get("status") ?? "PENDING";
@@ -81,14 +40,7 @@ export async function GET(request: Request) {
 
     const status = requestedStatus as VerificationQueueStatus;
 
-    const universityIds = admin.universityAccess.map(
-      (access) => access.universityId,
-    );
-
-    const universityFilter =
-      admin.role === "PLATFORM_ADMIN"
-        ? {}
-        : { universityId: { in: universityIds } };
+    const universityFilter = universityScopeFilter(admin.scope);
 
     const records = await prisma.academicMateProfile.findMany({
       where: {

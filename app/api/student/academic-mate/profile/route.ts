@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getRatingSummary } from "@/lib/review-service";
 
 async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
@@ -154,6 +155,7 @@ export async function GET() {
         },
         reviews: {
           orderBy: { createdAt: "desc" },
+          take: 50,
           select: {
             id: true,
             rating: true,
@@ -213,18 +215,10 @@ export async function GET() {
       updatedAt: offering.updatedAt,
     }));
 
-    const totalReviews = academicMate.reviews.length;
-    const averageRating =
-      totalReviews > 0
-        ? Number(
-            (
-              academicMate.reviews.reduce(
-                (total, review) => total + review.rating,
-                0,
-              ) / totalReviews
-            ).toFixed(2),
-          )
-        : null;
+    // Totals come from the database, so they stay right when the list below is capped.
+    const rating = await getRatingSummary(academicMate.id);
+    const totalReviews = rating.count;
+    const averageRating = rating.average;
 
     return NextResponse.json({
       profile: {
@@ -281,6 +275,7 @@ export async function GET() {
         totalQualifications: academicMate.qualifications.length,
         totalReviews,
         averageRating,
+        ratingDistribution: rating.distribution,
       },
     });
   } catch (error) {

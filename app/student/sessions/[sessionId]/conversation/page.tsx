@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { io } from "socket.io-client";
+import { BADGE_CHIP, sessionBadge } from "@/lib/session-badge";
+import { cancellationDetail, cancellationHeadline, type CancellationInfo } from "@/lib/cancellation";
 
 /* ---------- types ---------- */
 type ParticipantRole = "STUDENT" | "ACADEMIC_MATE";
@@ -15,7 +17,10 @@ type ConversationDetails = {
   id: string;
   studentMessagingEnabled: boolean;
   arrangementType: "ONE_TIME" | "RECURRING";
-  arrangementStatus: "PENDING" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
+  arrangementStatus: "PENDING" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "EXPIRED";
+  cancellation?: CancellationInfo | null;
+  /** Set when the server has closed messaging (cancelled, complete, or a one-time session with no response). */
+  messagingClosedReason?: "CANCELLED" | "COMPLETED" | "NO_RESPONSE" | null;
   otherUserName?: string;
   otherUserImage?: string | null;
   courseName?: string | null;
@@ -610,7 +615,9 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
   const canCancelCurrentSession = session !== null && arrangementStatus === "ACTIVE" && sessionStatus === "SCHEDULED" && currentSessionIsFuture;
   const canCancelArrangement = session !== null && isRecurring && (arrangementStatus === "ACTIVE" || arrangementStatus === "PAUSED");
   const hasSessionActions = canRescheduleCurrentSession || canCancelCurrentSession || canCancelArrangement;
-  const messagingPaused = conversation !== null && (arrangementCancelled || !conversation.studentMessagingEnabled);
+  const arrangementCompleted = arrangementStatus === "COMPLETED";
+  const noResponseClosed = conversation?.messagingClosedReason === "NO_RESPONSE" || arrangementStatus === "EXPIRED";
+  const messagingPaused = conversation !== null && (arrangementCancelled || arrangementCompleted || noResponseClosed || !conversation.studentMessagingEnabled);
   const fallbackCounterpart = role === "STUDENT" ? "Academic Mate" : role === "ACADEMIC_MATE" ? "Student" : "Session conversation";
   const displayName = conversation?.otherUserName || fallbackCounterpart;
   const avatarText = role === "STUDENT" ? "AM" : role === "ACADEMIC_MATE" ? "ST" : "TX";
@@ -708,7 +715,7 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
 
   /* ---------- messaging ---------- */
   async function sendMessage(text = draft.trim()) {
-    if (!conversation || conversation.arrangementStatus === "CANCELLED" || !conversation.studentMessagingEnabled || !text || sendingRef.current) return;
+    if (!conversation || conversation.arrangementStatus === "CANCELLED" || conversation.arrangementStatus === "COMPLETED" || conversation.messagingClosedReason === "NO_RESPONSE" || !conversation.studentMessagingEnabled || !text || sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
     lastActivityRef.current = Date.now();
@@ -931,7 +938,12 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
               <span className="text-stone-500"> · ends {formatClock(session.scheduledEnd)}</span>
             </p>
             <div className="flex shrink-0 items-center gap-1">
-              {/cancel/i.test(sessionStatus) && <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-600">Cancelled</span>}
+              {(() => {
+                const badge = sessionBadge({ ...session, status: sessionStatus }, nowMs, conversation?.arrangementType === "RECURRING");
+                // The date already says "upcoming"; only show states that tell you something new.
+                return badge.label === "Upcoming" || badge.label === "Next session" ? null : <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${BADGE_CHIP[badge.tone]}`}>{badge.label}</span>;
+              })()}
+              <Link href={`/student/sessions?session=${encodeURIComponent(session.id)}`} aria-label="Open session details" title="Session details" className="flex h-8 w-8 items-center justify-center rounded-full text-[#7d1f2a] hover:bg-stone-200/70 focus-visible:outline-2 focus-visible:outline-[#7d1f2a]"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></svg></Link>
               {hasSessionActions && (
                 <div ref={menuRef} className="relative">
                   <button type="button" aria-label="Session options" aria-haspopup="menu" aria-expanded={showBookingMenu} onClick={() => setShowBookingMenu((open) => !open)} className="flex h-8 w-8 items-center justify-center rounded-full text-stone-600 hover:bg-stone-200/70 focus-visible:outline-2 focus-visible:outline-[#7d1f2a]">
@@ -957,6 +969,13 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
             </div>
           </div>
         )}
+        {sessionStatus === "CANCELLED" || arrangementCancelled ? (
+          conversation?.cancellation && (
+            <p role="note" className="shrink-0 border-b border-[#eee5e0] bg-stone-50 px-4 py-2 text-[11px] leading-4 text-stone-600 sm:px-6 sm:text-xs">
+              {cancellationDetail(conversation.cancellation, (iso) => sessionDateFormatter.format(new Date(iso)))}
+            </p>
+          )
+        ) : null}
 
         {/* ---------- pending reschedule proposals ---------- */}
         {pendingProposals.length > 0 && (
@@ -1069,7 +1088,11 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
               <span className="mt-0.5 text-amber-600"><LockIcon /></span>
               <p>
                 {arrangementCancelled
-                  ? "This tutoring arrangement has been cancelled. Messaging is closed."
+                  ? `${conversation?.cancellation ? `${cancellationHeadline(conversation.cancellation, "arrangement")}. ` : "This tutoring arrangement has been cancelled. "}Messaging is closed.`
+                  : arrangementCompleted
+                    ? "This tutoring arrangement is complete. Messaging is closed, but you can still read the history."
+                  : noResponseClosed
+                    ? "This one-time session passed without a response. Messaging is closed, but you can still read the history."
                   : role === "ACADEMIC_MATE"
                     ? "You've paused messaging. You can still read the conversation history."
                     : "Messaging has been paused by the Academic Mate. You can still read the conversation history."}

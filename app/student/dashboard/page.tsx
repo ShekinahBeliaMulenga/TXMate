@@ -293,7 +293,7 @@ function DashboardContent({
   const nextRelative = nextSession ? relativeStart(nextSession.scheduledStart, nextSession.scheduledEnd, nowMs) : "";
 
   return (
-    <div className="mx-auto min-w-0 max-w-[1280px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+    <div className="mx-auto min-w-0 max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
       <style>{DASH_STYLES}</style>
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -302,15 +302,12 @@ function DashboardContent({
           <p className="mt-1.5 text-sm leading-5 text-[#6d6260]">{headline}</p>
           <p className="mt-1 text-xs text-[#8a7f7a]">{student.university.code} · Year {student.programmeYear.yearNumber}</p>
         </div>
-        <Link href="/student/find-academic-mate" className="inline-flex min-h-10 w-full items-center justify-center rounded-md bg-[#7d1f2a] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/50 focus-visible:ring-offset-2 sm:w-auto">
-          Find an Academic Mate
-        </Link>
       </header>
 
       {nextSession && nextCourse && nextMate && nextDay && (
         <section aria-label="Your next session" className="dash-rise mt-5 overflow-hidden rounded-xl bg-[#7d1f2a] text-white shadow-[0_1px_2px_rgba(40,35,33,0.12)]">
           <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
-            <div aria-hidden="true" className="flex w-16 shrink-0 flex-col items-center rounded-lg bg-white/10 py-2.5 sm:w-[72px]">
+            <div aria-hidden="true" className="flex w-16 shrink-0 flex-col items-center rounded-lg bg-white/10 py-2.5 sm:w-18">
               <span className="text-xs font-medium text-white/75">{nextDay.month}</span>
               <span className="text-3xl font-semibold leading-8 tabular-nums">{nextDay.day}</span>
             </div>
@@ -320,7 +317,7 @@ function DashboardContent({
                 Next session
                 {nextRelative && <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs font-medium text-white">{nextRelative}</span>}
               </p>
-              <h2 className="mt-1.5 break-words text-lg font-semibold leading-6 sm:text-xl">{nextCourse.name}</h2>
+              <h2 className="mt-1.5 wrap-break-word text-lg font-semibold leading-6 sm:text-xl">{nextCourse.name}</h2>
               <p className="mt-0.5 text-sm text-white/80">{nextCourse.code}, with {nextMate.name}</p>
               <div className="mt-3 flex flex-col gap-1.5 text-sm text-white/90 sm:flex-row sm:flex-wrap sm:gap-x-5">
                 <p className="flex min-w-0 items-start gap-1.5">
@@ -329,7 +326,7 @@ function DashboardContent({
                 </p>
                 <p className="flex min-w-0 items-start gap-1.5">
                   <Icon name="location" className="mt-0.5 h-4 w-4 shrink-0 text-white/70" />
-                  <span className="break-words">{nextSession.meetingLocation}</span>
+                  <span className="wrap-break-word">{nextSession.meetingLocation}</span>
                 </p>
               </div>
             </div>
@@ -390,14 +387,14 @@ function DashboardContent({
                       <div className="flex items-start justify-between gap-2.5">
                         <div className="min-w-0">
                           <p className="text-[11px] font-semibold text-[#7d1f2a]">{course.code}</p>
-                          <h3 className="mt-0.5 break-words text-[13px] font-semibold leading-5 text-[#282321] sm:text-sm">{course.name}</h3>
+                          <h3 className="mt-0.5 wrap-break-word text-[13px] font-semibold leading-5 text-[#282321] sm:text-sm">{course.name}</h3>
                           <p className="mt-0.5 text-[11px] text-[#6d6260] sm:text-xs">With {mate.name}</p>
                         </div>
                         <StatusBadge status={session.status} />
                       </div>
                       <div className="mt-2 flex flex-col gap-1 text-[11px] leading-4 text-[#625954] sm:flex-row sm:flex-wrap sm:gap-x-4 sm:text-xs">
                         <p className="flex min-w-0 items-start gap-1.5"><Icon name="pending" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#9a8f89]" /><time dateTime={session.scheduledStart}>{formatTimeRange(session.scheduledStart, session.scheduledEnd)}</time></p>
-                        <p className="flex min-w-0 items-start gap-1.5"><Icon name="location" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#9a8f89]" /><span className="break-words">{session.meetingLocation}</span></p>
+                        <p className="flex min-w-0 items-start gap-1.5"><Icon name="location" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#9a8f89]" /><span className="wrap-break-word">{session.meetingLocation}</span></p>
                       </div>
                     </div>
                   </article>
@@ -429,7 +426,7 @@ function DashboardContent({
                       <div className="flex flex-wrap items-start justify-between gap-1.5">
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] font-semibold text-[#7d1f2a]">{request.offering.course.code}</p>
-                          <p className="mt-0.5 break-words text-[13px] font-medium leading-5 text-[#282321] sm:text-sm">{request.offering.course.name}</p>
+                          <p className="mt-0.5 wrap-break-word text-[13px] font-medium leading-5 text-[#282321] sm:text-sm">{request.offering.course.name}</p>
                         </div>
                         <StatusBadge status={request.status} />
                       </div>
@@ -483,7 +480,7 @@ function DashboardContent({
 }
 function LoadingDashboard() {
   return (
-    <main role="status" aria-live="polite" aria-busy="true" className="mx-auto max-w-[1280px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+    <main role="status" aria-live="polite" aria-busy="true" className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
       <p className="sr-only">Loading your dashboard...</p>
       <div className="animate-pulse motion-reduce:animate-none">
         <div>

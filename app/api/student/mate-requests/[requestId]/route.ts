@@ -101,6 +101,8 @@ export async function PATCH(
           status: "CANCELLED",
           arrangementStatus: "CANCELLED",
           respondedAt: cancelledAt,
+          arrangementCancelledAt: cancelledAt,
+          arrangementCancelledByUserId: session.user.id,
         },
       });
 

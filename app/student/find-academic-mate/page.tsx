@@ -24,6 +24,7 @@ type AcademicMateOffering = {
     bio: string | null;
     teachingExperience: string | null;
     yearsExperience: number | null;
+    rating?: { average: number | null; count: number };
     verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
     user: { id: string; name: string; image: string | null };
     studentProfile: {
@@ -386,6 +387,12 @@ function OfferingRow({
                       {mate.user.name}
                     </Link>
                   </h2>
+                  {mate.rating && mate.rating.count > 0 && mate.rating.average !== null && (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#514844]" title={`${mate.rating.average} out of 5 from ${mate.rating.count} ${mate.rating.count === 1 ? "review" : "reviews"}`}>
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 text-amber-500" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8L12 3.2Z" /></svg>
+                      {mate.rating.average.toFixed(1)}<span className="font-normal text-[#8a7f7a]">({mate.rating.count})</span>
+                    </span>
+                  )}
                   {mate.verificationStatus === "VERIFIED" && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
                       <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -544,6 +551,11 @@ export default function FindAcademicMatePage() {
   const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // The top search bar links here with ?q=, so start from it.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearch(q.slice(0, 100));
+  }, []);
   const [selectedCourseId, setSelectedCourseId] = useState("ALL");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -789,7 +801,7 @@ export default function FindAcademicMatePage() {
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name, course, topic or department"
+                placeholder="Name, course or topic"
                 className={`${fieldClass} h-11 rounded-xl pl-10 pr-4 sm:h-11`}
               />
             </div>

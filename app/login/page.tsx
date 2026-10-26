@@ -92,6 +92,23 @@ export default function LoginPage() {
     return () => clearTimeout(t);
   }, [error]);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("google") !== "success") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/auth/redirect", { method: "GET", credentials: "include", headers: { Accept: "application/json" }, cache: "no-store" });
+        if (!response.ok) throw new Error("Redirect lookup failed");
+        const data = (await response.json()) as { redirectTo?: string };
+        if (!data.redirectTo) throw new Error("Missing redirect destination");
+        if (!cancelled) router.replace(data.redirectTo);
+      } catch {
+        if (!cancelled) { setError("Unable to complete Google sign-in. Please try again."); setLoading(false); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
+
   function handlePointerMove(e: React.PointerEvent<HTMLElement>) {
     if (e.pointerType === "touch") return;
     const el = sceneRef.current;
@@ -106,6 +123,18 @@ export default function LoginPage() {
   function handlePointerLeave() {
     sceneRef.current?.style.setProperty("--ry", "0deg");
     sceneRef.current?.style.setProperty("--rx", "0deg");
+  }
+
+  async function handleGoogleSignIn() {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await authClient.signIn.social({ provider: "google", callbackURL: "/login?google=success" });
+      if (result.error) { setError(result.error.message || "Unable to sign in with Google."); setLoading(false); }
+    } catch {
+      setError("Unable to sign in with Google. Please try again.");
+      setLoading(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -144,6 +173,14 @@ export default function LoginPage() {
         headers: { Accept: "application/json" },
         cache: "no-store",
       });
+
+      if (redirectResponse.status === 403) {
+        const blocked = (await redirectResponse.json().catch(() => ({}))) as { error?: string };
+        await authClient.signOut().catch(() => undefined);
+        setError(blocked.error || "This account can’t sign in right now.");
+        setLoading(false);
+        return;
+      }
 
       if (!redirectResponse.ok) {
         setError("Unable to determine where to take you.");
@@ -386,6 +423,12 @@ export default function LoginPage() {
                       <svg className="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </>
                   )}
+                </button>
+              </div>
+              <div className="mt-4">
+                <button type="button" onClick={handleGoogleSignIn} disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-[#6b1728]/15 disabled:cursor-not-allowed disabled:opacity-60">
+                  <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5"><path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15Z"/><path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z"/><path fill="#FBBC05" d="M12.6 27.6a12 12 0 0 1 0-7.2v-5.3H5.8a20 20 0 0 0 0 17.8l6.8-5.3Z"/><path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.9-5.9C34.1 5.8 29.5 4 24 4A20 20 0 0 0 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12Z"/></svg>
+                  {loading ? "Connecting to Google..." : "Continue with Google"}
                 </button>
               </div>
             </form>

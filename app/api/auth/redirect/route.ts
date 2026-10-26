@@ -38,8 +38,23 @@ export async function GET() {
             )
         ) {
             return NextResponse.json({
-                redirectTo: "/admin/academic-mates",
+                redirectTo: "/admin",
             });
+        }
+
+        // A suspended student can't use the app. Their sessions are revoked when suspended; this stops a fresh sign-in.
+        const student = await prisma.studentProfile.findUnique({
+            where: { userId: session.user.id },
+            select: { status: true },
+        });
+        if (student?.status === "SUSPENDED") {
+            return NextResponse.json(
+                {
+                    error: "This account has been suspended. Contact TXMate support if you think this is a mistake.",
+                    code: "ACCOUNT_SUSPENDED",
+                },
+                { status: 403 },
+            );
         }
 
         return NextResponse.json({

@@ -1,3 +1,4 @@
+
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { username } from "better-auth/plugins";
@@ -12,12 +13,27 @@ export const auth = betterAuth({
   trustedOrigins: [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://192.168.*.*:3000", // Allows any local IP in the 192.168.x.x range on port 3000
-    "https://literacy-requested-tuition-aaron.trycloudflare.com"
+    "http://192.168.*.*:3000",
+    "https://crestless-appetizer-secular.ngrok-free.dev",
   ],
 
   emailAndPassword: {
     enabled: true,
+  },
+
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+      requireLocalEmailVerified: false,
+    },
   },
 
   plugins: [

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { conversationClosedReason } from "@/lib/session-lifecycle-rules";
 import { emitConversationMessage } from "@/lib/realtime/socket-server";
 
 export const runtime = "nodejs";
@@ -31,16 +32,31 @@ function pausedMessage(isStudent: boolean) {
     : "Messaging is paused. Reopen messaging to send messages.";
 }
 
-function isConversationCancelled(conversation: {
+type ClosableConversation = {
   request: {
     arrangementStatus: string;
+    arrangementType: string;
+    tutoringSession: { status: string; scheduledEnd: Date } | null;
   };
-}) {
-  return conversation.request.arrangementStatus === "CANCELLED";
+};
+
+/** Why messaging is closed (history stays readable), or null while it is open. */
+function closedReasonOf(conversation: ClosableConversation) {
+  return conversationClosedReason(
+    {
+      arrangementStatus: conversation.request.arrangementStatus,
+      arrangementType: conversation.request.arrangementType,
+      session: conversation.request.tutoringSession,
+    },
+    Date.now(),
+  );
 }
 
-const CANCELLED_MESSAGE =
-  "This tutoring arrangement has been cancelled. Messaging is closed.";
+const CLOSED_MESSAGES = {
+  CANCELLED: "This tutoring arrangement has been cancelled. Messaging is closed.",
+  COMPLETED: "This tutoring arrangement is complete. Messaging is closed, but you can still read the history.",
+  NO_RESPONSE: "This one-time session passed without a response. Messaging is closed, but you can still read the history.",
+} as const;
 
 async function getAuthenticatedUser() {
   const session = await auth.api.getSession({
@@ -60,6 +76,7 @@ async function getConversation(conversationId: string) {
         select: {
           status: true,
           arrangementStatus: true,
+          arrangementType: true,
           studentProfile: {
             select: {
               userId: true,
@@ -281,9 +298,10 @@ export async function POST(
       );
     }
 
-    if (isConversationCancelled(conversation)) {
+    const closedReason = closedReasonOf(conversation);
+    if (closedReason) {
       return NextResponse.json(
-        { error: CANCELLED_MESSAGE },
+        { error: CLOSED_MESSAGES[closedReason] },
         { status: 403 },
       );
     }
@@ -314,9 +332,11 @@ export async function POST(
             select: {
               status: true,
               arrangementStatus: true,
+              arrangementType: true,
               tutoringSession: {
                 select: {
                   status: true,
+                  scheduledEnd: true,
                 },
               },
             },
@@ -328,8 +348,9 @@ export async function POST(
         return { kind: "not-found" as const };
       }
       
-      if (isConversationCancelled(currentConversation)) {
-        return { kind: "cancelled" as const };
+      const currentClosedReason = closedReasonOf(currentConversation);
+      if (currentClosedReason) {
+        return { kind: "cancelled" as const, message: CLOSED_MESSAGES[currentClosedReason] };
       }
       
       if (!currentConversation.studentMessagingEnabled) {
@@ -367,7 +388,7 @@ export async function POST(
 
     if (result.kind === "cancelled") {
       return NextResponse.json(
-        { error: CANCELLED_MESSAGE },
+        { error: result.message },
         { status: 403 },
       );
     }

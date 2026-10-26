@@ -71,6 +71,8 @@ enum TutoringArrangementStatus {
   PAUSED
   COMPLETED
   CANCELLED
+  // A one-time arrangement whose session went 24h past its end with no response from anyone.
+  EXPIRED
 }
 
 enum TutoringSessionStatus {
@@ -218,6 +220,8 @@ model User {
   rescheduleRequestsProposed    SessionRescheduleRequest[] @relation("RescheduleProposer")
   rescheduleRequestsReceived    SessionRescheduleRequest[] @relation("RescheduleResponder")
   tutoringArrangementsCancelled MateRequest[]              @relation("TutoringArrangementCancelledBy")
+  tutoringSessionsCancelled     TutoringSession[]          @relation("SessionCancelledBy")
+  disputedSessionCompletions     TutoringSession[]           @relation("SessionCompletionDisputedBy")
   pushSubscriptions             PushSubscription[]
 }
 
@@ -450,7 +454,7 @@ model StudentProfile {
   programmeId       String
   programmeYearId   String
   status            StudentStatus        @default(ACTIVE)
- phoneNumber       String?              @unique
+  phoneNumber       String?              @unique
   bio               String?
   profileVisibility ProfileVisibility    @default(PUBLIC)
   showStudentId     Boolean              @default(false)
@@ -579,6 +583,7 @@ model MateOffering {
   rateType               MateOfferingRateType       @default(PER_SESSION)
   rateDetails            String?
   availability           MateAvailability[]
+  sessionGroups          SessionGroup[]
 
   @@unique([id, universityId])
   @@unique([academicMateProfileId, courseId])
@@ -718,15 +723,30 @@ model TutoringSession {
   meetingLocation       String
   status                TutoringSessionStatus      @default(SCHEDULED)
   completedAt           DateTime?
+  studentCompletionConfirmedAt DateTime?
+  mateCompletionConfirmedAt DateTime?
+  completionPromptSentAt DateTime?
+  completionDisputedAt DateTime?
+  completionDisputedByUserId String?
+  completionDisputeReason String?
+  completionReviewRequiredAt DateTime?
+  // Bundles the sessions that one Academic Mate runs in the same slot, so the mate
+  // can confirm attendance and completion once for the whole group.
+  groupId               String?
   cancelledAt           DateTime?
   cancellationReason    String?
+  // Who cancelled this occurrence (a participant). Null for records made before this was tracked.
+  cancelledByUserId     String?
   reminderSentAt        DateTime?
   // Stable identity of this occurrence, retained when its actual time is rescheduled.
   occurrenceSlotStart   DateTime
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
   request               MateRequest                @relation("ArrangementSessions", fields: [arrangementId], references: [id], onDelete: Restrict)
+  completionDisputedBy  User?                      @relation("SessionCompletionDisputedBy", fields: [completionDisputedByUserId], references: [id], onDelete: SetNull)
   initialForArrangement MateRequest?               @relation("InitialSession")
+  group                 SessionGroup?              @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  cancelledBy           User?                      @relation("SessionCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
   attendance            Attendance?
   review                Review?
   payments              Payment[]
@@ -736,6 +756,32 @@ model TutoringSession {
   @@unique([arrangementId, occurrenceSlotStart])
   @@index([scheduledStart, status])
   @@index([status, reminderSentAt, scheduledStart])
+  @@index([completionReviewRequiredAt, status])
+  @@index([groupId])
+  @@index([cancelledByUserId])
+}
+
+/// One Academic Mate slot that several students' sessions share. Each student keeps
+/// their own session (arrangement, conversation, payment); the group exists so the
+/// mate answers once. Unique per offering + exact time window.
+model SessionGroup {
+  id                              String            @id @default(uuid())
+  offeringId                      String
+  scheduledStart                  DateTime
+  scheduledEnd                    DateTime
+  mateAttendancePromptSentAt      DateTime?
+  mateCompletionPromptSentAt      DateTime?
+  mateAttendanceSubmittedAt       DateTime?
+  mateAttendanceSubmittedByUserId String?
+  mateCompletionSubmittedAt       DateTime?
+  mateCompletionSubmittedByUserId String?
+  createdAt                       DateTime          @default(now())
+  updatedAt                       DateTime          @updatedAt
+  offering                        MateOffering      @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  sessions                        TutoringSession[]
+
+  @@unique([offeringId, scheduledStart, scheduledEnd])
+  @@index([scheduledStart])
 }
 
 model Attendance {
@@ -744,6 +790,14 @@ model Attendance {
   status             AttendanceStatus @default(PENDING)
   studentCheckedInAt DateTime?
   mateConfirmedAt    DateTime?
+  studentAttended    Boolean?
+  studentRespondedAt DateTime?
+  /// How many times the student has changed their answer (capped by MAX_STUDENT_ANSWER_CHANGES).
+  studentAnswerChanges Int            @default(0)
+  mateConfirmedStudentAttended       Boolean?
+  mateRespondedAt    DateTime?
+  studentAttendancePromptSentAt DateTime?
+  mateAttendancePromptSentAt DateTime?
   disputedAt         DateTime?
   disputeReason      String?
   resolvedAt         DateTime?
@@ -838,7 +892,11 @@ model Notification {
   title      String
   body       String
   data       Json?
+  // Stable identity of the event this notification announces; prevents duplicates.
+  dedupeKey  String?                @unique
   readAt     DateTime?
+  /// Hidden from the user's list. The row stays so dedupeKey keeps blocking duplicates.
+  deletedAt  DateTime?
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
   user       User                   @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
@@ -999,6 +1057,33 @@ model AdminProfile {
   verifiedMateOfferings             MateOfferingVerification[] @relation("AdminVerifiedMateOfferings")
   resolvedAttendances               Attendance[]               @relation("AdminResolvedAttendance")
   reviewedAcademicMateVerifications AcademicMateVerification[] @relation("AdminReviewedAcademicMateVerifications")
+  auditLogs                         AdminAuditLog[]            @relation("AdminAuditLogs")
+}
+
+/// Append-only record of sensitive admin actions. Actor name and role are snapshotted so the
+/// trail stays meaningful if the admin account is later changed or removed.
+model AdminAuditLog {
+  id             String        @id @default(uuid())
+  adminProfileId String?
+  actorUserId    String
+  actorName      String
+  actorRole      AdminRole
+  action         String
+  targetType     String
+  targetId       String?
+  universityId   String?
+  summary        String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  adminProfile   AdminProfile? @relation("AdminAuditLogs", fields: [adminProfileId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([adminProfileId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+  @@index([universityId, createdAt])
 }
 
 model AdminUniversityAccess {

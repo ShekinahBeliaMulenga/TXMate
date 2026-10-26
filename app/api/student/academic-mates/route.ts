@@ -1,3 +1,4 @@
+import { releaseStudentRequestBlocks } from "@/lib/arrangement-expiry";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -174,6 +175,9 @@ export async function GET(request: Request) {
 
     const offeringIds = offerings.map((offering) => offering.id);
 
+    // Stale unanswered one-time arrangements shouldn't show as "already requested".
+    await releaseStudentRequestBlocks(prisma, new Date(), { studentProfileId: student.id });
+
     const existingRequests = offeringIds.length
       ? await prisma.mateRequest.findMany({
           where: {
@@ -240,6 +244,12 @@ export async function GET(request: Request) {
         },
       ]),
     );
+    // One grouped query for every Academic Mate in the results.
+    const mateIds = [...new Set(offerings.map((offering) => offering.academicMateProfile.id))];
+    const ratingRows = mateIds.length
+      ? await prisma.review.groupBy({ by: ["mateProfileId"], where: { mateProfileId: { in: mateIds } }, _avg: { rating: true }, _count: { _all: true } })
+      : [];
+    const ratingByMate = new Map(ratingRows.map((row) => [row.mateProfileId, { average: row._avg.rating === null ? null : Number(row._avg.rating.toFixed(1)), count: row._count._all }]));
     const academicMates = offerings.map((offering) => ({
       offeringId: offering.id,
       title: offering.title,
@@ -251,7 +261,7 @@ export async function GET(request: Request) {
       rateDetails: offering.rateDetails,
       course: offering.course,
       topics: offering.topics.map(({ topic }) => topic),
-      academicMate: offering.academicMateProfile,
+      academicMate: { ...offering.academicMateProfile, rating: ratingByMate.get(offering.academicMateProfile.id) ?? { average: null, count: 0 } },
       existingRequest: requestsByOffering.get(offering.id) ?? null,
     }));
 

@@ -353,12 +353,7 @@ export default function StudentProfilePage() {
               {/* Photo or initials, with an "active" dot on its bottom-right edge */}
               <div className="relative shrink-0">
                 <Avatar name={user.name} image={user.image} />
-                {studentProfile.status === "ACTIVE" && (
-                  <span 
-                    className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot.ACTIVE}`} 
-                  />
-                   
-                )}
+                <span className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[studentProfile.status]}`} />
               </div>
               <span className="mb-1 inline-flex items-center gap-2 bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span className={`h-2 w-2 rounded-full ${statusDot[studentProfile.status]}`} />

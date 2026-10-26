@@ -641,11 +641,11 @@ export default function StudentRequestsPage() {
                 </div>
 
                 <div className="min-w-0">
-                  <p className="break-words text-sm">
+                  <p className="wrap-break-word text-sm">
                     <span className="font-semibold text-[#7d1f2a]">{course.code}</span>{" "}
                     <span className="text-[#504740]">{course.name}</span>
                   </p>
-                  <p className="mt-1 line-clamp-2 break-words text-sm leading-5 text-[#756b65]">
+                  <p className="mt-1 line-clamp-2 wrap-break-word text-sm leading-5 text-[#756b65]">
                     {item.message?.trim() ? `“${item.message.trim()}”` : "No message included"}
                   </p>
                 </div>
@@ -693,7 +693,7 @@ export default function StudentRequestsPage() {
                 const session = item.tutoringSession;
                 return (
                   <tr key={item.id} className="border-b border-[#eee8e2] last:border-0 hover:bg-[#fcfaf8]">
-                    <td className={`${TD} break-words`}>
+                    <td className={`${TD} wrap-break-word`}>
                       <p className="font-mono text-[11px] font-semibold text-[#7d1f2a]">{course.code}</p>
                       <p className="mt-0.5 text-xs leading-5 text-[#282321]">{course.name}</p>
                       <p className="mt-1 text-[10px] text-[#7a6f6a]">{arrangementLabel(item, true)}</p>
@@ -701,7 +701,7 @@ export default function StudentRequestsPage() {
                     <td className={TD}>
                       <div className="flex min-w-0 items-center gap-2">
                         <Avatar name={academicMate.name} src={academicMate.image} className="h-7 w-7 text-[10px]" />
-                        <span className="min-w-0 break-words text-xs font-medium text-[#4d4541]">{academicMate.name}</span>
+                        <span className="min-w-0 wrap-break-word text-xs font-medium text-[#4d4541]">{academicMate.name}</span>
                       </div>
                     </td>
                     <td className={TD}>
@@ -773,12 +773,6 @@ export default function StudentRequestsPage() {
               Track responses and manage your Academic Mate requests.
             </p>
           </div>
-          <Link
-            href="/student/find-academic-mate"
-            className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#7d1f2a] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#681923]"
-          >
-            Find an Academic Mate
-          </Link>
         </header>
 
         {pageError && (
@@ -890,7 +884,7 @@ export default function StudentRequestsPage() {
               <h2 id="request-details-title" className="text-base font-semibold">
                 Request details
               </h2>
-              <p className="mt-1 break-words text-xs text-[#6d6260]">
+              <p className="mt-1 wrap-break-word text-xs text-[#6d6260]">
                 {selectedRequest.offering.course.code} · {selectedRequest.offering.course.name}
               </p>
             </div>
@@ -900,13 +894,13 @@ export default function StudentRequestsPage() {
             {getDetailRows(selectedRequest).map(([label, value]) => (
               <div key={label} className="flex justify-between gap-4 py-2.5">
                 <dt className="shrink-0 text-xs text-[#7a6f6a]">{label}</dt>
-                <dd className="break-words text-right text-xs font-medium">{value}</dd>
+                <dd className="wrap-break-word text-right text-xs font-medium">{value}</dd>
               </div>
             ))}
           </dl>
           <div className="mt-4">
             <p className="text-xs font-semibold text-[#625954]">Your message</p>
-            <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-5 text-[#4d4541]">
+            <p className="mt-1.5 whitespace-pre-wrap wrap-break-word text-sm leading-5 text-[#4d4541]">
               {selectedRequest.message?.trim() || "No message was included with this request."}
             </p>
           </div>

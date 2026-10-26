@@ -1,3 +1,4 @@
+import { findCrossCourseOverlapWarnings } from "@/lib/mate-conflicts";
 import { NextResponse } from "next/server";
 import { Weekday } from "@/generated/prisma/client";
 
@@ -535,8 +536,19 @@ export async function PATCH(
                 },
             });
 
+        const warnings = isActive
+            ? await findCrossCourseOverlapWarnings(prisma, {
+                academicMateProfileId: academicMate.id,
+                offeringId: offering.id,
+                day,
+                startMinute,
+                endMinute,
+            }).catch(() => [] as string[])
+            : [];
+
         return NextResponse.json({
             availability: updated,
+            warnings,
         });
     } catch (error) {
         console.error(

@@ -1,3 +1,5 @@
+import { getMateBusyStarts } from "@/lib/mate-conflicts";
+import { releaseStudentRequestBlocks } from "@/lib/arrangement-expiry";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -29,6 +31,7 @@ type ErrorResult = {
     | "past-time"
     | "invalid-slot"
     | "session-conflict"
+    | "mate-busy"
     | "pending-conflict"
     | "invalid-recurrence"
     | "schedule-conflict";
@@ -201,6 +204,9 @@ export async function POST(request: Request) {
       const now = new Date();
       if (requestedStart <= now) return { kind: "past-time" } as ErrorResult;
 
+      // An unanswered one-time arrangement for this offering must not block a fresh request.
+      await releaseStudentRequestBlocks(tx, now, { studentProfileId: student.id, offeringId: currentOffering.id });
+
       const existingRequest = await tx.mateRequest.findFirst({
         where: {
           studentProfileId: student.id,
@@ -270,6 +276,14 @@ export async function POST(request: Request) {
         academicMateProfileId: currentOffering.academicMateProfile.id,
       });
       if (scheduleConflict) return { kind: "schedule-conflict" } as ErrorResult;
+
+      const mateBusy = await getMateBusyStarts(tx, {
+        academicMateProfileId: currentOffering.academicMateProfile.id,
+        offeringId: currentOffering.id,
+        durationMinutes: currentOffering.sessionDurationMinutes,
+        occurrenceStarts,
+      });
+      if (mateBusy.size > 0) return { kind: "mate-busy" } as ErrorResult;
 
       const createdRequest = await tx.mateRequest.create({
         data: {
@@ -360,6 +374,7 @@ export async function POST(request: Request) {
         "duplicate-request": { error: "You already have a pending or accepted request for this offering.", status: 409 },
         "past-time": { error: "Choose a future session time.", status: 400 },
         "invalid-slot": { error: "That time no longer matches the Academic Mate's availability. Refresh the available times and choose another slot.", status: 409 },
+        "mate-busy": { error: "The Academic Mate already has another session at that time. Refresh the available times and choose another slot.", status: 409 },
         "session-conflict": { error: "You or the Academic Mate already has a session during that time. Choose another slot.", status: 409 },
         "pending-conflict": { error: "That time has already been proposed in another pending request. Choose another available slot.", status: 409 },
         "invalid-recurrence": { error: "Choose a recurring schedule that includes at least one future session within the next 30 days.", status: 400 },

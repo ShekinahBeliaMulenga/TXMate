@@ -5,12 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MessageHits, useMessageSearch } from "./MessageHits";
 import { ReadReceipt } from "./read-receipt";
+import { BADGE_TEXT, sessionBadge } from "@/lib/session-badge";
+import { cancellationShort, type CancellationInfo } from "@/lib/cancellation";
 
 type ConversationItem = {
   id: string;
   updatedAt: string;
-  arrangementStatus: "PENDING" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
+  arrangementStatus: "PENDING" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED" | "EXPIRED";
   arrangementType: "ONE_TIME" | "RECURRING";
+  cancellation?: CancellationInfo | null;
   sessionLabel: "NEXT" | "IN_PROGRESS" | "SESSION" | null;
   otherUserName: string;
   otherUserImage: string | null;
@@ -83,23 +86,34 @@ function stamp(value: string | undefined | null, nowMs: number) {
   return d.getFullYear() === new Date(nowMs).getFullYear() ? shortDateFmt.format(d) : longDateFmt.format(d);
 }
 
-type ArrangementGroup = "ACTIVE" | "COMPLETED" | "CANCELLED";
+type ArrangementGroup = "CURRENT" | "COMPLETED" | "CANCELLED" | "EXPIRED";
 
 function arrangementGroup(status: ConversationItem["arrangementStatus"]): ArrangementGroup {
   if (status === "COMPLETED") return "COMPLETED";
   if (status === "CANCELLED") return "CANCELLED";
-  // PENDING and PAUSED arrangements are not ended, so keep them under Active.
-  return "ACTIVE";
+  if (status === "EXPIRED") return "EXPIRED";
+  // Pending, active and paused arrangements are still current, but retain their exact state chips.
+  return "CURRENT";
 }
 
-function arrangementState(status: ConversationItem["arrangementStatus"]) {
+function arrangementState(status: ConversationItem["arrangementStatus"], sessionStatus?: string) {
   switch (status) {
     case "PENDING": return { label: "Pending", tone: "bg-amber-50 text-amber-800 ring-1 ring-amber-200" };
     case "PAUSED": return { label: "Paused", tone: "bg-stone-100 text-stone-600" };
     case "COMPLETED": return { label: "Completed", tone: "bg-stone-100 text-stone-600" };
     case "CANCELLED": return { label: "Cancelled", tone: "bg-stone-100 text-stone-600" };
-    default: return { label: "Active", tone: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
+    case "EXPIRED": return sessionStatus === "DISPUTED"
+      ? { label: "Needs review", tone: "bg-red-50 text-red-800 ring-1 ring-red-200" }
+      : sessionStatus === "NO_SHOW"
+        ? { label: "No-show", tone: "bg-stone-100 text-stone-600" }
+        : { label: "No response", tone: "bg-orange-50 text-orange-800 ring-1 ring-orange-200" };
+    default: return { label: "Current", tone: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" };
   }
+}
+
+/** The conversation's session state, from the shared rules so it matches the chat and Sessions. */
+function badgeFor(item: ConversationItem, nowMs: number) {
+  return item.session ? sessionBadge(item.session, nowMs, item.arrangementType === "RECURRING") : null;
 }
 
 function sortKey(item: ConversationItem) {
@@ -133,7 +147,8 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
 }
 
 function Row({ item, nowMs, currentUserId }: { item: ConversationItem; nowMs: number; currentUserId: string }) {
-  const state = arrangementState(item.arrangementStatus);
+  const state = arrangementState(item.arrangementStatus, item.session?.status);
+  const badge = badgeFor(item, nowMs);
   const when = stamp(item.lastMessage?.createdAt ?? item.updatedAt, nowMs);
   const unread = item.unreadCount ?? 0;
   // Ticks only appear when the latest message in the chat is the current user's own.
@@ -175,14 +190,19 @@ function Row({ item, nowMs, currentUserId }: { item: ConversationItem; nowMs: nu
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="rounded-md bg-[#f4eceb] px-1.5 py-0.5 text-[10px] font-semibold text-[#7d1f2a]">{item.courseName}</span>
-          {item.session && item.sessionLabel && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-[#8a7f7a]">
+          {item.session && badge && (
+            <span className={`inline-flex items-center gap-1 text-[11px] ${BADGE_TEXT[badge.tone]}`}>
               <CalendarIcon />
-              <span>{item.sessionLabel === "NEXT" ? "Next session" : item.sessionLabel === "IN_PROGRESS" ? "In progress" : "Session"}:</span>
+              <span>{badge.label}:</span>
               {toDate(item.session.scheduledStart) ? sessionFmt.format(new Date(item.session.scheduledStart)) : "Session"}
             </span>
           )}
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${state.tone}`}>{state.label}</span>
+          {item.cancellation && (
+            <span className="text-[11px] text-[#8a7f7a]">
+              {cancellationShort(item.cancellation)}{item.cancellation.scope === "ARRANGEMENT" ? " · whole arrangement" : ""}
+            </span>
+          )}
           {!item.studentMessagingEnabled && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200">
               <LockIcon /> Paused
@@ -255,7 +275,7 @@ function chipClass(active: boolean) {
   }`;
 }
 
-const STATUS_OPTIONS = [["ACTIVE", "Active"], ["COMPLETED", "Completed"], ["CANCELLED", "Cancelled"]] as const;
+const STATUS_OPTIONS = [["CURRENT", "Current"], ["COMPLETED", "Completed"], ["CANCELLED", "Cancelled"], ["EXPIRED", "No response"]] as const;
 
 const selectClass =
   "w-36 shrink-0 truncate rounded-full border border-[#e4dbd3] bg-white py-1 pl-2.5 pr-6 text-[11px] font-semibold sm:w-44 sm:py-1.5 sm:pl-3 sm:pr-7 sm:text-xs text-[#625954] outline-none transition focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10";
@@ -266,10 +286,19 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  // The top search bar links here with ?q=, so start from it.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setQuery(q.slice(0, 100));
+  }, []);
   const [unreadOnly, setUnreadOnly] = useState(false);
-  const [arrangementFilter, setArrangementFilter] = useState<ArrangementGroup>("ACTIVE");
+  const [arrangementFilter, setArrangementFilter] = useState<ArrangementGroup>("CURRENT");
   const [course, setCourse] = useState("");
-  const [nowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Server-side search across every message (not just the last one in each chat).
   const { hits, searching, failed } = useMessageSearch(query);
@@ -347,7 +376,7 @@ export default function MessagesPage() {
   // Status counts follow the course and unread filters, so each number is what that status would show.
   // While searching those controls are hidden and ignored, so the counts ignore them too.
   const arrangementCounts = useMemo(() => {
-    const counts: Record<ArrangementGroup, number> = { ACTIVE: 0, COMPLETED: 0, CANCELLED: 0 };
+    const counts: Record<ArrangementGroup, number> = { CURRENT: 0, COMPLETED: 0, CANCELLED: 0, EXPIRED: 0 };
     for (const c of conversations) {
       if (!searchActive && activeCourse && c.courseName !== activeCourse) continue;
       if (!searchActive && unreadOnly && (c.unreadCount ?? 0) === 0) continue;
@@ -386,8 +415,8 @@ export default function MessagesPage() {
     ? `No matches for \u201C${query.trim()}\u201D in ${arrangementFilter.toLowerCase()} conversations`
     : unreadOnly
       ? "No unread conversations in this group"
-      : arrangementFilter === "ACTIVE"
-        ? "No active conversations"
+      : arrangementFilter === "CURRENT"
+        ? "No current conversations"
         : arrangementFilter === "COMPLETED"
           ? "No completed conversations"
           : "No cancelled conversations";
@@ -417,7 +446,7 @@ export default function MessagesPage() {
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search names, courses or messages"
+                placeholder="Search messages"
                 className="w-full rounded-xl border border-[#e4dbd3] bg-white py-3 pl-10 pr-4 text-base text-[#282321] outline-none transition placeholder:text-[#a99d95] focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10 sm:text-sm"
               />
             </div>

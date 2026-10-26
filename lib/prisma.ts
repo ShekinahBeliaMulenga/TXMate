@@ -25,9 +25,11 @@ function schedulePushDelivery(task: () => Promise<void>) {
       }
     });
   } catch (error) {
-    // Never fail a committed business operation because post-response delivery
-    // could not be scheduled. The in-app notification remains available.
-    console.error("[push] Could not schedule deferred notification delivery:", error);
+    // `after` only works inside a request. Background work (the session lifecycle trigger) has no
+    // request, so deliver directly rather than silently skipping the browser notification.
+    // Never fail a committed business operation because delivery could not be scheduled.
+    console.warn("[push] No request scope for deferred delivery; sending directly:", error instanceof Error ? error.message : error);
+    void task().catch((deliveryError) => console.error("[push] Direct notification delivery failed:", deliveryError));
   }
 }
 
@@ -64,3 +66,21 @@ export const prisma = basePrisma.$extends({
     },
   },
 });
+
+/**
+ * Sends browser/push notifications for anything created in the last few minutes that has not been
+ * delivered yet. Background jobs call this once they finish, so delivery never depends on the
+ * timing of a request-scoped callback relative to a transaction commit. Idempotent: notifications
+ * that already have a delivery record are skipped.
+ */
+export async function flushRecentPushNotifications(windowMs = 3 * 60_000): Promise<void> {
+  const since = new Date(Date.now() - windowMs);
+  const recipients = await basePrisma.notification.findMany({
+    where: { createdAt: { gte: since }, deletedAt: null },
+    distinct: ["userId"],
+    select: { userId: true },
+    take: 500,
+  });
+  if (recipients.length === 0) return;
+  await dispatchPushForRecentNotifications(basePrisma, recipients.map((row) => row.userId), since);
+}

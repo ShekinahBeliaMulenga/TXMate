@@ -15,6 +15,9 @@ import { usePendingRequestCount } from "./use-pending-requests";
 import { useUnreadMessageCount } from "./use-unread-messages";
 import { useAcceptedRequestCount } from "./use-accepted-requests";
 import { usePendingRescheduleCount } from "./use-pending-reschedule-count";
+import NotificationBell from "./notification-bell";
+import SessionPromptHost from "./session-prompt";
+import NavSearch, { type NavSearchItem } from "./nav-search";
 
 type IconName =
   | "dashboard"
@@ -36,12 +39,15 @@ type IconName =
   | "id-card"
   | "user-check"
   | "layers"
-  | "clock";
+  | "clock"
+  | "refresh";
 
 type NavigationItem = {
   label: string;
   href: string;
   icon: IconName;
+  /** Extra words the navigation search matches, besides the label. */
+  keywords?: string;
   /** Shows the pending-requests count next to this item. */
   showPendingBadge?: boolean;
   /** Shows the unread-messages count next to this item. */
@@ -63,16 +69,19 @@ const NAVIGATION_GROUPS: {
         label: "Dashboard",
         href: "/student/dashboard",
         icon: "dashboard",
+        keywords: "home overview summary today",
       },
       {
         label: "Find a Mate",
         href: "/student/find-academic-mate",
         icon: "search",
+        keywords: "tutor tutors academic mate find search book course help",
       },
       {
         label: "My Requests",
         href: "/student/requests",
         icon: "inbox",
+        keywords: "requests pending accepted sent booking status",
         showAcceptedBadge: true,
       },
 
@@ -80,12 +89,14 @@ const NAVIGATION_GROUPS: {
         label: "Sessions",
         href: "/student/sessions",
         icon: "calendar",
+        keywords: "attendance completion schedule upcoming past confirm tutoring",
       },
 
       {
         label: "Messages",
         href: "/student/messages",
         icon: "messages",
+        keywords: "chat inbox conversations talk",
         showUnreadBadge: true,
       },
 
@@ -93,6 +104,7 @@ const NAVIGATION_GROUPS: {
         label: "Your courses",
         href: "/student/repeating-courses",
         icon: "book",
+        keywords: "repeating courses subjects units modules",
       },
     ],
   },
@@ -103,43 +115,51 @@ const NAVIGATION_GROUPS: {
         label: "Profile overview",
         href: "/student/academic-mate",
         icon: "academic",
+        keywords: "academic mate dashboard earnings",
       },
       {
         label: "Preview profile",
         href: "/student/academic-mate/profile",
         icon: "eye",
+        keywords: "public profile ratings reviews see how others see",
       },
       {
         label: "Mate profile",
         href: "/student/academic-mate/edit",
         icon: "edit",
+        keywords: "edit bio headline about me",
       },
       {
         label: "Verification",
         href: "/student/academic-mate/verification",
         icon: "shield",
+        keywords: "verify documents id transcript approval",
       },
       {
         label: "Offerings",
         href: "/student/academic-mate/offerings",
         icon: "layers",
+        keywords: "courses price teach rates sessions offer",
       },
       {
         label: "Mate requests",
         href: "/student/academic-mate/requests",
         icon: "list",
+        keywords: "incoming requests students accept decline",
         showPendingBadge: true,
       },
       {
         label: "Reschedules",
         href: "/student/academic-mate/sessions",
-        icon: "calendar",
+        icon: "refresh",
+        keywords: "change time move session proposals",
         showRescheduleBadge: true,
       },
       {
         label: "Availability",
         href: "/student/academic-mate/availability",
         icon: "clock",
+        keywords: "hours times slots free calendar",
       },
     ],
   },
@@ -150,11 +170,13 @@ const NAVIGATION_GROUPS: {
         label: "Student profile",
         href: "/student/profile",
         icon: "user",
+        keywords: "photo name phone bio details",
       },
       {
         label: "Settings",
         href: "/student/settings",
         icon: "settings",
+        keywords: "password security notifications push alerts privacy visibility photo account sign in",
       },
     ],
   },
@@ -168,13 +190,8 @@ const BOTTOM_TABS: {
   badge?: "unread" | "accepted";
 }[] = [
   { label: "Dashboard", href: "/student/dashboard", icon: "dashboard" },
-  { label: "Find", href: "/student/find-academic-mate", icon: "search" },
-  {
-    label: "Messages",
-    href: "/student/messages",
-    icon: "messages",
-    badge: "unread",
-  },
+  { label: "Find a Mate", href: "/student/find-academic-mate", icon: "search" },
+  { label: "Sessions", href: "/student/sessions", icon: "calendar" },
   {
     label: "My Requests",
     href: "/student/requests",
@@ -184,6 +201,10 @@ const BOTTOM_TABS: {
 ];
 
 const BOTTOM_TAB_HREFS = BOTTOM_TABS.map((tab) => tab.href);
+
+const NAV_SEARCH_ITEMS: NavSearchItem[] = NAVIGATION_GROUPS.flatMap((group) =>
+  group.items.map((item) => ({ label: item.label, href: item.href, keywords: item.keywords })),
+);
 
 function Icon({
   name,
@@ -329,6 +350,15 @@ function Icon({
           <polygon points="12 2 2 7 12 12 22 7 12 2" />
           <polyline points="2 17 12 22 22 17" />
           <polyline points="2 12 12 17 22 12" />
+        </svg>
+      );
+    case "refresh":
+      return (
+        <svg {...props}>
+          <path d="M20 11a8 8 0 0 0-14.5-4.3L4 8.5" />
+          <path d="M4 4v4.5h4.5" />
+          <path d="M4 13a8 8 0 0 0 14.5 4.3L20 15.5" />
+          <path d="M20 20v-4.5h-4.5" />
         </svg>
       );
     case "clock":
@@ -607,6 +637,8 @@ function SidebarContents({
       <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-[#eee8e2] px-5">
         <Brand onClick={onNavigate} />
 
+        {!mobile && <NotificationBell align="left" />}
+
         {mobile && (
           <button
             type="button"
@@ -694,6 +726,7 @@ export default function StudentAppShell({
   const { data: session } = authClient.useSession();
 
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
@@ -711,6 +744,7 @@ export default function StudentAppShell({
 
   useEffect(() => {
     setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
+    setMobileSearchOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
   }, [pathname]);
 
   useEffect(() => {
@@ -831,9 +865,37 @@ export default function StudentAppShell({
 
       {/* Mobile top bar: brand only, navigation lives in the bottom bar */}
       <header className="sticky top-0 z-30 border-b border-[#e2d9d0] bg-white lg:hidden">
-        <div className="flex h-14 items-center px-4">
+        <div className="flex h-14 items-center justify-between gap-2 px-4">
           <Brand />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen((value) => !value)}
+              aria-label="Search TXMate"
+              aria-expanded={mobileSearchOpen}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#625954] transition hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
+            >
+              <Icon name="search" className="h-6 w-6" />
+            </button>
+            <Link
+              href="/student/messages"
+              aria-label={unreadCount > 0 ? `Messages, ${unreadCount} unread` : "Messages"}
+              aria-current={isActivePath(pathname, "/student/messages") ? "page" : undefined}
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-lg transition hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${isActivePath(pathname, "/student/messages") ? "text-[#7d1f2a]" : "text-[#625954]"}`}
+            >
+              <span className="relative">
+                <Icon name="messages" className="h-6 w-6" />
+                <TabBadge count={unreadCount} tone="brand" />
+              </span>
+            </Link>
+            <NotificationBell />
+          </div>
         </div>
+        {mobileSearchOpen && (
+          <div className="border-t border-[#eee8e2] px-4 py-2.5">
+            <NavSearch items={NAV_SEARCH_ITEMS} onNavigate={() => setMobileSearchOpen(false)} autoFocus />
+          </div>
+        )}
       </header>
 
       {/* Mobile bottom tab bar */}
@@ -953,6 +1015,7 @@ export default function StudentAppShell({
       >
         {children}
       </div>
+      <SessionPromptHost />
     </div>
   );
 }

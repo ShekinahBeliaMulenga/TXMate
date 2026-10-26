@@ -1,3 +1,5 @@
+import { releaseStudentRequestBlocks } from "@/lib/arrangement-expiry";
+import { getMateBusyStarts } from "@/lib/mate-conflicts";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -58,6 +60,8 @@ export async function GET(request: Request) {
     if (offering.academicMateProfile.userId === session.user.id) {
       return NextResponse.json({ error: "You cannot request support from yourself." }, { status: 400 });
     }
+
+    await releaseStudentRequestBlocks(prisma, new Date(), { studentProfileId: student.id, offeringId: offering.id });
 
     const existingRequest = await prisma.mateRequest.findFirst({
       where: {
@@ -154,7 +158,16 @@ export async function GET(request: Request) {
         .map((session) => `${session.arrangementId}:${session.occurrenceSlotStart.getTime()}`),
     );
 
+    // Hide times the Academic Mate is already busy at (a group session at the exact same time is fine).
+    const mateBusy = await getMateBusyStarts(prisma, {
+      academicMateProfileId: offering.academicMateProfile.id,
+      offeringId: offering.id,
+      durationMinutes: offering.sessionDurationMinutes,
+      occurrenceStarts: candidates.map((candidate) => candidate.start),
+    });
+
     const slots = candidates.filter((candidate) => {
+      if (mateBusy.has(candidate.start.getTime())) return false;
       const sessionConflict = sessions.some(
         (existing) => candidate.start < existing.scheduledEnd && candidate.end > existing.scheduledStart,
       );

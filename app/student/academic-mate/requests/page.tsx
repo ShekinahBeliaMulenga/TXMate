@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 type RequestStatus =
@@ -47,6 +48,13 @@ type RequestItem = {
     scheduledEnd: string;
     meetingLocation: string;
   } | null;
+  sessions?: Array<{
+    id: string;
+    status: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+    meetingLocation: string;
+  }>;
 };
 type RequestsResponse = {
   academicMate: {
@@ -841,23 +849,22 @@ export default function AcademicMateRequestsPage() {
                   )}
                 </div>
               )}
-              {selectedRequest.tutoringSession && (
+              {(selectedRequest.sessions?.length ? selectedRequest.sessions : selectedRequest.tutoringSession ? [selectedRequest.tutoringSession] : []).length > 0 && (
                 <div className="border-t border-[#eee8e2] pt-4">
-                  <h3 className="text-sm font-semibold text-[#3d3530]">
-                    Scheduled session
-                  </h3>
-                  <p className="mt-2 text-sm text-[#413a35]">
-                    {formatDateTime(
-                      selectedRequest.tutoringSession.scheduledStart
-                    )}
-                  </p>
-                  <p className="mt-1 text-sm text-[#625954]">
-                    {selectedRequest.tutoringSession.meetingLocation}
-                  </p>
-                  <div className="mt-2">
-                    <StatusBadge
-                      status={selectedRequest.tutoringSession.status}
-                    />
+                  <h3 className="text-sm font-semibold text-[#3d3530]">Scheduled sessions</h3>
+                  <div className="mt-3 space-y-2">
+                    {(selectedRequest.sessions?.length ? selectedRequest.sessions : selectedRequest.tutoringSession ? [selectedRequest.tutoringSession] : []).map((scheduledSession) => (
+                      <div key={scheduledSession.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#eee8e2] p-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-[#413a35]">{formatDateTime(scheduledSession.scheduledStart)}</p>
+                          <p className="mt-1 text-xs text-[#756b65]">{scheduledSession.meetingLocation}</p>
+                          <div className="mt-2"><StatusBadge status={scheduledSession.status} /></div>
+                        </div>
+                        <Link href={`/student/sessions/${encodeURIComponent(scheduledSession.id)}`} className="inline-flex min-h-9 items-center rounded-md border border-[#d8cec5] px-3 text-xs font-semibold text-[#7d1f2a] hover:bg-[#f7f4f1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
+                          Attendance &amp; completion
+                        </Link>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -960,7 +967,7 @@ export default function AcademicMateRequestsPage() {
                   ? "Saving..."
                   : confirmation.action === "ACCEPTED"
                     ? "Confirm acceptance"
-                    : "Decline"}
+                    : "Confirm decline"}
               </button>
             </div>
           </section>

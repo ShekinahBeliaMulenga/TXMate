@@ -178,6 +178,7 @@ export async function POST(request: Request, { params }: RouteContext) {
             status: "CANCELLED",
             cancelledAt: now,
             cancellationReason: reason || null,
+            cancelledByUserId: authSession.user.id,
           },
         });
 
@@ -256,6 +257,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         status: "CANCELLED" as const,
         cancelledAt: now.toISOString(),
         cancellationReason: reason || null,
+        cancelledByUserId: authSession.user.id,
       },
       arrangement: {
         id: booking.arrangementId,

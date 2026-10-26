@@ -1,7 +1,10 @@
+import { triggerSessionLifecycle } from "@/lib/session-lifecycle-trigger";
+import { expireStaleForUser } from "@/lib/arrangement-expiry";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCancellation } from "@/lib/cancellation";
 
 export async function GET() {
   try {
@@ -11,6 +14,8 @@ export async function GET() {
     }
 
     const userId = session.user.id;
+    await expireStaleForUser(prisma, userId);
+    triggerSessionLifecycle();
     const now = new Date();
     const conversations = await prisma.conversation.findMany({
       where: {
@@ -31,6 +36,9 @@ export async function GET() {
             status: true,
             arrangementType: true,
             arrangementStatus: true,
+            arrangementCancelledAt: true,
+            arrangementCancelledByUserId: true,
+            arrangementCancellationReason: true,
             studentProfile: {
               select: {
                 userId: true,
@@ -54,6 +62,9 @@ export async function GET() {
                 scheduledStart: true,
                 scheduledEnd: true,
                 status: true,
+                cancelledAt: true,
+                cancellationReason: true,
+                cancelledByUserId: true,
               },
             },
             // One inbox row per arrangement, with the nearest live occurrence as its date/context.
@@ -69,6 +80,9 @@ export async function GET() {
                 scheduledStart: true,
                 scheduledEnd: true,
                 status: true,
+                cancelledAt: true,
+                cancellationReason: true,
+                cancelledByUserId: true,
               },
             },
           },
@@ -125,7 +139,7 @@ export async function GET() {
         : request.studentProfile.user;
       const initialSession = request.tutoringSession;
       const nextSession =
-        request.arrangementStatus === "COMPLETED" || request.arrangementStatus === "CANCELLED"
+        request.arrangementStatus === "COMPLETED" || request.arrangementStatus === "CANCELLED" || request.arrangementStatus === "EXPIRED"
           ? null
           : request.sessions[0] ?? null;
       // The date shown in an active recurring arrangement is the next live occurrence,
@@ -148,7 +162,24 @@ export async function GET() {
         studentMessagingEnabled: conversation.studentMessagingEnabled,
         unreadCount: unreadByConversation.get(conversation.id) ?? 0,
         lastMessage: conversation.messages[0] ?? null,
-        session: displaySession,
+        session: displaySession
+          ? { id: displaySession.id, scheduledStart: displaySession.scheduledStart, scheduledEnd: displaySession.scheduledEnd, status: displaySession.status }
+          : null,
+        cancellation: buildCancellation({
+          viewerUserId: userId,
+          studentUserId: request.studentProfile.userId,
+          studentName: request.studentProfile.user.name,
+          mateUserId: request.offering.academicMateProfile.userId,
+          mateName: request.offering.academicMateProfile.user.name,
+          arrangementType: request.arrangementType,
+          arrangementStatus: request.arrangementStatus,
+          session: displaySession ?? initialSession,
+          arrangement: {
+            cancelledAt: request.arrangementCancelledAt,
+            cancelledByUserId: request.arrangementCancelledByUserId,
+            cancellationReason: request.arrangementCancellationReason,
+          },
+        }),
         sessionLabel: nextSession ? (nextSession.status === "IN_PROGRESS" ? "IN_PROGRESS" : "NEXT") : displaySession ? "SESSION" : null,
         conversationUrl: routeSession
           ? `/student/sessions/${encodeURIComponent(routeSession.id)}/conversation`

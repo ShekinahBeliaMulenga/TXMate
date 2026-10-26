@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { releaseStudentRequestBlocks } from "@/lib/arrangement-expiry";
+import { getRatingSummary } from "@/lib/review-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -138,6 +140,7 @@ export async function GET(_request: Request, context: RouteContext) {
         },
         reviews: {
           orderBy: { createdAt: "desc" },
+          take: 50,
           select: {
             id: true,
             rating: true,
@@ -209,12 +212,22 @@ export async function GET(_request: Request, context: RouteContext) {
       isSameUniversityStudent &&
       !isOwner;
 
+    // Clear anything that no longer blocks a new request (unanswered, disputed or no-show one-time
+    // sessions), then show only live requests, matching the rule enforced when requesting.
+    if (canRequest && activeOfferingIds.length) {
+      try {
+        await releaseStudentRequestBlocks(prisma, new Date(), { studentProfileId: viewerStudent!.id });
+      } catch (error) {
+        console.error("Releasing finished one-time arrangements failed (profile still served):", error);
+      }
+    }
     const activeRequests = canRequest && activeOfferingIds.length
       ? await prisma.mateRequest.findMany({
           where: {
             studentProfileId: viewerStudent!.id,
             offeringId: { in: activeOfferingIds },
             status: { in: ["REQUESTED", "ACCEPTED"] },
+            arrangementStatus: { in: ["PENDING", "ACTIVE", "PAUSED"] },
           },
           select: {
             id: true,
@@ -236,10 +249,10 @@ export async function GET(_request: Request, context: RouteContext) {
       ]),
     );
 
-    const totalReviews = mate.reviews.length;
-    const averageRating = totalReviews
-      ? Number((mate.reviews.reduce((total, review) => total + review.rating, 0) / totalReviews).toFixed(2))
-      : null;
+    // Totals come from the database, so they stay right when the list below is capped.
+    const rating = await getRatingSummary(mate.id);
+    const totalReviews = rating.count;
+    const averageRating = rating.average;
 
     return NextResponse.json({
       profile: {
@@ -292,6 +305,7 @@ export async function GET(_request: Request, context: RouteContext) {
         totalQualifications: mate.qualifications.length,
         totalReviews,
         averageRating,
+        ratingDistribution: rating.distribution,
       },
       viewer: {
         signedIn: !!viewerUserId,

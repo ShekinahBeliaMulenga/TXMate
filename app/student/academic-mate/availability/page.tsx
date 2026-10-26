@@ -34,7 +34,7 @@ type Availability = {
   } | null;
 };
 
-type ApiResponse<T> = { data?: T; offerings?: T; availability?: T; error?: string; message?: string };
+type ApiResponse<T> = { data?: T; offerings?: T; availability?: T; warnings?: string[]; error?: string; message?: string };
 
 type View = "schedule" | "form";
 
@@ -284,7 +284,8 @@ export default function AcademicMateAvailabilityPage() {
       await loadData(false);
       resetForm(false);
       setView("schedule");
-      setSuccess(wasEditing ? "Availability updated successfully." : "Availability added successfully.");
+      const heading = wasEditing ? "Availability updated successfully." : "Availability added successfully.";
+      setSuccess(json.warnings?.length ? `${heading} Heads up: ${json.warnings.join(" ")}` : heading);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save availability.");
     } finally {

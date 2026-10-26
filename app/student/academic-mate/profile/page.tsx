@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import RatingSummary from "@/components/student/rating-summary";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
@@ -12,148 +13,33 @@ type Weekday = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SAT
 type StudentStatus = "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
 
 type AcademicMateProfileResponse = {
-  profile: {
-    id: string;
-    status: AcademicMateStatus;
-    verificationStatus: VerificationStatus;
-    headline: string | null;
-    bio: string | null;
-    teachingExperience: string | null;
-    yearsExperience: number | null;
-    profileVisibility: ProfileVisibility;
-    verifiedAt: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
+  profile: { id: string; status: AcademicMateStatus; verificationStatus: VerificationStatus; headline: string | null; bio: string | null; teachingExperience: string | null; yearsExperience: number | null; profileVisibility: ProfileVisibility; verifiedAt: string | null; createdAt: string; updatedAt: string };
   user: { id: string; name: string; email: string; image: string | null };
   student: {
-    id: string;
-    studentId: string | null;
-    gender: "MALE" | "FEMALE";
-    status: StudentStatus;
-    phoneNumber: string | null;
-    bio: string | null;
-    profileVisibility: ProfileVisibility;
+    id: string; studentId: string | null; gender: "MALE" | "FEMALE"; status: StudentStatus; phoneNumber: string | null; bio: string | null; profileVisibility: ProfileVisibility;
     university: { id: string; code: string; name: string; slug: string };
     school: { id: string; code: string; name: string };
     department: { id: string; code: string; name: string } | null;
     programme: { id: string; code: string; name: string; level: string; durationYears: number };
     programmeYear: { id: string; yearNumber: number };
-    courses: Array<{
-      id: string;
-      semester: number | null;
-      status: string;
-      academicYear: { id: string; name: string; isCurrent: boolean };
-      course: { id: string; code: string; name: string; description: string | null; credits: number | null };
-    }>;
+    courses: Array<{ id: string; semester: number | null; status: string; academicYear: { id: string; name: string; isCurrent: boolean }; course: { id: string; code: string; name: string; description: string | null; credits: number | null } }>;
   } | null;
   offerings: Array<{
-    id: string;
-    course: { id: string; code: string; name: string; description: string | null };
-    title: string | null;
-    description: string | null;
-    rate: string;
-    currency: string;
-    sessionDurationMinutes: number;
-    rateType: MateOfferingRateType;
-    rateDetails: string | null;
-    status: MateOfferingStatus;
-    verificationStatus: VerificationStatus;
-    topics: Array<{ id: string; name: string; description: string | null }>;
-    isOutsideCurrentCurriculum: boolean;
-    createdAt: string;
-    updatedAt: string;
+    id: string; course: { id: string; code: string; name: string; description: string | null }; title: string | null; description: string | null; rate: string; currency: string; sessionDurationMinutes: number; rateType: MateOfferingRateType; rateDetails: string | null; status: MateOfferingStatus; verificationStatus: VerificationStatus; topics: Array<{ id: string; name: string; description: string | null }>; isOutsideCurrentCurriculum: boolean; createdAt: string; updatedAt: string;
   }>;
-  availability: Array<{
-    id: string;
-    mateOfferingId: string;
-    day: Weekday;
-    startMinute: number;
-    endMinute: number;
-    timezone: string;
-    isActive: boolean;
-  }>;
-  experiences: Array<{
-    id: string;
-    title: string;
-    organisation: string | null;
-    description: string | null;
-    startYear: number | null;
-    endYear: number | null;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-  qualifications: Array<{
-    id: string;
-    name: string;
-    issuer: string | null;
-    year: number | null;
-    credentialUrl: string | null;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-  reviews: Array<{
-    id: string;
-    rating: number;
-    comment: string | null;
-    createdAt: string;
-    reviewerUser: { id: string; name: string; image: string | null };
-  }>;
-  statistics: {
-    totalOfferings: number;
-    totalAvailabilitySlots: number;
-    totalExperiences: number;
-    totalQualifications: number;
-    totalReviews: number;
-    averageRating: number | null;
-  };
+  availability: Array<{ id: string; mateOfferingId: string; day: Weekday; startMinute: number; endMinute: number; timezone: string; isActive: boolean }>;
+  experiences: Array<{ id: string; title: string; organisation: string | null; description: string | null; startYear: number | null; endYear: number | null; createdAt: string; updatedAt: string }>;
+  qualifications: Array<{ id: string; name: string; issuer: string | null; year: number | null; credentialUrl: string | null; createdAt: string; updatedAt: string }>;
+  reviews: Array<{ id: string; rating: number; comment: string | null; createdAt: string; reviewerUser: { id: string; name: string; image: string | null } }>;
+  statistics: { totalOfferings: number; totalAvailabilitySlots: number; totalExperiences: number; totalQualifications: number; totalReviews: number; averageRating: number | null; ratingDistribution?: Record<string, number> };
 };
 
-const academicMateStatusLabel: Record<AcademicMateStatus, string> = {
-  ACTIVE: "Active",
-  INACTIVE: "Inactive",
-  SUSPENDED: "Suspended",
-};
-
-const statusDot: Record<AcademicMateStatus, string> = {
-  ACTIVE: "bg-emerald-500",
-  INACTIVE: "bg-stone-400",
-  SUSPENDED: "bg-amber-500",
-};
-
-const verificationLabel: Record<VerificationStatus, string> = {
-  UNVERIFIED: "Unverified",
-  PENDING: "Verification pending",
-  VERIFIED: "Verified",
-  REJECTED: "Verification rejected",
-};
-
-const verificationStyle: Record<VerificationStatus, string> = {
-  UNVERIFIED: "bg-stone-100 text-stone-700 ring-stone-200",
-  PENDING: "bg-amber-50 text-amber-800 ring-amber-200",
-  VERIFIED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  REJECTED: "bg-red-50 text-red-800 ring-red-200",
-};
-
-const rateTypeLabel: Record<MateOfferingRateType, string> = {
-  PER_SESSION: "per session",
-  PER_HOUR: "per hour",
-  PER_WEEK: "per week",
-  PER_MONTH: "per month",
-  PER_COURSE: "per course",
-  CUSTOM: "Custom rate",
-};
-
-const weekdayLabel: Record<Weekday, string> = {
-  MONDAY: "Monday",
-  TUESDAY: "Tuesday",
-  WEDNESDAY: "Wednesday",
-  THURSDAY: "Thursday",
-  FRIDAY: "Friday",
-  SATURDAY: "Saturday",
-  SUNDAY: "Sunday",
-};
-
+const academicMateStatusLabel: Record<AcademicMateStatus, string> = { ACTIVE: "Active", INACTIVE: "Inactive", SUSPENDED: "Suspended" };
+const statusDot: Record<AcademicMateStatus, string> = { ACTIVE: "bg-emerald-500", INACTIVE: "bg-stone-400", SUSPENDED: "bg-amber-500" };
+const verificationLabel: Record<VerificationStatus, string> = { UNVERIFIED: "Unverified", PENDING: "Verification pending", VERIFIED: "Verified", REJECTED: "Verification rejected" };
+const verificationStyle: Record<VerificationStatus, string> = { UNVERIFIED: "bg-stone-100 text-stone-700 ring-stone-200", PENDING: "bg-amber-50 text-amber-800 ring-amber-200", VERIFIED: "bg-emerald-50 text-emerald-800 ring-emerald-200", REJECTED: "bg-red-50 text-red-800 ring-red-200" };
+const rateTypeLabel: Record<MateOfferingRateType, string> = { PER_SESSION: "per session", PER_HOUR: "per hour", PER_WEEK: "per week", PER_MONTH: "per month", PER_COURSE: "per course", CUSTOM: "Custom rate" };
+const weekdayLabel: Record<Weekday, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
 const weekdayOrder: Weekday[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
 const iconPaths = {
@@ -185,22 +71,14 @@ function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: str
   );
 }
 
-function Section({ title, subtitle, aside, icon, children }: { title: string; subtitle?: string; aside?: ReactNode; icon: IconName; children: ReactNode }) {
+function Section({ title, aside, children }: { title: string; subtitle?: string; aside?: ReactNode; icon?: IconName; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-[#ece5de] bg-[#fbf9f7] px-5 py-3.5 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]">
-            <Icon name={icon} className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-[15px] font-semibold text-[#282321]">{title}</h2>
-            {subtitle ? <p className="mt-0.5 text-xs text-[#7a6f6a]">{subtitle}</p> : null}
-          </div>
-        </div>
+    <section className="rounded-xl border border-[#ece5de] bg-white">
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-5">
+        <h2 className="text-sm font-semibold text-[#282321]">{title}</h2>
         {aside}
       </div>
-      <div className="px-5 py-5 sm:px-6">{children}</div>
+      <div className="px-4 pb-4 pt-3 sm:px-5">{children}</div>
     </section>
   );
 }
@@ -255,7 +133,6 @@ function formatTime(minutes: number) {
   return `${displayHour}:${String(mins).padStart(2, "0")} ${period}`;
 }
 
-
 function formatRateType(rateType: MateOfferingRateType) {
   return rateTypeLabel[rateType] || titleCase(rateType);
 }
@@ -307,9 +184,7 @@ export default function AcademicMateProfilePage() {
         const rawBody = await response.text();
 
         if (!contentType.includes("application/json")) {
-          throw new Error(
-            `Expected a JSON response from the Academic Mate profile service, but received ${contentType || "non-JSON content"}.`
-          );
+          throw new Error(`Expected a JSON response from the Academic Mate profile service, but received ${contentType || "non-JSON content"}.`);
         }
 
         let body: { error?: string } & Partial<AcademicMateProfileResponse>;
@@ -321,17 +196,7 @@ export default function AcademicMateProfilePage() {
 
         if (!response.ok) throw new Error(body.error || "Unable to load your Academic Mate profile.");
 
-        if (
-          !body.profile ||
-          !body.user ||
-          !body.student ||
-          !body.offerings ||
-          !body.availability ||
-          !body.experiences ||
-          !body.qualifications ||
-          !body.reviews ||
-          !body.statistics
-        ) {
+        if (!body.profile || !body.user || !body.student || !body.offerings || !body.availability || !body.experiences || !body.qualifications || !body.reviews || !body.statistics) {
           throw new Error("The Academic Mate profile service returned an incomplete profile.");
         }
 
@@ -379,13 +244,23 @@ export default function AcademicMateProfilePage() {
     return map;
   }, [data]);
 
+  const groupedReviews = useMemo(() => {
+    const groups = new Map<string, { reviewer: AcademicMateProfileResponse["reviews"][number]["reviewerUser"]; reviews: AcademicMateProfileResponse["reviews"] }>();
+    for (const review of data?.reviews ?? []) {
+      const group = groups.get(review.reviewerUser.id);
+      if (group) group.reviews.push(review);
+      else groups.set(review.reviewerUser.id, { reviewer: review.reviewerUser, reviews: [review] });
+    }
+    return Array.from(groups.values());
+  }, [data?.reviews]);
+
   if (loading) {
     const block = "animate-pulse rounded-xl border border-[#e2d9d0] bg-white";
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-6xl">
           <div className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-            <div className="h-32 animate-pulse bg-[#7d1f2a]/70 sm:h-40" />
+            <div className="h-24 animate-pulse bg-[#7d1f2a]/70 sm:h-32" />
             <div className="px-5 pb-6 sm:px-8">
               <div className="-mt-12 h-24 w-24 animate-pulse rounded-full bg-[#eee7df] ring-4 ring-white sm:-mt-14 sm:h-28 sm:w-28" />
               <div className="mt-5 h-8 w-56 animate-pulse rounded-lg bg-[#eee7df]" />
@@ -410,17 +285,10 @@ export default function AcademicMateProfilePage() {
   if (error || !data) {
     return (
       <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-6xl"></div>
-        <div role="alert" className="mx-auto max-w-xl rounded-xl border border-[#e2d9d0] bg-white p-10 text-center shadow-sm">
+        <div role="alert" className="mx-auto max-w-xl rounded-xl border border-[#ece5de] bg-white p-8 text-center">
           <h1 className="text-xl font-semibold text-[#282321]">Couldn’t load your Academic Mate profile</h1>
           <p className="mt-3 text-sm leading-6 text-[#6d6260]">{error ?? "Your Academic Mate profile could not be loaded."}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-6 rounded-lg bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
-          >
-            Try again
-          </button>
+          <button type="button" onClick={() => window.location.reload()} className="mt-6 rounded-lg bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">Try again</button>
         </div>
       </main>
     );
@@ -428,7 +296,6 @@ export default function AcademicMateProfilePage() {
 
   const { profile, user, student, offerings, experiences, qualifications, reviews, statistics } = data;
   const averageRating = statistics.averageRating;
-
   const stats: { label: string; value: string; icon: IconName }[] = [
     { label: "Courses supported", value: String(statistics.totalOfferings), icon: "book" },
     { label: "Average rating", value: averageRating !== null ? averageRating.toFixed(1) : "—", icon: "star" },
@@ -439,156 +306,79 @@ export default function AcademicMateProfilePage() {
   return (
     <main className="min-h-screen bg-[#f4f1ed] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-
         {/* Header */}
         <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-          <div aria-hidden="true" className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
-            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
-            <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
+          <div aria-hidden="true" className="relative h-24 overflow-hidden bg-linear-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-32">
+            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-26 border-white/6" />
+            <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full border-22 border-white/5" />
           </div>
-
-          <div className="px-5 pb-6 sm:px-8">
-          <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
-            <div className="relative inline-block">
-              {user.image ? (
-                <Image src={user.image} alt={user.name} width={64} height={64} unoptimized className="h-20 w-20 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-24 sm:w-24" />
-              ) : (
-                <div aria-hidden="true" className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-2xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-28 sm:w-28 sm:text-3xl">
-                  {initials(user.name)}
-                </div>
-              )}
-
-              {/* Facebook-style status dot positioned at the bottom-right */}
-              <span 
-                className={`absolute bottom-1.5 right-1.5 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[profile.status]}`} 
-                title={academicMateStatusLabel[profile.status]}
-                aria-label={academicMateStatusLabel[profile.status]}
-              />
+          <div className="px-4 pb-5 sm:px-6">
+            <div className="relative z-10 -mt-10 flex items-end justify-between gap-4 sm:-mt-12">
+              <div className="relative inline-block">
+                {user.image ? (
+                  <Image src={user.image} alt={user.name} width={64} height={64} unoptimized className="h-24 w-24 shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:h-28 sm:w-28" />
+                ) : (
+                  <div aria-hidden="true" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-xl font-semibold text-[#7d1f2a] ring-4 ring-white sm:h-24 sm:w-24 sm:text-2xl">{initials(user.name)}</div>
+                )}
+                <span className={`absolute bottom-1.5 right-1.5 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[profile.status]}`} title={academicMateStatusLabel[profile.status]} aria-label={academicMateStatusLabel[profile.status]} />
+              </div>
             </div>
-          </div>
-
             <div className="mt-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">{user.name}</h1>
+                <h1 className="text-xl font-semibold tracking-tight text-[#282321] sm:text-2xl">{user.name}</h1>
                 <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${verificationStyle[profile.verificationStatus]}`}>
                   <Icon name={profile.verificationStatus === "VERIFIED" ? "check" : "shield"} className="h-3.5 w-3.5" />
                   {verificationLabel[profile.verificationStatus]}
                 </span>
               </div>
-
-              <p className="mt-1.5 max-w-2xl text-s text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
-
+              <p className="mt-1 max-w-2xl text-sm text-[#3f3734]">{profile.headline || "Academic support and tutoring"}</p>
               {student ? (
-                <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#6d6260]">
-                  <li className="inline-flex items-center gap-1.5">
-                    <Icon name="book" className="h-4 w-4 text-[#7d1f2a]" />
-                    {student.programme.name}, Year {student.programmeYear.yearNumber}
-                  </li>
-                  <li className="inline-flex items-center gap-1.5">
-                    <Icon name="university" className="h-4 w-4 text-[#7d1f2a]" />
-                    {student.university.name}
-                  </li>
-
-                    {student.department && (
-                      <li className="inline-flex items-center gap-1.5">
-                        <Icon name="briefcase" className="h-4 w-4 text-[#7d1f2a]" />
-                        {student.department.name}
-                      </li>
-                    )}
+                <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-[#6d6260]">
+                  <li className="inline-flex items-center gap-1.5"><Icon name="book" className="h-4 w-4 text-[#7d1f2a]" />{student.programme.name}, Year {student.programmeYear.yearNumber}</li>
+                  <li className="inline-flex items-center gap-1.5"><Icon name="university" className="h-4 w-4 text-[#7d1f2a]" />{student.university.name}</li>
+                  {student.department && <li className="inline-flex items-center gap-1.5"><Icon name="briefcase" className="h-4 w-4 text-[#7d1f2a]" />{student.department.name}</li>}
                 </ul>
               ) : null}
             </div>
           </div>
-
           <dl className="grid grid-cols-2 divide-x divide-y divide-[#ece5de] border-t border-[#ece5de] bg-[#fbf9f7] sm:grid-cols-4 sm:divide-y-0">
             {stats.map((stat) => (
-              <div key={stat.label} className="flex items-center gap-3 px-5 py-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]">
-                  <Icon name={stat.icon} />
-                </span>
-                <div className="min-w-0">
-                  <dd className="truncate text-lg font-semibold leading-none text-[#282321]">{stat.value}</dd>
-                  <dt className="mt-1 text-xs text-[#6d6260]">{stat.label}</dt>
-                </div>
+              <div key={stat.label} className="flex items-center gap-3 px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a]/10 text-[#7d1f2a]"><Icon name={stat.icon} /></span>
+                <div className="min-w-0"><dd className="truncate text-lg font-semibold leading-none text-[#282321]">{stat.value}</dd><dt className="mt-1 text-xs text-[#6d6260]">{stat.label}</dt></div>
               </div>
             ))}
           </dl>
         </section>
 
         {/* Content */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 space-y-6">
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-4">
             <Section title="About" subtitle="Academic support profile" icon="user">
-              <div className="space-y-5">
-                <Field label="Bio" value={profile.bio} />
-                <Field label="Teaching experience" value={profile.teachingExperience} />
-              </div>
+              <div className="space-y-4"><Field label="Bio" value={profile.bio} /><Field label="Teaching experience" value={profile.teachingExperience} /></div>
             </Section>
 
-            <Section
-              title="Courses I support"
-              subtitle="Academic support offerings"
-              icon="book"
-              aside={<span className="text-xs font-medium text-[#6d6260]">{offerings.length} {offerings.length === 1 ? "course" : "courses"}</span>}
-            >
-              {sortedOfferings.length === 0 ? (
-                <Empty text="No courses have been added yet." />
-              ) : (
+            <Section title="Courses I support" subtitle="Academic support offerings" icon="book" aside={<span className="text-xs font-medium text-[#6d6260]">{offerings.length} {offerings.length === 1 ? "course" : "courses"}</span>}>
+              {sortedOfferings.length === 0 ? <Empty text="No courses have been added yet." /> : (
                 <ul className="space-y-3">
                   {sortedOfferings.map((offering) => (
-                    <li key={offering.id} className="rounded-xl border border-[#e2d9d0] bg-white p-5 shadow-sm">
-                      {/* Course */}
+                    <li key={offering.id} className="rounded-lg border border-[#ece5de] bg-[#fdfcfb] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-baseline gap-2">
-                            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-[#7d1f2a]">
-                              {offering.course.code}
-                            </span>
-                            <h3 className="truncate text-sm font-semibold text-[#241f1c]">
-                              {offering.course.name}
-                            </h3>
+                            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-[#7d1f2a]">{offering.course.code}</span>
+                            <h3 className="truncate text-sm font-semibold text-[#241f1c]">{offering.course.name}</h3>
                           </div>
-
-                          {offering.title && (
-                            <p className="mt-0.5 truncate text-xs text-[#6b625c]">
-                              {offering.title}
-                            </p>
-                          )}
+                          {offering.title && <p className="mt-0.5 truncate text-xs text-[#6b625c]">{offering.title}</p>}
                         </div>
                       </div>
-
-                      {/* Description */}
-                      {offering.description && (
-                        <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#625b55]">
-                          {offering.description}
-                        </p>
-                      )}
-
-                      {/* Details: icon + plain text */}
+                      {offering.description && <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#625b55]">{offering.description}</p>}
                       <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-[#4e4742]">
-                        <span className="inline-flex items-center gap-1.5 font-semibold text-[#241f1c]">
-                          <Icon name="tag" className="h-3.5 w-3.5 text-[#7d1f2a]" />
-                          {offering.currency} {offering.rate} · {formatRateType(offering.rateType)}
-                        </span>
-
-                        <span className="inline-flex items-center gap-1.5">
-                          <Icon name="clock" className="h-3.5 w-3.5 text-[#8a817a]" />
-                          {formatDuration(offering.sessionDurationMinutes)}
-                        </span>
-
-                        <span className={`inline-flex items-center gap-1.5 font-medium ${statusTone(offering.status)}`}>
-                          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-                          {formatStatus(offering.status)}
-                        </span>
+                        <span className="inline-flex items-center gap-1.5 font-semibold text-[#241f1c]"><Icon name="tag" className="h-3.5 w-3.5 text-[#7d1f2a]" />{offering.currency} {offering.rate} · {formatRateType(offering.rateType)}</span>
+                        <span className="inline-flex items-center gap-1.5"><Icon name="clock" className="h-3.5 w-3.5 text-[#8a817a]" />{formatDuration(offering.sessionDurationMinutes)}</span>
+                        <span className={`inline-flex items-center gap-1.5 font-medium ${statusTone(offering.status)}`}><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />{formatStatus(offering.status)}</span>
                       </div>
-
-                      {/* Custom pricing note */}
-                      {offering.rateType === "CUSTOM" && offering.rateDetails && (
-                        <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#6b625c]">
-                          <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a817a]" />
-                          <span>{offering.rateDetails}</span>
-                        </p>
-                      )}
+                      {offering.rateType === "CUSTOM" && offering.rateDetails && <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#6b625c]"><Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8a817a]" /><span>{offering.rateDetails}</span></p>}
                     </li>
                   ))}
                 </ul>
@@ -596,22 +386,16 @@ export default function AcademicMateProfilePage() {
             </Section>
 
             <Section title="Experience" subtitle="Academic and professional experience" icon="briefcase">
-              {experiences.length === 0 ? (
-                <Empty text="No experience has been added yet." />
-              ) : (
+              {experiences.length === 0 ? <Empty text="No experience has been added yet." /> : (
                 <ul className="divide-y divide-[#ece5de]">
                   {experiences.map((experience) => (
-                    <li key={experience.id} className="py-4 first:pt-0 last:pb-0">
+                    <li key={experience.id} className="py-3 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
                         <h3 className="text-sm font-semibold text-[#282321]">{experience.title}</h3>
-                        {experience.startYear !== null ? (
-                          <span className="text-xs text-[#7a6f6a]">
-                            {experience.startYear} – {experience.endYear ?? "Present"}
-                          </span>
-                        ) : null}
+                        {experience.startYear !== null && <span className="text-xs text-[#7a6f6a]">{experience.startYear} – {experience.endYear ?? "Present"}</span>}
                       </div>
-                      {experience.organisation ? <p className="mt-0.5 text-sm text-[#6d6260]">{experience.organisation}</p> : null}
-                      {experience.description ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#514844]">{experience.description}</p> : null}
+                      {experience.organisation && <p className="mt-0.5 text-sm text-[#6d6260]">{experience.organisation}</p>}
+                      {experience.description && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#514844]">{experience.description}</p>}
                     </li>
                   ))}
                 </ul>
@@ -619,62 +403,55 @@ export default function AcademicMateProfilePage() {
             </Section>
 
             <Section title="Qualifications" subtitle="Academic and professional qualifications" icon="certificate">
-              {qualifications.length === 0 ? (
-                <Empty text="No qualifications have been added yet." />
-              ) : (
+              {qualifications.length === 0 ? <Empty text="No qualifications have been added yet." /> : (
                 <ul className="divide-y divide-[#ece5de]">
                   {qualifications.map((qualification) => (
-                    <li key={qualification.id} className="py-4 first:pt-0 last:pb-0">
+                    <li key={qualification.id} className="py-3 first:pt-0 last:pb-0">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-4">
                         <h3 className="text-sm font-semibold text-[#282321]">{qualification.name}</h3>
-                        {qualification.year !== null ? <span className="text-xs text-[#7a6f6a]">{qualification.year}</span> : null}
+                        {qualification.year !== null && <span className="text-xs text-[#7a6f6a]">{qualification.year}</span>}
                       </div>
-                      {qualification.issuer ? <p className="mt-0.5 text-sm text-[#6d6260]">{qualification.issuer}</p> : null}
-                      {qualification.credentialUrl ? (
-                        <a
-                          href={qualification.credentialUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#7d1f2a] hover:underline hover:underline-offset-2"
-                        >
-                          View credential
-                          <Icon name="arrow" className="h-3.5 w-3.5" />
+                      {qualification.issuer && <p className="mt-0.5 text-sm text-[#6d6260]">{qualification.issuer}</p>}
+                      {qualification.credentialUrl && (
+                        <a href={qualification.credentialUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#7d1f2a] hover:underline hover:underline-offset-2">
+                          View credential <Icon name="arrow" className="h-3.5 w-3.5" />
                         </a>
-                      ) : null}
+                      )}
                     </li>
                   ))}
                 </ul>
               )}
             </Section>
 
-            <Section
-              title="Reviews"
-              subtitle="Feedback from students"
-              icon="star"
-              aside={reviews.length > 0 ? <span className="text-xs font-medium text-[#6d6260]">{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</span> : null}
-            >
-              {reviews.length === 0 ? (
-                <Empty text="No reviews yet." />
-              ) : (
+            <Section title="Reviews" subtitle="Feedback from students" icon="star" aside={statistics.totalReviews > 0 ? <span className="text-xs font-medium text-[#6d6260]">{statistics.totalReviews} {statistics.totalReviews === 1 ? "review" : "reviews"}</span> : null}>
+              <RatingSummary average={statistics.averageRating} count={statistics.totalReviews} distribution={statistics.ratingDistribution} />
+              {reviews.length === 0 ? <Empty text="No reviews yet." /> : (
                 <ul className="divide-y divide-[#ece5de]">
-                  {reviews.map((review) => (
-                    <li key={review.id} className="flex items-start gap-3.5 py-4 first:pt-0 last:pb-0">
-                      {review.reviewerUser.image ? (
-                        <Image src={review.reviewerUser.image} alt={review.reviewerUser.name} width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" />
-                      ) : (
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-xs font-semibold text-[#7d1f2a]">
-                          {initials(review.reviewerUser.name)}
+                  {groupedReviews.map(({ reviewer, reviews: studentReviews }) => (
+                    <li key={reviewer.id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-2.5">
+                        {reviewer.image ? (
+                          <Image src={reviewer.image} alt="" width={40} height={40} unoptimized className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <div aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-[11px] font-semibold text-[#7d1f2a]">{initials(reviewer.name)}</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                            <p className="text-[13px] font-semibold text-[#282321]">{reviewer.name}</p>
+                            {studentReviews.length > 1 && <span className="text-[11px] text-[#7a6f6a]">{studentReviews.length} reviews</span>}
+                          </div>
+                          <ul className="mt-2 space-y-3">
+                            {studentReviews.map((review) => (
+                              <li key={review.id} className="border-l-2 border-[#ece5de] pl-3">
+                                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                  <Stars rating={review.rating} />
+                                  <time dateTime={review.createdAt} className="text-[10px] text-[#7a6f6a]">{formatDate(review.createdAt)}</time>
+                                </div>
+                                {review.comment && <p className="mt-1 whitespace-pre-wrap wrap-break-word text-[12px] leading-[1.45] text-[#514844]">{review.comment}</p>}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-x-3">
-                          <p className="text-sm font-semibold text-[#282321]">{review.reviewerUser.name}</p>
-                          <p className="text-xs text-[#7a6f6a]">{formatDate(review.createdAt)}</p>
-                        </div>
-                        <div className="mt-1">
-                          <Stars rating={review.rating} />
-                        </div>
-                        {review.comment ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#514844]">{review.comment}</p> : null}
                       </div>
                     </li>
                   ))}
@@ -683,39 +460,23 @@ export default function AcademicMateProfilePage() {
             </Section>
           </div>
 
-          <aside className="space-y-6 lg:sticky lg:top-6 lg:h-fit">
+          <aside className="space-y-4 lg:sticky lg:top-6 lg:h-fit">
             <Section title="Availability" subtitle="Weekly tutoring times" icon="calendar">
-              {groupedAvailability.size === 0 ? (
-                <Empty text="No availability has been added yet." />
-              ) : (
+              {groupedAvailability.size === 0 ? <Empty text="No availability has been added yet." /> : (
                 <ul className="space-y-3">
                   {weekdayOrder.map((day) => {
                     const slots = groupedAvailability.get(day);
                     if (!slots || slots.length === 0) return null;
                     return (
                       <li key={day} className="flex items-start gap-3">
-                        <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md bg-[#7d1f2a]/10 text-xs font-semibold text-[#7d1f2a]" title={weekdayLabel[day]}>
-                          {weekdayLabel[day].slice(0, 3)}
-                        </span>
+                        <span className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md bg-[#7d1f2a]/10 text-xs font-semibold text-[#7d1f2a]" title={weekdayLabel[day]}>{weekdayLabel[day].slice(0, 3)}</span>
                         <div className="flex flex-wrap gap-1.5">
                           {slots.map((slot) => {
                             const offering = offeringById.get(slot.mateOfferingId);
                             return (
-                              <span
-                                key={slot.id}
-                                className="inline-flex items-center gap-2 rounded-md border border-[#ece5de] bg-[#fbf9f7] px-2.5 py-1.5 text-xs font-medium text-[#514844]"
-                              >
-                                <span className="tabular-nums">
-                                  {formatTime(slot.startMinute)} – {formatTime(slot.endMinute)}
-                                </span>
-                                {offering ? (
-                                  <span
-                                    title={offering.course.name}
-                                    className="inline-flex items-center gap-1 border-l border-[#e2d9d0] pl-2 text-[11px] font-semibold text-[#7d1f2a]"
-                                  >
-                                    {offering.course.code}
-                                  </span>
-                                ) : null}
+                              <span key={slot.id} className="inline-flex items-center gap-2 rounded-md border border-[#ece5de] bg-[#fbf9f7] px-2.5 py-1.5 text-xs font-medium text-[#514844]">
+                                <span className="tabular-nums">{formatTime(slot.startMinute)} – {formatTime(slot.endMinute)}</span>
+                                {offering && <span title={offering.course.name} className="inline-flex items-center gap-1 border-l border-[#e2d9d0] pl-2 text-[11px] font-semibold text-[#7d1f2a]">{offering.course.code}</span>}
                               </span>
                             );
                           })}

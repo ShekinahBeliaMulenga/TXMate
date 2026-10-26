@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { authClient } from "@/lib/auth-client";
 
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -382,14 +381,6 @@ function IconAlert(props: IconProps) {
   );
 }
 
-function IconLogout(props: IconProps) {
-  return (
-    <IconBase {...props}>
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5m5 5H3" />
-    </IconBase>
-  );
-}
-
 const SECTION_ICONS: Record<SectionId, typeof IconOverview> = {
   overview: IconOverview,
   academic: IconAcademic,
@@ -566,33 +557,19 @@ async function readJson<T>(response: Response): Promise<T | null> {
   }
 }
 
-function TopBar({
-  label,
-  onSignOut,
-  signingOut,
-}: {
-  label: string;
-  onSignOut: () => void;
-  signingOut: boolean;
-}) {
+function TopBar({ label }: { label: string }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="mb-4 flex items-center">
       <Link
         href="/admin/academic-mates"
-        className={`text-sm font-medium text-[#7d1f2a] hover:underline ${FOCUS_RING}`}
+        aria-label={label}
+        title={label}
+        className={`-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-[#7d1f2a] transition hover:bg-[#7d1f2a]/10 ${FOCUS_RING}`}
       >
-        {label}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden="true">
+          <path d="M15.75 19.5 8.25 12l7.5-7.5" />
+        </svg>
       </Link>
-
-      <button
-        type="button"
-        onClick={onSignOut}
-        disabled={signingOut}
-        className={`inline-flex items-center gap-1.5 text-sm font-medium text-stone-600 hover:text-stone-900 disabled:opacity-60 ${FOCUS_RING}`}
-      >
-        <IconLogout />
-        {signingOut ? "Signing out…" : "Sign out"}
-      </button>
     </div>
   );
 }
@@ -634,7 +611,7 @@ function SectionNav({
     return (
       <nav
         aria-label="Review sections"
-        className="sticky top-0 z-20 -mx-4 mb-6 border-b border-stone-200 bg-[#f7f6f4]/90 backdrop-blur-md sm:-mx-6 xl:hidden"
+        className="sticky top-14 z-20 -mx-4 mb-6 border-b border-stone-200 bg-[#f4f1ed]/90 backdrop-blur-md sm:-mx-6 xl:hidden"
       >
         <ul className="flex overflow-x-auto px-4 sm:px-6">
           {items.map((item) => {
@@ -665,7 +642,7 @@ function SectionNav({
   }
 
   return (
-    <nav aria-label="Review sections" className="sticky top-8">
+    <nav aria-label="Review sections" className="sticky top-20">
       <ul className="relative flex flex-col gap-1">
         {/* Sliding highlight that follows the active item */}
         <span
@@ -768,34 +745,6 @@ export default function AcademicMateVerificationDetailPage() {
   const [success, setSuccess] = useState("");
 
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
-
-  const router = useRouter();
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function handleSignOut() {
-    if (signingOut) {
-      return;
-    }
-
-    try {
-      setSigningOut(true);
-
-      const result = await authClient.signOut({
-        fetchOptions: {
-          onSuccess: () => {
-            router.replace("/login");
-          },
-        },
-      });
-
-      if (result?.error) {
-        throw new Error(result.error.message);
-      }
-    } catch {
-      setSigningOut(false);
-      setError("Unable to sign out. Please try again.");
-    }
-  }
 
   const abortRef = useRef<AbortController | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
@@ -1029,7 +978,7 @@ export default function AcademicMateVerificationDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f7f6f4] text-stone-900">
+      <div className="text-stone-900">
         <MotionStyles />
 
         <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-8">
@@ -1045,21 +994,17 @@ export default function AcademicMateVerificationDetailPage() {
             <div className="am-shimmer h-72 rounded-2xl" />
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (error && !data) {
     return (
-      <main className="min-h-screen bg-[#f7f6f4] text-stone-900">
+      <div className="text-stone-900">
         <MotionStyles />
 
         <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-          <TopBar
-            label="Back to Academic Mates"
-            onSignOut={handleSignOut}
-            signingOut={signingOut}
-          />
+<TopBar label="Back to Academic Mates" />
 
           <div
             role="alert"
@@ -1078,7 +1023,7 @@ export default function AcademicMateVerificationDetailPage() {
             </button>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -1111,17 +1056,13 @@ export default function AcademicMateVerificationDetailPage() {
     activeIndex < SECTIONS.length - 1 ? SECTIONS[activeIndex + 1] : null;
 
   return (
-    <main className="relative min-h-screen overflow-x-clip bg-[#f7f6f4] text-stone-900">
+    <div className="relative overflow-x-clip text-stone-900">
       <MotionStyles />
 
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="am-rise pb-6">
-          <TopBar
-            label="Academic Mate Verification"
-            onSignOut={handleSignOut}
-            signingOut={signingOut}
-          />
+<TopBar label="Back to Academic Mate verification" />
 
           <div className="overflow-hidden rounded-2xl border border-[#6f1c27] bg-[#7d1f2a] text-white shadow-md shadow-[#7d1f2a]/20">
             <div className="flex flex-col gap-6 px-6 py-7 sm:px-8 md:flex-row md:items-center md:justify-between">
@@ -1744,7 +1685,7 @@ export default function AcademicMateVerificationDetailPage() {
           </div>
 
           {/* Decision */}
-          <aside className="lg:sticky lg:top-8 lg:self-start">
+          <aside className="lg:sticky lg:top-20 lg:self-start">
             <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-sm shadow-stone-900/5">
               <h2 className="text-sm font-semibold">Decision</h2>
 
@@ -1884,6 +1825,6 @@ export default function AcademicMateVerificationDetailPage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }

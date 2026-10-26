@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { buildCancellation } from "@/lib/cancellation";
+import { conversationClosedReason } from "@/lib/session-lifecycle-rules";
 import { expirePendingRescheduleProposals } from "@/lib/reschedule-proposal-expiry";
 
 export const runtime = "nodejs";
@@ -56,12 +58,18 @@ async function getSessionConversation(sessionId: string) {
       scheduledStart: true,
       scheduledEnd: true,
       status: true,
+      cancelledAt: true,
+      cancellationReason: true,
+      cancelledByUserId: true,
       request: {
         select: {
           id: true,
           status: true,
           arrangementType: true,
           arrangementStatus: true,
+          arrangementCancelledAt: true,
+          arrangementCancelledByUserId: true,
+          arrangementCancellationReason: true,
           studentProfile: {
             select: {
               userId: true,
@@ -219,6 +227,29 @@ export async function GET(
         id: booking.request.conversation.id,
         arrangementType: booking.request.arrangementType,
         arrangementStatus: booking.request.arrangementStatus,
+        messagingClosedReason: conversationClosedReason(
+          {
+            arrangementStatus: booking.request.arrangementStatus,
+            arrangementType: booking.request.arrangementType,
+            session: { status: booking.status, scheduledEnd: booking.scheduledEnd },
+          },
+          Date.now(),
+        ),
+        cancellation: buildCancellation({
+          viewerUserId: user.id,
+          studentUserId: booking.request.studentProfile.userId,
+          studentName: booking.request.studentProfile.user.name,
+          mateUserId: booking.request.offering.academicMateProfile.userId,
+          mateName: booking.request.offering.academicMateProfile.user.name,
+          arrangementType: booking.request.arrangementType,
+          arrangementStatus: booking.request.arrangementStatus,
+          session: { ...booking, status: sessionStatus },
+          arrangement: {
+            cancelledAt: booking.request.arrangementCancelledAt,
+            cancelledByUserId: booking.request.arrangementCancelledByUserId,
+            cancellationReason: booking.request.arrangementCancellationReason,
+          },
+        }),
         courseName: booking.request.offering.course.name,
         studentMessagingEnabled:
           booking.request.conversation.studentMessagingEnabled,

@@ -3,8 +3,6 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
 
 type VerificationStatus = "PENDING" | "VERIFIED" | "REJECTED" | "UNVERIFIED";
 
@@ -370,7 +368,6 @@ function ProfileCard({ profile }: { profile: VerificationProfile }) {
 }
 
 export default function AdminAcademicMatesPage() {
-  const router = useRouter();
 
   const [status, setStatus] = useState<VerificationStatus>("PENDING");
 
@@ -472,21 +469,16 @@ export default function AdminAcademicMatesPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[#f4f1ed] antialiased">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="antialiased">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         {/* HEADER */}
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7d1f2a]">
-              <Icon name="shield" className="h-4 w-4" />
-              Administration
-            </div>
-
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#241f1c] sm:text-4xl">
+            <h1 className="text-2xl font-semibold tracking-tight text-[#282321]">
               Academic Mate verification
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#625b55] sm:text-base">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6d6260]">
               Review Academic Mate profiles submitted for verification and
               manage their verification status.
             </p>
@@ -504,21 +496,6 @@ export default function AdminAcademicMatesPage() {
                 className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
               />
               Refresh
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                void authClient.signOut({
-                  fetchOptions: {
-                    onSuccess: () => router.push("/login"),
-                  },
-                })
-              }
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d8cec6] bg-white px-4 py-2.5 text-sm font-semibold text-[#7d1f2a] transition hover:border-[#bcaea6] hover:bg-[#faf8f6]"
-            >
-              <Icon name="logout" className="h-4 w-4" />
-              Sign out
             </button>
           </div>
         </div>
@@ -630,6 +607,6 @@ export default function AdminAcademicMatesPage() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

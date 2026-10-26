@@ -1,3 +1,4 @@
+import { getMateBusyStarts } from "@/lib/mate-conflicts";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -266,6 +267,15 @@ export async function PATCH(
       });
       if (scheduleConflict) return { kind: "schedule-conflict" as const };
 
+      const mateBusy = await getMateBusyStarts(tx, {
+        academicMateProfileId: mate.id,
+        offeringId: offering.id,
+        durationMinutes: offering.sessionDurationMinutes,
+        occurrenceStarts: validationStarts,
+        excludeArrangementId: currentRequest.id,
+      });
+      if (mateBusy.size > 0) return { kind: "mate-busy" as const };
+
       // Claim the request before creating the session. The transaction rolls back both writes on failure.
       const claim = await tx.mateRequest.updateMany({
         where: {
@@ -369,6 +379,7 @@ export async function PATCH(
         "offering-unavailable": { status: 409, error: "This offering is no longer available." },
         "past-time": { status: 409, error: "The proposed time has passed. The student needs to submit a new request with another available time." },
         "invalid-slot": { status: 409, error: "The proposed time no longer matches your availability. Ask the student to submit a new request with another available time." },
+        "mate-busy": { status: 409, error: "You already have another session that overlaps this time. Only a group session for the same course at exactly the same time can share a slot. Ask the student to choose another time." },
         "session-conflict": { status: 409, error: "You or the student already has a session during the proposed time. The request was not accepted." },
         "pending-conflict": { status: 409, error: "Another pending request already uses this time. Resolve that request before accepting this one." },
         "schedule-conflict": { status: 409, error: "At least one occurrence in this recurring schedule now conflicts with another session or pending request. Do not accept this arrangement yet. Ask the student to submit a request with a different recurring time." },
