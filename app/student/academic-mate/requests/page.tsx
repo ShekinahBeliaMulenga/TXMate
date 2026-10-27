@@ -3,12 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-type RequestStatus =
-  | "REQUESTED"
-  | "ACCEPTED"
-  | "DECLINED"
-  | "CANCELLED"
-  | "EXPIRED";
+type RequestStatus = |"REQUESTED"| "ACCEPTED"| "DECLINED"| "CANCELLED"| "EXPIRED";
 type RequestAction = "ACCEPTED" | "DECLINED";
 type StatusFilter = "REQUESTED" | "ACCEPTED" | "DECLINED" | "ALL";
 type Course = {
@@ -25,6 +20,8 @@ type RequestItem = {
   respondedAt: string | null;
   createdAt: string;
   student: {
+    id: string;
+    profileVisibility: "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
     name: string;
     image: string | null;
     university: { name: string; code: string };
@@ -223,6 +220,26 @@ function RequestActions({
     </div>
   );
 }
+
+
+function StudentProfileAvatar({ item, className }: { item: RequestItem; className: string }) {
+  const avatar = item.student.image ? (
+    <Image src={item.student.image} alt="" width={64} height={64} unoptimized className={`${className} shrink-0 rounded-full object-cover`} />
+  ) : (
+    <span aria-hidden="true" className={`${className} flex shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] font-semibold text-white`}>
+      {item.student.name.trim().charAt(0).toUpperCase() || "S"}
+    </span>
+  );
+  const canView = (item.status === "REQUESTED" || item.status === "ACCEPTED") && item.student.profileVisibility !== "PRIVATE";
+
+  return canView ? (
+    <Link href={`/student/mates/${encodeURIComponent(item.student.id)}`} aria-label={`View ${item.student.name}'s profile`} title="View student profile" className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-[#7d1f2a]">
+      {avatar}
+    </Link>
+  ) : avatar;
+}
+
+
 export default function AcademicMateRequestsPage() {
   const router = useRouter();
   const [data, setData] = useState<RequestsResponse | null>(null);
@@ -242,6 +259,8 @@ export default function AcademicMateRequestsPage() {
     useState<Confirmation | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+
+
   // Debounce search so that we do not send a request for every keystroke.
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -577,7 +596,7 @@ export default function AcademicMateRequestsPage() {
                   <li key={item.id} className="space-y-3 px-4 py-4 sm:px-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        {item.student.image ? <Image src={item.student.image} alt="" width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
+                      <StudentProfileAvatar item={item} className="h-10 w-10 text-sm" />
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{item.student.name}</p>
                           <p className="mt-0.5 text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</p>
@@ -664,14 +683,14 @@ export default function AcademicMateRequestsPage() {
                       className="align-top transition hover:bg-[#fcfaf8]"
                     >
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => setSelectedRequest(item)} className="flex w-full items-start gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
-                            {item.student.image ? <Image src={item.student.image} alt="" width={64} height={64} unoptimized className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-sm font-semibold text-white">{item.student.name.trim().charAt(0).toUpperCase() || "S"}</span>}
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold hover:text-[#7d1f2a]">{item.student.name}</span>
-                              <span className="mt-1 block truncate text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</span>
-                              <span className="mt-2 block truncate text-xs text-[#8a7f7a]">{item.message ? `“${item.message}”` : "No message included"}</span>
-                            </span>
-                          </button>
+                      <div className="flex items-start gap-3">
+                        <StudentProfileAvatar item={item} className="h-10 w-10 text-sm" />
+                        <button type="button" onClick={() => setSelectedRequest(item)} className="min-w-0 flex-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
+                          <span className="block truncate text-sm font-semibold hover:text-[#7d1f2a]">{item.student.name}</span>
+                          <span className="mt-1 block truncate text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</span>
+                          <span className="mt-2 block truncate text-xs text-[#8a7f7a]">{item.message ? `“${item.message}”` : "No message included"}</span>
+                        </button>
+                      </div>
                       </td>
                       <td className="px-4 py-4">
                         <p className="text-sm font-semibold text-[#7d1f2a]">
@@ -774,7 +793,7 @@ export default function AcademicMateRequestsPage() {
           >
             <div className="flex items-start justify-between gap-4 border-b border-[#e8e1da] px-5 py-4 sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
-                {selectedRequest.student.image ? <Image src={selectedRequest.student.image} alt="" width={64} height={64} unoptimized className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7d1f2a] text-base font-semibold text-white">{selectedRequest.student.name.trim().charAt(0).toUpperCase() || "S"}</div>}
+                <StudentProfileAvatar item={selectedRequest} className="h-12 w-12 text-base" />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-[#877a72]">Request details</p>
                   <h2 id="request-details-title" className="mt-1 truncate text-xl font-semibold tracking-tight">{selectedRequest.student.name}</h2>

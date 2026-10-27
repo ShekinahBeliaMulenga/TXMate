@@ -38,7 +38,7 @@ export default function ProfileTabs({ tabs, active, onChange }: { tabs: readonly
             aria-controls={tabPanelId(tab.id)}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.id)}
-            className={`relative px-1 py-3.5 text-sm font-semibold transition focus-visible:ring-inset ${FOCUS} ${selected ? "text-[#7d1f2a]" : "text-[#6d6260] hover:text-[#282321]"}`}
+            className={`relative px-1 py-2.5 text-[13px] font-semibold transition focus-visible:ring-inset ${FOCUS} ${selected ? "text-[#7d1f2a]" : "text-[#6d6260] hover:text-[#282321]"}`}
           >
             {tab.label}
             <span aria-hidden="true" className={`absolute inset-x-3 bottom-0 h-0.5 rounded-full transition ${selected ? "bg-[#7d1f2a]" : "bg-transparent"}`} />

@@ -1,13 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import {useCallback,useEffect,useRef,useState,type ReactNode,} from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -18,29 +12,7 @@ import { usePendingRescheduleCount } from "./use-pending-reschedule-count";
 import NotificationBell from "./notification-bell";
 import SessionPromptHost from "./session-prompt";
 import NavSearch, { type NavSearchItem } from "./nav-search";
-
-type IconName =
-  | "dashboard"
-  | "search"
-  | "user"
-  | "settings"
-  | "academic"
-  | "inbox"
-  | "messages"
-  | "book"
-  | "calendar"
-  | "shield"
-  | "edit"
-  | "eye"
-  | "logout"
-  | "close"
-  | "menu"
-  | "list"
-  | "id-card"
-  | "user-check"
-  | "layers"
-  | "clock"
-  | "refresh";
+import { Icon, type IconName } from "@/components/ui/icon";
 
 type NavigationItem = {
   label: string;
@@ -149,18 +121,19 @@ const NAVIGATION_GROUPS: {
         showPendingBadge: true,
       },
       {
+        label: "Availability",
+        href: "/student/academic-mate/availability",
+        icon: "clock",
+        keywords: "hours times slots free calendar",
+      },
+      {
         label: "Reschedules",
         href: "/student/academic-mate/sessions",
         icon: "refresh",
         keywords: "change time move session proposals",
         showRescheduleBadge: true,
       },
-      {
-        label: "Availability",
-        href: "/student/academic-mate/availability",
-        icon: "clock",
-        keywords: "hours times slots free calendar",
-      },
+      
     ],
   },
   {
@@ -205,177 +178,6 @@ const BOTTOM_TAB_HREFS = BOTTOM_TABS.map((tab) => tab.href);
 const NAV_SEARCH_ITEMS: NavSearchItem[] = NAVIGATION_GROUPS.flatMap((group) =>
   group.items.map((item) => ({ label: item.label, href: item.href, keywords: item.keywords })),
 );
-
-function Icon({
-  name,
-  className = "h-[18px] w-[18px]",
-}: {
-  name: IconName;
-  className?: string;
-}) {
-  const props = {
-    "aria-hidden": true as const,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.7,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    className,
-  };
-
-  switch (name) {
-    case "dashboard":
-      return (
-        <svg {...props}>
-          <rect x="3" y="3" width="7" height="8" rx="1" />
-          <rect x="14" y="3" width="7" height="5" rx="1" />
-          <rect x="14" y="12" width="7" height="9" rx="1" />
-          <rect x="3" y="15" width="7" height="6" rx="1" />
-        </svg>
-      );
-    case "search":
-      return (
-        <svg {...props}>
-          <circle cx="10.8" cy="10.8" r="6.8" />
-          <path d="m16 16 4.2 4.2" />
-        </svg>
-      );
-    case "user":
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21a8 8 0 0 1 16 0" />
-        </svg>
-      );
-    case "settings":
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-2.8-2.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3v-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.8-2.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.8 2.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6.8Z" />
-        </svg>
-      );
-    case "academic":
-      return (
-        <svg {...props}>
-          <path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z" />
-          <path d="M6.5 11.2v5.2c3.6 2.7 7.4 2.7 11 0v-5.2M21.5 9v7" />
-        </svg>
-      );
-    case "inbox":
-      return (
-        <svg {...props}>
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M3 13h5l2 3h4l2-3h5" />
-        </svg>
-      );
-    case "book":
-      return (
-        <svg {...props}>
-          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22Z" />
-          <path d="M4 5.5v14A2.5 2.5 0 0 1 6.5 17H20" />
-        </svg>
-      );
-    case "calendar":
-      return (
-        <svg {...props}>
-          <rect x="3" y="5" width="18" height="16" rx="2" />
-          <path d="M16 3v4M8 3v4M3 10h18" />
-        </svg>
-      );
-    case "shield":
-      return (
-        <svg {...props}>
-          <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
-          <path d="m9 12 2 2 4-4" />
-        </svg>
-      );
-    case "edit":
-      return (
-        <svg {...props}>
-          <path d="m15 5 4 4M4 20l4-.8L19 8a2.1 2.1 0 0 0-3-3L5 16l-1 4Z" />
-        </svg>
-      );
-    case "eye":
-      return (
-        <svg {...props}>
-          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      );
-    case "logout":
-      return (
-        <svg {...props}>
-          <path d="M10 17l5-5-5-5M15 12H3" />
-          <path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" />
-        </svg>
-      );
-    case "close":
-      return (
-        <svg {...props}>
-          <path d="m18 6-12 12M6 6l12 12" />
-        </svg>
-      );
-    case "menu":
-      return (
-        <svg {...props}>
-          <path d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      );
-    case "list":
-      return (
-        <svg {...props}>
-          <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-        </svg>
-      );
-    case "id-card":
-      return (
-        <svg {...props}>
-          <rect x="2" y="5" width="20" height="14" rx="2" />
-          <circle cx="8" cy="12" r="2" />
-          <path d="M12 11h4M12 14h2" />
-        </svg>
-      );
-    case "user-check":
-      return (
-        <svg {...props}>
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <polyline points="16 11 18 13 22 9" />
-        </svg>
-      );
-    case "layers":
-      return (
-        <svg {...props}>
-          <polygon points="12 2 2 7 12 12 22 7 12 2" />
-          <polyline points="2 17 12 22 22 17" />
-          <polyline points="2 12 12 17 22 12" />
-        </svg>
-      );
-    case "refresh":
-      return (
-        <svg {...props}>
-          <path d="M20 11a8 8 0 0 0-14.5-4.3L4 8.5" />
-          <path d="M4 4v4.5h4.5" />
-          <path d="M4 13a8 8 0 0 0 14.5 4.3L20 15.5" />
-          <path d="M20 20v-4.5h-4.5" />
-        </svg>
-      );
-    case "clock":
-      return (
-        <svg {...props}>
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-      );
-    case "messages":
-      return (
-        <svg {...props}>
-          <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" />
-        </svg>
-      );
-  }
-}
 
 function isActivePath(pathname: string, href: string) {
   if (pathname === href) return true;
@@ -497,13 +299,13 @@ function NavigationGroups({
                       {active && (
                         <span
                           aria-hidden="true"
-                          className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r bg-[#7d1f2a]"
+                          className="absolute bottom-2 left-0 top-2 w-0.75 rounded-r bg-[#7d1f2a]"
                         />
                       )}
 
                       <Icon
                         name={item.icon}
-                        className="h-[17px] w-[17px] shrink-0"
+                        className="h-4.25 w-4.25 shrink-0"
                       />
 
                       <span className="min-w-0 flex-1 truncate">
@@ -634,7 +436,7 @@ function SidebarContents({
 }) {
   return (
     <>
-      <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-[#eee8e2] px-5">
+      <div className="flex h-18 shrink-0 items-center justify-between border-b border-[#eee8e2] px-5">
         <Brand onClick={onNavigate} />
 
         {!mobile && <NotificationBell align="left" />}
@@ -680,7 +482,7 @@ function SidebarContents({
           disabled={signingOut}
           className="flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[#625954] transition-colors hover:bg-[#f8f5f2] hover:text-[#7d1f2a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:cursor-wait disabled:opacity-60"
         >
-          <Icon name="logout" className="h-[17px] w-[17px] shrink-0" />
+          <Icon name="logout" className="h-4.25 w-4.25 shrink-0" />
           <span>{signingOut ? "Signing out..." : "Sign out"}</span>
         </button>
 
@@ -744,7 +546,7 @@ export default function StudentAppShell({
 
   useEffect(() => {
     setMobileOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
-    setMobileSearchOpen(false); // eslint-disable-line react-hooks/set-state-in-effect
+    setMobileSearchOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -844,7 +646,7 @@ export default function StudentAppShell({
     <div className="min-h-screen bg-[#f9f8f6] text-[#282321] antialiased">
       <a
         href="#main-content"
-        className="sr-only z-[60] rounded-md bg-white px-4 py-2 font-medium text-[#7d1f2a] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/40"
+        className="sr-only z-60 rounded-md bg-white px-4 py-2 font-medium text-[#7d1f2a] focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/40"
       >
         Skip to content
       </a>
@@ -875,7 +677,7 @@ export default function StudentAppShell({
               aria-expanded={mobileSearchOpen}
               className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-[#625954] transition hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"
             >
-              <Icon name="search" className="h-6 w-6" />
+              <Icon name="search" className="h-5 w-5" />
             </button>
             <Link
               href="/student/messages"
@@ -884,7 +686,7 @@ export default function StudentAppShell({
               className={`inline-flex h-11 w-11 items-center justify-center rounded-lg transition hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${isActivePath(pathname, "/student/messages") ? "text-[#7d1f2a]" : "text-[#625954]"}`}
             >
               <span className="relative">
-                <Icon name="messages" className="h-6 w-6" />
+                <Icon name="messages" className="h-5 w-5" />
                 <TabBadge count={unreadCount} tone="brand" />
               </span>
             </Link>
@@ -927,7 +729,7 @@ export default function StudentAppShell({
                   <span className="relative">
                     <Icon
                       name={tab.icon}
-                      className={`h-[22px] w-[22px] ${
+                      className={`h-5.5 w-5.5 ${
                         active ? "stroke-[2.1]" : ""
                       }`}
                     />
@@ -951,7 +753,7 @@ export default function StudentAppShell({
               className="flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[10.5px] font-medium text-[#7a6f68] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40"
             >
               <span className="relative">
-                <Icon name="menu" className="h-[22px] w-[22px]" />
+                <Icon name="menu" className="h-5.5 w-5.5" />
                 {/* Mate requests live inside the drawer, so flag them here */}
                 {(pendingCount > 0 || rescheduleCount > 0) && (
                   <span

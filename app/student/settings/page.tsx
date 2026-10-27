@@ -162,8 +162,8 @@ export default function StudentSettingsPage() {
   }
 
   const page = "min-h-screen bg-[#f4f1ed] text-[#282321]";
-  const pad = "mx-auto max-w-5xl px-3 pb-8 pt-4 sm:px-5 sm:pb-10 sm:pt-5 lg:px-8";
-  const pulse = "animate-pulse rounded-2xl border border-[#e2d9d0] bg-white";
+  const pad = "mx-auto max-w-6xl px-4 pb-8 pt-5 sm:px-6 sm:pb-10 sm:pt-6 lg:px-12 lg:pb-14 lg:pt-10";
+  const pulse = "animate-pulse rounded-2xl bg-white";
 
   if (loading) {
     return (
@@ -181,7 +181,7 @@ export default function StudentSettingsPage() {
     return (
       <main className={page}>
         <div className={pad}>
-          <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-[#e2d9d0] bg-white p-8 text-center">
+          <div role="alert" className="mx-auto max-w-xl rounded-2xl bg-white p-8 text-center shadow-sm">
             <h1 className="text-xl font-semibold text-[#282321]">Couldn’t load your settings</h1>
             <p className="mt-3 text-sm leading-6 text-[#6d6260]">{error}</p>
             <button type="button" onClick={() => void loadProfile()} className={`mt-6 rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#691923] ${FOCUS}`}>
@@ -239,15 +239,15 @@ export default function StudentSettingsPage() {
   return (
     <main className={page}>
       <div className={pad}>
-        <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-10">
-          <div className={`${section ? "hidden lg:block" : "block"} lg:sticky lg:top-6`}>
+        <div className="lg:grid lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start lg:gap-0">
+          <div className={`${section ? "hidden lg:block" : "block"} lg:sticky lg:top-10 lg:pr-10`}>
             <ScreenHeading title="Settings" subtitle="Manage your account, profile and preferences." />
             <div className="mt-4">
               <SettingsMenu activeId={activeId} onSelect={openSection} />
             </div>
           </div>
 
-          <div className={`${section ? "block" : "hidden lg:block"} min-w-0 max-w-2xl`}>
+          <div className={`${section ? "block" : "hidden lg:block"} min-w-0 max-w-2xl lg:pl-12`}>
             <div className="mb-3 lg:hidden">
               <button
                 type="button"

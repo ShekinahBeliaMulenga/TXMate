@@ -776,7 +776,7 @@ export default function FindAcademicMatePage() {
   const detailsHasSession = Boolean(getRequestState(detailsRequest)?.session);
 
   const fieldClass =
-    "h-10 w-full rounded-lg border border-[#d8cec5] bg-white px-3 text-base text-[#282321] shadow-sm outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 sm:h-9 sm:text-sm";
+    "h-9 w-full rounded-lg border border-[#d8cec5] bg-white px-3 text-base text-[#282321] shadow-sm outline-none transition placeholder:text-[#a39a94] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10 sm:h-8 sm:text-[13px]";
 
   return (
     <main className="min-h-[calc(100dvh-4rem)] bg-[#f9f8f6] px-3 py-4 sm:px-5 lg:px-6">
@@ -784,8 +784,8 @@ export default function FindAcademicMatePage() {
 
       <div className="mx-auto max-w-6xl">
         <header className="mb-3">
-          <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Find an Academic Mate</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-5 text-[#6d6260]">
+          <h1 className="text-lg font-bold tracking-tight text-[#282321] sm:text-xl">Find an Academic Mate</h1>
+          <p className="mt-0.5 max-w-2xl text-xs leading-4 text-[#6d6260]">
             Compare course offerings, experience and rates. Tap a card to see the full profile.
           </p>
         </header>
@@ -795,14 +795,14 @@ export default function FindAcademicMatePage() {
           <div className="flex gap-2">
             <div className="relative min-w-0 flex-1">
               <label htmlFor="mate-search" className="sr-only">Search Academic Mates</label>
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8a7f7a]"><Icon name="search" className="h-4 w-4" /></span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8a7f7a]"><Icon name="search" className="h-3.5 w-3.5" /></span>
               <input
                 id="mate-search"
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Name, course or topic"
-                className={`${fieldClass} h-11 rounded-xl pl-10 pr-4 sm:h-11`}
+                className={`${fieldClass} rounded-lg pl-9 pr-3 sm:h-9`}
               />
             </div>
             <button
@@ -810,14 +810,14 @@ export default function FindAcademicMatePage() {
               onClick={() => setShowFilters((v) => !v)}
               aria-expanded={showFilters}
               aria-controls="filter-panel"
-              className={`relative inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold shadow-sm transition lg:hidden ${
+              className={`relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-sm transition lg:hidden ${
                 showFilters || activeFilterCount > 0 ? "border-[#7d1f2a]/40 bg-[#f8f2f0] text-[#7d1f2a]" : "border-[#d8cec5] bg-white text-[#4b423e]"
               }`}
             >
-              <Icon name="sliders" className="h-4 w-4" />
+              <Icon name="sliders" className="h-3.5 w-3.5" />
               <span className="hidden min-[400px]:inline">Filters</span>
               {activeFilterCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#7d1f2a] px-1 text-[11px] font-bold text-white">{activeFilterCount}</span>
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#7d1f2a] px-1 text-[10px] font-bold text-white">{activeFilterCount}</span>
               )}
             </button>
           </div>
@@ -834,7 +834,7 @@ export default function FindAcademicMatePage() {
                     aria-pressed={active}
                     title={course.name || undefined}
                     onClick={() => setSelectedCourseId(course.id)}
-                    className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition ${
                       active ? "border-[#7d1f2a] bg-[#7d1f2a] text-white shadow-sm" : "border-[#e4dbd3] bg-white text-[#4b423e] hover:border-[#d8c2c5] hover:bg-[#fbf8f6]"
                     }`}
                   >
@@ -846,17 +846,17 @@ export default function FindAcademicMatePage() {
           )}
         </section>
 
-        <div className="lg:grid lg:grid-cols-[230px_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div className="lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:items-start lg:gap-5">
           {/* ---------- filters (sidebar on desktop, drawer-style panel on mobile) ---------- */}
           <aside
             id="filter-panel"
             aria-label="Price and duration filters"
-            className={`${showFilters ? "block" : "hidden"} mb-2 rounded-lg border border-[#e4dbd3] bg-white p-2 lg:sticky lg:top-3 lg:mb-0 lg:block`}
+            className={`${showFilters ? "block" : "hidden"} mb-2 rounded-lg border border-[#e4dbd3] bg-white p-3 lg:sticky lg:top-3 lg:mb-0 lg:block`}
           >
-            <h2 className="text-sm font-semibold text-[#282321]">Filters</h2>
+            <h2 className="text-[13px] font-semibold text-[#282321]">Filters</h2>
 
-            <fieldset className="mt-3">
-              <legend className="text-xs font-semibold text-[#6d6260]">Price</legend>
+            <fieldset className="mt-2.5">
+              <legend className="text-[11px] font-semibold text-[#6d6260]">Price</legend>
               <div className="mt-1.5 grid grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="min-price" className="sr-only">Minimum price</label>
@@ -869,8 +869,8 @@ export default function FindAcademicMatePage() {
               </div>
             </fieldset>
 
-            <div className="mt-3">
-              <label htmlFor="duration-filter" className="text-xs font-semibold text-[#6d6260]">Session length</label>
+            <div className="mt-2.5">
+              <label htmlFor="duration-filter" className="text-[11px] font-semibold text-[#6d6260]">Session length</label>
               <select id="duration-filter" value={durationFilter} onChange={(event) => setDurationFilter(event.target.value)} className={`${fieldClass} mt-1.5`}>
                 <option value="ALL">Any length</option>
                 <option value="UP_TO_30">30 minutes or less</option>
@@ -881,7 +881,7 @@ export default function FindAcademicMatePage() {
             </div>
 
             {hasAnyFilter && (
-              <button type="button" onClick={clearFilters} className="mt-3 w-full rounded-lg border border-[#e4dbd3] py-1.5 text-xs font-semibold text-[#7d1f2a] transition hover:bg-[#f8f2f0]">
+              <button type="button" onClick={clearFilters} className="mt-2.5 w-full rounded-lg border border-[#e4dbd3] py-1 text-[11px] font-semibold text-[#7d1f2a] transition hover:bg-[#f8f2f0]">
                 Clear all filters
               </button>
             )}
@@ -892,23 +892,23 @@ export default function FindAcademicMatePage() {
             {!showSkeleton && !error && (
               <div className="mb-2 flex items-end justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-[#282321]">
+                  <h2 className="text-[13px] font-semibold text-[#282321]">
                     {search.trim() ? `Search results for “${search.trim()}”` : "Suggested"}
                   </h2>
-                  <p className="mt-0.5 text-xs leading-4 text-[#6d6260]">
+                  <p className="mt-0.5 text-[11px] leading-4 text-[#6d6260]">
                     {search.trim()
                       ? "Results can include courses outside your current enrolment."
                       : "Based on courses you are enrolled in or repeating. Search to discover others."}
                   </p>
                 </div>
-                <p className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold tabular-nums text-[#7d1f2a] shadow-sm ring-1 ring-[#eadfd9]" aria-live="polite">
+                <p className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#7d1f2a] shadow-sm ring-1 ring-[#eadfd9]" aria-live="polite">
                   {filteredOfferings.length} {filteredOfferings.length === 1 ? "offering" : "offerings"}
                 </p>
               </div>
             )}
 
             {!showSkeleton && !error && data?.truncated && (
-              <p className="mb-2 rounded-lg bg-[#fbf8f6] px-3 py-1.5 text-xs leading-4 text-[#6d6260]">
+              <p className="mb-2 rounded-lg bg-[#fbf8f6] px-3 py-1 text-[11px] leading-4 text-[#6d6260]">
                 Showing the first 100 results. Search for something more specific to narrow them down.
               </p>
             )}
@@ -921,22 +921,22 @@ export default function FindAcademicMatePage() {
             )}
 
             {!loading && error && (
-              <div role="alert" className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-8 text-center shadow-sm">
-                <h2 className="text-base font-semibold text-[#282321]">Unable to load results</h2>
-                <p className="mx-auto mt-1.5 max-w-sm text-sm leading-5 text-[#6d6260]">{error}</p>
-                <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="mt-4 rounded-lg bg-[#7d1f2a] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923]">Try again</button>
+              <div role="alert" className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-5 text-center shadow-sm">
+                <h2 className="text-sm font-semibold text-[#282321]">Unable to load results</h2>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-4 text-[#6d6260]">{error}</p>
+                <button type="button" onClick={() => setRetryCount((count) => count + 1)} className="mt-3 rounded-lg bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-[#681923]">Try again</button>
               </div>
             )}
 
             {!loading && !error && filteredOfferings.length === 0 && (
-              <div className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-8 text-center shadow-sm">
-                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f4eceb] text-[#7d1f2a]"><Icon name="search" className="h-6 w-6" /></span>
-                <h2 className="mt-3 text-base font-semibold text-[#282321]">{data && data.academicMates.length > 0 ? "No matching results" : "No Academic Mate matches yet"}</h2>
-                <p className="mx-auto mt-1.5 max-w-sm text-sm leading-5 text-[#6d6260]">
+              <div className="rounded-xl border border-[#e4dbd3] bg-white px-4 py-5 text-center shadow-sm">
+                <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#f4eceb] text-[#7d1f2a]"><Icon name="search" className="h-4 w-4" /></span>
+                <h2 className="mt-2 text-sm font-semibold text-[#282321]">{data && data.academicMates.length > 0 ? "No matching results" : "No Academic Mate matches yet"}</h2>
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-4 text-[#6d6260]">
                   {data && data.academicMates.length > 0 ? "Try a different search term, or loosen your filters." : "There are currently no verified Academic Mate offerings matching your courses. Check back later, or search for another course."}
                 </p>
                 {hasAnyFilter && (
-                  <button type="button" onClick={clearFilters} className="mt-3 text-sm font-semibold text-[#7d1f2a] hover:underline">Clear filters</button>
+                  <button type="button" onClick={clearFilters} className="mt-2 text-xs font-semibold text-[#7d1f2a] hover:underline">Clear filters</button>
                 )}
               </div>
             )}

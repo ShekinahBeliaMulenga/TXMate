@@ -54,7 +54,7 @@ function buildEntries(sessions: SessionLifecycleItem[]): Entry[] {
 const membersOf = (entry: Entry) => entry.kind === "group" ? entry.sessions : [entry.session];
 
 function SearchIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
 }
 
 function SessionsView() {
@@ -201,71 +201,71 @@ function SessionsView() {
   }[tab];
 
   return (
-    <main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-4 pb-10 pt-5 text-[#282321] sm:px-6 lg:px-8 lg:pt-8">
-      <div className="mx-auto max-w-3xl">
+    <main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-3 pb-8 pt-4 text-[#282321] sm:px-5 lg:pt-6">
+      <div className="mx-auto max-w-2xl">
         <header>
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Sessions</h1>
-          <p className="mt-1 text-sm text-[#756b65]">Your tutoring sessions, and anything waiting on your answer.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Sessions</h1>
+          <p className="mt-1 text-sm text-[#756a63]">Your tutoring sessions, and anything waiting on your answer.</p>
         </header>
 
-        <div className="relative mt-4">
+        <div className="relative mt-3">
           <label htmlFor="session-search" className="sr-only">Search by course, person or place</label>
           <SearchIcon />
-          <input id="session-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" className="h-11 w-full rounded-xl border border-[#e2d8d0] bg-white pl-10 pr-10 text-sm outline-none placeholder:text-[#a3978f] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
-          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
+          <input id="session-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" className="h-9 w-full rounded-lg border border-[#e2d8d0] bg-white pl-9 pr-9 text-[13px] outline-none placeholder:text-[#a3978f] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
         </div>
 
         {needAnswer.length > 0 && filter !== "AWAITING_CONFIRMATION" && (
-          <button type="button" onClick={showAnswers} role="status" aria-label={`${needAnswer.length} ${needAnswer.length === 1 ? "session needs" : "sessions need"} your answer. Show`} className="mt-3 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-[#f8efec] px-3 text-[11px] font-medium text-[#6b3b36] transition hover:bg-[#f3e4df] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
+          <button type="button" onClick={showAnswers} role="status" aria-label={`${needAnswer.length} ${needAnswer.length === 1 ? "session needs" : "sessions need"} your answer. Show`} className="mt-2 inline-flex min-h-7 items-center gap-1.5 rounded-full bg-[#f8efec] px-2.5 text-[11px] font-medium text-[#6b3b36] transition hover:bg-[#f3e4df] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#7d1f2a]" />
             {needAnswer.length} awaiting your answer
-            <Glyph name="chevronRight" className="h-3.5 w-3.5 text-[#9a6a64]" />
+            <Glyph name="chevronRight" className="h-3 w-3 text-[#9a6a64]" />
           </button>
         )}
 
-        <div role="tablist" aria-label="Session time" className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-[#efeae5] p-1">
+        <div role="tablist" aria-label="Session time" className="mt-3 grid grid-cols-3 gap-0.5 rounded-lg bg-[#efeae5] p-0.5">
           {TABS.map((item) => (
-            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
               {item.label}
-              <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${tab === item.id ? "bg-[#f4e5e2] text-[#7d1f2a]" : "bg-[#e3dcd6] text-[#6f655f]"}`}>{counts[item.id]}{item.id === "PAST" && hasMoreHistory ? "+" : ""}</span>
+              <span className={`rounded-full px-1.5 text-[10px] leading-4 tabular-nums ${tab === item.id ? "bg-[#f4e5e2] text-[#7d1f2a]" : "bg-[#e3dcd6] text-[#6f655f]"}`}>{counts[item.id]}{item.id === "PAST" && hasMoreHistory ? "+" : ""}</span>
             </button>
           ))}
         </div>
 
-        <div className="mt-3">
-          <button type="button" onClick={() => setFilterOpen((open) => !open)} aria-expanded={filterOpen} aria-controls="session-filter-panel" aria-label={`Filter sessions by status. Showing: ${FILTERS.find((item) => item.id === filter)?.label ?? "All"}`} className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter !== "ALL" ? "border-[#7d1f2a] bg-[#fdf6f3] text-[#7d1f2a]" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" /></svg>
+        <div className="mt-2">
+          <button type="button" onClick={() => setFilterOpen((open) => !open)} aria-expanded={filterOpen} aria-controls="session-filter-panel" aria-label={`Filter sessions by status. Showing: ${FILTERS.find((item) => item.id === filter)?.label ?? "All"}`} className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter !== "ALL" ? "border-[#7d1f2a] bg-[#fdf6f3] text-[#7d1f2a]" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" /></svg>
             {filter === "ALL" ? "Filter" : FILTERS.find((item) => item.id === filter)?.label}
-            <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-3 w-3 transition-transform ${filterOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
           </button>
-          {filter !== "ALL" && <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter" title="Clear filter" className="ml-1 inline-flex h-10 w-10 items-center justify-center rounded-full text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
+          {filter !== "ALL" && <button type="button" onClick={() => setFilter("ALL")} aria-label="Clear filter" title="Clear filter" className="ml-1 inline-flex h-8 w-8 items-center justify-center rounded-full text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
           {filterOpen && (
-            <div id="session-filter-panel" role="group" aria-label="Filter by status" className="mt-2 flex flex-wrap gap-2 rounded-xl border border-[#e8e0d9] bg-white p-3">
+            <div id="session-filter-panel" role="group" aria-label="Filter by status" className="mt-1.5 flex flex-wrap gap-1.5 rounded-lg border border-[#e8e0d9] bg-white p-2">
               {FILTERS.map((item) => (
-                <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); setFilterOpen(false); }} className={`min-h-9 rounded-full border px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter === item.id ? "border-[#7d1f2a] bg-[#7d1f2a] text-white" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>{item.label}</button>
+                <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); setFilterOpen(false); }} className={`min-h-7 rounded-full border px-3 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${filter === item.id ? "border-[#7d1f2a] bg-[#7d1f2a] text-white" : "border-[#e2d8d0] bg-white text-[#625954] hover:bg-[#faf7f5]"}`}>{item.label}</button>
               ))}
             </div>
           )}
         </div>
 
-        {error && <div role="alert" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => void load()} className="shrink-0 font-semibold underline">Try again</button></div>}
+        {error && <div role="alert" className="mt-3 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800"><span>{error}</span><button type="button" onClick={() => void load()} className="shrink-0 font-semibold underline">Try again</button></div>}
 
-        <div className="mt-5">
+        <div className="mt-4">
           {loading ? (
-            <div className="space-y-3" role="status" aria-busy="true"><span className="sr-only">Loading your sessions…</span>{[1, 2, 3].map((key) => <div key={key} className="h-36 animate-pulse rounded-2xl border border-[#e8e0d9] bg-white motion-reduce:animate-none" />)}</div>
+            <div className="space-y-2" role="status" aria-busy="true"><span className="sr-only">Loading your sessions…</span>{[1, 2, 3].map((key) => <div key={key} className="h-24 animate-pulse rounded-xl border border-[#e8e0d9] bg-white motion-reduce:animate-none" />)}</div>
           ) : visible.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#d9cec5] bg-white px-5 py-10 text-center">
-              <h2 className="text-sm font-semibold">{search || filter !== "ALL" ? "No sessions match" : empty[0]}</h2>
-              <p className="mx-auto mt-1.5 max-w-sm text-xs leading-5 text-[#81766f]">{search || filter !== "ALL" ? "Try a different search, or clear the filter to see everything in this tab." : empty[1]}</p>
-              {(search || filter !== "ALL") && <button type="button" onClick={() => { setQuery(""); setFilter("ALL"); }} className="mt-4 min-h-10 rounded-lg border border-[#ded4cd] bg-white px-4 text-xs font-semibold text-[#584c45] hover:bg-[#faf7f5]">Clear search and filter</button>}
-              {!search && filter === "ALL" && tab === "UPCOMING" && <Link href="/student/find-academic-mate" className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-[#7d1f2a] px-4 text-xs font-semibold text-white hover:bg-[#681923]">Find an Academic Mate</Link>}
+            <div className="rounded-xl border border-dashed border-[#d9cec5] bg-white px-4 py-7 text-center">
+              <h2 className="text-[13px] font-semibold">{search || filter !== "ALL" ? "No sessions match" : empty[0]}</h2>
+              <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#81766f]">{search || filter !== "ALL" ? "Try a different search, or clear the filter to see everything in this tab." : empty[1]}</p>
+              {(search || filter !== "ALL") && <button type="button" onClick={() => { setQuery(""); setFilter("ALL"); }} className="mt-3 min-h-8 rounded-lg border border-[#ded4cd] bg-white px-3 text-xs font-semibold text-[#584c45] hover:bg-[#faf7f5]">Clear search and filter</button>}
+              {!search && filter === "ALL" && tab === "UPCOMING" && <Link href="/student/find-academic-mate" className="mt-3 inline-flex min-h-8 items-center rounded-lg bg-[#7d1f2a] px-3 text-xs font-semibold text-white hover:bg-[#681923]">Find an Academic Mate</Link>}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {days.map((day) => (
                 <section key={day.key} aria-label={day.label}>
-                  <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#8a7d74]">{day.label}</h2>
-                  <div className="space-y-3">
+                  <h2 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8a7d74]">{day.label}</h2>
+                  <div className="space-y-2">
                     {day.entries.map((entry) => entry.kind === "group"
                       ? <GroupCard key={entry.key} groupId={entry.groupId} sessions={entry.sessions} now={now} onOpen={(id) => openPopup("group", id)} />
                       : <SessionCard key={entry.key} session={entry.session} now={now} onOpen={(id) => openPopup("session", id)} onChanged={() => load()} />)}
@@ -275,8 +275,8 @@ function SessionsView() {
             </div>
           )}
 
-          {tab === "PAST" && hasMoreHistory && <button type="button" onClick={() => void loadMoreHistory()} disabled={loadingHistory} className="mt-5 min-h-11 w-full rounded-xl border border-[#e2d8d0] bg-white px-4 text-sm font-semibold text-[#625954] hover:bg-[#faf7f5] disabled:opacity-50">{loadingHistory ? "Loading…" : "Show older sessions"}</button>}
-          {openLimitReached && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">You have a lot of active sessions, so only the next 250 are shown. Use search to find a specific one.</p>}
+          {tab === "PAST" && hasMoreHistory && <button type="button" onClick={() => void loadMoreHistory()} disabled={loadingHistory} className="mt-4 min-h-9 w-full rounded-lg border border-[#e2d8d0] bg-white px-4 text-xs font-semibold text-[#625954] hover:bg-[#faf7f5] disabled:opacity-50">{loadingHistory ? "Loading…" : "Show older sessions"}</button>}
+          {openLimitReached && <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-5 text-amber-900">You have a lot of active sessions, so only the next 250 are shown. Use search to find a specific one.</p>}
         </div>
       </div>
       {openGroupId ? <GroupSheetDialog key={openGroupId} groupId={openGroupId} onClose={closePopup} onChanged={() => load()} />
@@ -286,5 +286,5 @@ function SessionsView() {
 }
 
 export default function SessionsPage() {
-  return <Suspense fallback={<main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-4 py-8"><div className="mx-auto max-w-3xl"><div className="h-8 w-40 animate-pulse rounded bg-[#e8e0d9]" /></div></main>}><SessionsView /></Suspense>;
+  return <Suspense fallback={<main className="min-h-[calc(100dvh-3.5rem)] bg-[#f9f8f6] px-4 py-8"><div className="mx-auto max-w-2xl"><div className="h-8 w-40 animate-pulse rounded bg-[#e8e0d9]" /></div></main>}><SessionsView /></Suspense>;
 }

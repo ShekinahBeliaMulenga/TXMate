@@ -32,7 +32,14 @@ type RequestItem = {
     rateType: string;
     sessionDurationMinutes: number;
     course: { id: string; code: string; name: string };
-    academicMate: { name: string; image: string | null };
+    academicMate: {
+      id: string;
+      name: string;
+      image: string | null;
+      status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+      verificationStatus: "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
+      profileVisibility: "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
+    };
   };
   tutoringSession: {
     id: string;
@@ -227,6 +234,22 @@ function Avatar({ name, src, className }: { name: string; src: string | null; cl
       {initials(name)}
     </span>
   );
+}
+
+function AcademicMateProfileAvatar({ item, className }: { item: RequestItem; className: string }) {
+  const mate = item.offering.academicMate;
+  const avatar = <Avatar name={mate.name} src={mate.image} className={className} />;
+  const canView =
+    (item.status === "REQUESTED" || item.status === "ACCEPTED") &&
+    mate.status === "ACTIVE" &&
+    mate.verificationStatus === "VERIFIED" &&
+    mate.profileVisibility !== "PRIVATE";
+
+  return canView ? (
+    <Link href={`/student/academic-mate/${encodeURIComponent(mate.id)}`} aria-label={`View ${mate.name}'s profile`} title="View Academic Mate profile" className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-[#7d1f2a]">
+      {avatar}
+    </Link>
+  ) : avatar;
 }
 
 const FOCUSABLE =
@@ -596,27 +619,18 @@ export default function StudentRequestsPage() {
         Loading requests...
       </div>
     );
-  } else if (!loaded && pageError) {
-    // The error banner above already offers "Try again", so there is no misleading empty state here.
+  } else if (requests.length === 0) {
     body = null;
   } else if (filteredRequests.length === 0) {
     body = (
       <div className="px-4 py-14 text-center">
-        <h2 className="text-sm font-semibold">{requests.length === 0 ? "No requests yet" : "No matching requests"}</h2>
+        <h2 className="text-sm font-semibold">No matching requests</h2>
         <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-[#6d6260]">
-          {requests.length === 0
-            ? "Requests you send to Academic Mates will appear here so you can track their status."
-            : "Try another search term or status filter."}
+          Try another search term or status filter.
         </p>
-        {requests.length === 0 ? (
-          <Link href="/student/find-academic-mate" className="mt-3 inline-flex text-xs font-semibold text-[#7d1f2a] hover:underline">
-            Browse Academic Mates
-          </Link>
-        ) : (
-          <button type="button" onClick={clearFilters} className="mt-3 text-xs font-semibold text-[#7d1f2a] hover:underline">
-            Clear filters
-          </button>
-        )}
+        <button type="button" onClick={clearFilters} className="mt-3 text-xs font-semibold text-[#7d1f2a] hover:underline">
+          Clear filters
+        </button>
       </div>
     );
   } else {
@@ -631,7 +645,7 @@ export default function StudentRequestsPage() {
               <li key={item.id} className="space-y-3 px-4 py-4 sm:px-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <Avatar name={academicMate.name} src={academicMate.image} className="h-10 w-10 text-xs" />
+                  <AcademicMateProfileAvatar item={item} className="h-10 w-10 text-xs" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{academicMate.name}</p>
                       <p className="mt-0.5 text-xs text-[#756b65]">{arrangementLabel(item, true)}</p>
@@ -700,7 +714,7 @@ export default function StudentRequestsPage() {
                     </td>
                     <td className={TD}>
                       <div className="flex min-w-0 items-center gap-2">
-                        <Avatar name={academicMate.name} src={academicMate.image} className="h-7 w-7 text-[10px]" />
+                      <AcademicMateProfileAvatar item={item} className="h-7 w-7 text-[10px]" />
                         <span className="min-w-0 wrap-break-word text-xs font-medium text-[#4d4541]">{academicMate.name}</span>
                       </div>
                     </td>
@@ -866,15 +880,17 @@ export default function StudentRequestsPage() {
           </div>
         </section>
 
-        <section
-          className={`mt-4 overflow-hidden rounded-lg border border-[#e2d9d0] bg-white transition-opacity ${
-            refreshing ? "pointer-events-none opacity-60" : ""
-          }`}
-          aria-label="Your requests"
-          aria-busy={loading}
-        >
-          {body}
-        </section>
+        {body !== null && (
+          <section
+            className={`mt-4 overflow-hidden rounded-lg border border-[#e2d9d0] bg-white transition-opacity ${
+              refreshing ? "pointer-events-none opacity-60" : ""
+            }`}
+            aria-label="Your requests"
+            aria-busy={loading}
+          >
+            {body}
+          </section>
+        )}
       </div>
 
       {selectedRequest && (

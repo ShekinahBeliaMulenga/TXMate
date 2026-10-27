@@ -91,14 +91,14 @@ function Icon({ name, className = "h-4 w-4" }: { name: IconName; className?: str
 function Section({ title, icon, aside, children, className = "" }: { title: string; icon?: IconName; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${className}`}>
-      <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] bg-[#faf8f6]/50 px-5 py-3.5">
+      <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] bg-[#faf8f6]/50 px-3 py-2 sm:px-4 sm:py-2.5">
         <div className="flex items-center gap-2.5">
           {icon && <Icon name={icon} className="h-4 w-4 text-[#8a7f7a]" />}
-          <h2 className="text-sm font-bold tracking-tight text-[#282321]">{title}</h2>
+          <h2 className="text-[13px] font-bold tracking-tight text-[#282321]">{title}</h2>
         </div>
         {aside && <div>{aside}</div>}
       </div>
-      <div className="flex-1 px-5 py-4">{children}</div>
+      <div className="flex-1 px-3 py-1 sm:px-4 sm:py-2">{children}</div>
     </section>
   );
 }
@@ -106,10 +106,10 @@ function Section({ title, icon, aside, children, className = "" }: { title: stri
 /** One label/value line. Must sit inside a <dl>. The last row in a list drops its divider. */
 function DetailRow({ icon, label, children, valueClass = "text-[#282321]" }: { icon: IconName; label: string; children: ReactNode; valueClass?: string }) {
   return (
-    <div className="flex items-center gap-3 border-b border-[#f0ebe5] py-3 last:border-0">
+    <div className="flex items-center gap-2.5 border-b border-[#f0ebe5] py-2 last:border-0 sm:gap-3 sm:py-2.5">
       <Icon name={icon} className="h-4 w-4 shrink-0 text-[#8a7f7a]" />
-      <dt className="w-28 shrink-0 text-[13px] text-[#8a7f7a]">{label}</dt>
-      <dd className={`min-w-0 text-[13px] ${valueClass}`}>{children}</dd>
+      <dt className="w-28 shrink-0 whitespace-nowrap text-[11px] text-[#8a7f7a] sm:w-28 sm:text-xs">{label}</dt>
+      <dd className={`min-w-0 text-[11px] sm:text-xs ${valueClass}`}>{children}</dd>
     </div>
   );
 }
@@ -124,11 +124,11 @@ function initials(name: string) {
 /** Profile photo, or the person's initials when there is no photo (or it fails to load). */
 function Avatar({ name, image }: { name: string; image: string | null }) {
   const [failed, setFailed] = useState(false);
-  const size = "h-24 w-24 sm:h-28 sm:w-28";
+  const size = "h-18 w-18 sm:h-20 sm:w-20";
   return image && !failed ? (
-    <Image src={image} alt={name} width={64} height={64} unoptimized onError={() => setFailed(true)} className={`${size} shrink-0 rounded-full bg-white object-cover ring-4 ring-white`} />
+    <Image src={image} alt={name} width={96} height={96} unoptimized onError={() => setFailed(true)} className={`${size} shrink-0 rounded-full bg-white object-cover ring-4 ring-white`} />
   ) : (
-    <div aria-hidden="true" className={`${size} flex shrink-0 select-none items-center justify-center rounded-full bg-[#f4eceb] text-3xl font-semibold tracking-wide text-[#7d1f2a] ring-4 ring-white sm:text-4xl`}>
+    <div aria-hidden="true" className={`${size} flex shrink-0 select-none items-center justify-center rounded-full bg-[#f4eceb] text-lg font-semibold tracking-wide text-[#7d1f2a] ring-2 ring-white sm:text-3xl sm:ring-4`}>
       {initials(name)}
     </div>
   );
@@ -149,10 +149,10 @@ function formatDate(value: string) {
 
 function SkeletonRow() {
   return (
-    <div className="border-b border-[#f0ebe5] py-3 last:border-0">
+    <div className="border-b border-[#f0ebe5] py-2 last:border-0 sm:py-2.5">
       <div className="flex h-5 items-center gap-3">
         <div className="h-4 w-4 shrink-0 rounded bg-[#e8e0d8]" />
-        <div className="w-28 shrink-0"><div className="h-3 w-20 rounded bg-[#eee8e2]" /></div>
+        <div className="w-24 shrink-0"><div className="h-3 w-20 rounded bg-[#eee8e2]" /></div>
         <div className="h-3 w-40 max-w-full rounded bg-[#f0ebe5]" />
       </div>
     </div>
@@ -162,10 +162,10 @@ function SkeletonRow() {
 function SkeletonSection({ titleWidth, children, className = "" }: { titleWidth: string; children: ReactNode; className?: string }) {
   return (
     <section className={`flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 ${className}`}>
-      <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] bg-[#faf8f6]/50 px-5 py-3.5">
+      <div className="flex items-center justify-between gap-4 border-b border-[#f0ebe5] bg-[#faf8f6]/50 px-3 py-2 sm:px-4 sm:py-2.5">
         <div className="flex h-5 items-center"><div className={`h-3.5 rounded bg-[#e8e0d8] ${titleWidth}`} /></div>
       </div>
-      <div className="flex-1 px-5 py-4">{children}</div>
+      <div className="flex-1 px-3 py-1 sm:px-4 sm:py-2">{children}</div>
     </section>
   );
 }
@@ -173,7 +173,7 @@ function SkeletonSection({ titleWidth, children, className = "" }: { titleWidth:
 function SkeletonTab({ active, width }: { active?: boolean; width: string }) {
   const tone = active ? "bg-[#e2d4d0]" : "bg-[#eee8e2]";
   return (
-    <div className={`flex h-9 w-[92px] items-center gap-1.5 rounded-lg px-3.5 ${width} ${active ? "bg-[#f4f1ed]" : ""}`}>
+    <div className={`flex h-8 w-[92px] items-center gap-1.5 rounded-lg px-3.5 ${width} ${active ? "bg-[#f4f1ed]" : ""}`}>
       <div className={`h-3.5 w-3.5 shrink-0 rounded ${tone}`} />
       <div className={`h-3 flex-1 rounded ${tone}`} />
     </div>
@@ -182,40 +182,40 @@ function SkeletonTab({ active, width }: { active?: boolean; width: string }) {
 
 function ProfileSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 pb-16 sm:px-6 lg:px-8" aria-busy="true">
-      <div className="mx-auto max-w-5xl animate-pulse motion-reduce:animate-none">
+    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8" aria-busy="true">
+      <div className="mx-auto max-w-4xl animate-pulse motion-reduce:animate-none">
         <span role="status" aria-live="polite" className="sr-only">Loading your student profile...</span>
 
         {/* Hero */}
         <section aria-hidden="true" className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-          <div className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
-            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
-            <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
+          <div className="relative h-16 overflow-hidden bg-linear-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-28">
+            <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-26 border-white/6" />
+            <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full border-22 border-white/5" />
             <div className="absolute right-4 top-4 sm:right-5 sm:top-5"><div className="h-6 w-28 rounded-full bg-white/20" /></div>
           </div>
-          <div className="px-5 pb-6 sm:px-8">
-            <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+          <div className="px-3 pb-3 sm:px-6 sm:pb-4">
+            <div className="relative z-10 -mt-8 flex items-end justify-between gap-4 sm:-mt-12">
               <div className="h-24 w-24 shrink-0 rounded-full bg-[#e9ddd8] ring-4 ring-white sm:h-28 sm:w-28" />
               <div className="mb-1 h-6 w-20 rounded-full bg-[#eee8e2]" />
             </div>
-            <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="mt-2 flex flex-col gap-3 sm:mt-4 sm:gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
                 <div className="mt-1.5 flex h-[22px] items-center"><div className="h-4 w-64 max-w-full rounded bg-[#eee8e2]" /></div>
                 <div className="mt-1 flex h-5 items-center"><div className="h-3.5 w-full max-w-md rounded bg-[#f0ebe5]" /></div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
                   <div className="h-6 w-28 rounded-full bg-[#f0ebe5]" />
                   <div className="h-6 w-40 rounded-full bg-[#f0ebe5]" />
                 </div>
-                <div className="mt-5">
-                  <div className="mb-1.5 flex h-[15px] items-center"><div className="h-2.5 w-12 rounded bg-[#e8e0d8]" /></div>
+                <div className="mt-3 sm:mt-4">
+                  <div className="mb-1.5 flex h-3.75 items-center"><div className="h-2.5 w-12 rounded bg-[#e8e0d8]" /></div>
                   <div className="max-w-2xl">
-                    <div className="flex h-[21px] items-center"><div className="h-3 w-full rounded bg-[#eee8e2]" /></div>
-                    <div className="flex h-[21px] items-center"><div className="h-3 w-4/5 rounded bg-[#f0ebe5]" /></div>
+                    <div className="flex h-5.25 items-center"><div className="h-3 w-full rounded bg-[#eee8e2]" /></div>
+                    <div className="flex h-5.25 items-center"><div className="h-3 w-4/5 rounded bg-[#f0ebe5]" /></div>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-end">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:justify-end">
                 {["w-20", "w-36"].map((w) => (
                   <div key={w} className="flex h-5 items-center gap-2">
                     <div className="h-4 w-4 rounded bg-[#e8e0d8]" />
@@ -228,7 +228,7 @@ function ProfileSkeleton() {
         </section>
 
         {/* Tabs */}
-        <div aria-hidden="true" className="mb-5 mt-6 flex justify-center">
+        <div aria-hidden="true" className="mb-3 mt-3 flex justify-center sm:mb-4 sm:mt-4">
           <div className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5">
             <SkeletonTab active width="sm:w-[108px]" />
             <SkeletonTab width="sm:w-[150px]" />
@@ -237,12 +237,12 @@ function ProfileSkeleton() {
         </div>
 
         {/* Overview tab */}
-        <div aria-hidden="true" className="grid items-stretch gap-5 md:grid-cols-2">
+        <div aria-hidden="true" className="grid items-stretch gap-3 sm:gap-4 md:grid-cols-2">
           <SkeletonSection titleWidth="w-36" className="h-full">
             <div>{Array.from({ length: 6 }, (_, i) => <SkeletonRow key={i} />)}</div>
           </SkeletonSection>
           <SkeletonSection titleWidth="w-32" className="h-full">
-            <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
+            <div className="flex h-full min-h-35 flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
               <div className="mb-2.5 h-7 w-7 rounded bg-[#e8e0d8]" />
               <div className="h-3.5 w-24 rounded bg-[#e8e0d8]" />
               <div className="mt-1 h-5 w-24 rounded-full bg-[#f3e8e9]" />
@@ -251,7 +251,7 @@ function ProfileSkeleton() {
           </SkeletonSection>
         </div>
 
-        <div aria-hidden="true" className="mt-12 flex justify-center"><div className="h-2.5 w-56 rounded bg-[#e8e0d8]" /></div>
+        <div aria-hidden="true" className="mt-8 flex justify-center"><div className="h-2.5 w-56 rounded bg-[#e8e0d8]" /></div>
       </div>
     </main>
   );
@@ -330,15 +330,15 @@ export default function StudentProfilePage() {
 
   const { studentProfile, user, university, academic } = data;
   const currentAcademicYear = academic.currentAcademicYear;
-  const actionLink = "inline-flex items-center gap-2 text-sm font-medium text-[#6d6260] transition-colors hover:text-[#7d1f2a] focus-visible:outline-none focus-visible:underline";
-  const chip = "inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-3 py-1 text-xs font-medium text-[#5f5551]";
+  const actionLink = "inline-flex items-center gap-2 text-xs font-medium text-[#6d6260] transition-colors hover:text-[#7d1f2a] focus-visible:outline-none focus-visible:underline";
+  const chip = "inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-2.5 py-0.5 text-[11px] font-medium text-[#5f5551]";
 
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-4 py-6 pb-16 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
+    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8">
+      <div className="mx-auto max-w-4xl">
         {/* --- HERO PROFILE SECTION --- */}
         <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
-          <div aria-hidden="true" className="relative h-32 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-40">
+          <div aria-hidden="true" className="relative h-16 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-28">
             <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
             <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
             <div className="absolute right-4 top-4 sm:right-5 sm:top-5">
@@ -348,44 +348,44 @@ export default function StudentProfilePage() {
               </span>
             </div>
           </div>
-          <div className="px-5 pb-6 sm:px-8">
-            <div className="relative z-10 -mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+          <div className="px-3 pb-3 sm:px-6 sm:pb-4">
+            <div className="relative z-10 -mt-8 flex items-end justify-between gap-4 sm:-mt-12">
               {/* Photo or initials, with an "active" dot on its bottom-right edge */}
               <div className="relative shrink-0">
                 <Avatar name={user.name} image={user.image} />
-                <span className={`absolute bottom-1 right-1 block h-4 w-4 rounded-full ring-4 ring-white ${statusDot[studentProfile.status]}`} />
+                <span className={`absolute bottom-1 right-1 block h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusDot[studentProfile.status]}`} />
               </div>
               <span className="mb-1 inline-flex items-center gap-2 bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span className={`h-2 w-2 rounded-full ${statusDot[studentProfile.status]}`} />
                 {statusLabel[studentProfile.status]}
               </span>
             </div>
-            <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="mt-2 flex flex-col gap-3 sm:mt-4 sm:gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">{user.name}</h1>
-                <p className="mt-1.5 text-[15px] text-[#3f3734]">
+                <h1 className="text-base font-semibold tracking-tight text-[#282321] sm:text-2xl">{user.name}</h1>
+                <p className="mt-0.5 text-xs text-[#3f3734] sm:mt-1 sm:text-[13px]">
                   {academic.programme.name}
                   <span className="text-[#8a7f7a]"> · Year {academic.year.yearNumber}</span>
                 </p>
-                <p className="mt-1 text-sm text-[#6d6260]">
+                <p className="mt-0.5 text-[11px] leading-4 text-[#6d6260] sm:text-xs">
                   {university.name}
                   <span className="text-[#8a7f7a]"> · {academic.school.name}</span>
                   <span className="text-[#8a7f7a]">{" · "}{academic.department?.name ?? "Department not assigned"}</span>
                 </p>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
                   <span className={chip}><Icon name="eye" className="h-3.5 w-3.5" />{visibilityLabel[studentProfile.profileVisibility]}</span>
                   <span className={chip}><Icon name="calendar" className="h-3.5 w-3.5" />{currentAcademicYear?.name ?? "Academic year not assigned"}</span>
                 </div>
-                <div className="mt-5">
-                  <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8a7f7a]">About</h3>
+                <div className="mt-3 sm:mt-4">
+                  <h3 className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#8a7f7a]">About</h3>
                   {studentProfile.bio ? (
-                    <p className="max-w-2xl text-balance text-[13px] leading-relaxed text-[#4b423e]">{studentProfile.bio}</p>
+                    <p className="max-w-2xl text-balance text-[11px] leading-relaxed sm:text-xs text-[#4b423e]">{studentProfile.bio}</p>
                   ) : (
-                    <p className="text-[13px] italic text-[#8a7f7a]">No bio has been provided yet.</p>
+                    <p className="text-xs italic text-[#8a7f7a]">No bio has been provided yet.</p>
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-end">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:justify-end">
                 <a href="/student/settings" className={actionLink}>
                   <Icon name="pencil" className="h-4 w-4" />
                   Edit profile
@@ -400,7 +400,7 @@ export default function StudentProfilePage() {
         </section>
 
         {/* --- NAVIGATION TABS --- */}
-        <div className="mb-5 mt-6 flex justify-center">
+        <div className="mb-3 mt-3 flex justify-center sm:mb-4 sm:mt-4">
           <nav className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5" aria-label="Tabs">
             {TABS.map((tab) => (
               <button
@@ -408,7 +408,7 @@ export default function StudentProfilePage() {
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 aria-current={activeTab === tab.id ? "true" : undefined}
-                className={`relative flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-bold transition-all duration-200 ${
+                className={`relative flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold sm:px-3 sm:py-1.5 sm:text-xs transition-all duration-200 ${
                   activeTab === tab.id ? "bg-[#f4f1ed] text-[#7d1f2a]" : "text-[#8a7f7a] hover:bg-[#faf8f6] hover:text-[#282321]"
                 }`}
               >
@@ -423,7 +423,7 @@ export default function StudentProfilePage() {
         {/* --- TAB CONTENT --- */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           {activeTab === "overview" && (
-            <div className="grid items-stretch gap-5 md:grid-cols-2">
+            <div className="grid items-stretch gap-3 sm:gap-4 md:grid-cols-2">
               <Section title="Institutional Details" className="h-full">
                 <dl>
                   <DetailRow icon="university" label="University">{university.name}</DetailRow>
@@ -435,7 +435,7 @@ export default function StudentProfilePage() {
                 </dl>
               </Section>
               <Section title="Academic Timeline" className="h-full">
-                <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
+                <div className="flex h-full min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
                   <Icon name="calendar" className="mb-2.5 h-7 w-7 text-[#d8cec5]" />
                   <p className="text-[13px] font-bold text-[#4b423e]">Academic Year</p>
                   <p className="mt-1 rounded-full bg-[#f6eaec] px-2.5 py-0.5 text-[11px] font-semibold text-[#7d1f2a]">
@@ -452,21 +452,21 @@ export default function StudentProfilePage() {
           {activeTab === "courses" && (
             <Section
               title="Course Enrollment"
-              aside={<span className="text-sm text-[#6d6260]">{sortedCourses.length} {sortedCourses.length === 1 ? "course" : "courses"}</span>}
+              aside={<span className="text-xs text-[#6d6260]">{sortedCourses.length} {sortedCourses.length === 1 ? "course" : "courses"}</span>}
             >
               {sortedCourses.length === 0 ? (
-                <div className="py-8">
+                <div className="py-5">
                   <p className="text-sm font-medium text-[#282321]">No Courses Found</p>
                   <p className="mt-1 text-sm text-[#8a7f7a]">You have no academic courses assigned for this period.</p>
                 </div>
               ) : (
                 <div>
                   {sortedCourses.map((item) => (
-                    <div key={item.id} className="border-b border-[#eee7df] py-4 last:border-0">
-                      <div className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_180px_100px] sm:items-center sm:gap-4">
-                        <p className="text-sm font-medium text-[#7d1f2a]">{item.course.code}</p>
-                        <p className="text-sm font-medium text-[#282321]">{item.course.name}</p>
-                        <p className="text-sm text-[#6d6260]">
+                    <div key={item.id} className="border-b border-[#eee7df] py-2 last:border-0 sm:py-2.5">
+                      <div className="grid gap-0.5 sm:grid-cols-[96px_minmax(0,1fr)_160px_90px] sm:items-center sm:gap-3">
+                        <p className="text-[11px] font-semibold text-[#7d1f2a] sm:text-xs">{item.course.code}</p>
+                        <p className="text-[11px] font-medium text-[#282321] sm:text-xs">{item.course.name}</p>
+                        <p className="text-[11px] text-[#6d6260] sm:text-xs">
                           {!item.isInCurriculum
                             ? "Outside current curriculum"
                             : item.isCompulsory
@@ -476,7 +476,7 @@ export default function StudentProfilePage() {
                                 : "Elective"}
                         </p>
                         <p
-                          className={`text-sm font-medium sm:text-right ${
+                          className={`text-[11px] font-medium sm:text-right sm:text-xs ${
                             item.status === "ENROLLED"
                               ? "text-[#7d1f2a]"
                               : item.status === "COMPLETED"
@@ -497,7 +497,7 @@ export default function StudentProfilePage() {
           )}
 
           {activeTab === "privacy" && (
-            <div className="grid items-stretch gap-5 md:grid-cols-2">
+            <div className="grid items-stretch gap-3 sm:gap-4 md:grid-cols-2">
               <Section title="Contact Information" className="h-full">
                 <dl>
                   <DetailRow icon="mail" label="Primary Email" valueClass="break-all text-[#282321]">{user.email}</DetailRow>
@@ -524,7 +524,7 @@ export default function StudentProfilePage() {
           )}
         </div>
 
-        <footer className="mt-12 text-center text-[10px] font-bold uppercase tracking-widest text-[#a39a95]">
+        <footer className="mt-8 text-center text-[10px] font-bold uppercase tracking-widest text-[#a39a95]">
           Account Active Since {formatDate(studentProfile.createdAt)}
         </footer>
       </div>

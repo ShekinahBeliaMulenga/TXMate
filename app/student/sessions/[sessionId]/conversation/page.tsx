@@ -23,6 +23,7 @@ type ConversationDetails = {
   messagingClosedReason?: "CANCELLED" | "COMPLETED" | "NO_RESPONSE" | null;
   otherUserName?: string;
   otherUserImage?: string | null;
+  otherUserProfileHref?: string | null;
   courseName?: string | null;
   session: { id: string; scheduledStart: string; scheduledEnd: string; status?: string; rescheduleProposals?: RescheduleProposal[] } | null;
 };
@@ -621,6 +622,11 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
   const fallbackCounterpart = role === "STUDENT" ? "Academic Mate" : role === "ACADEMIC_MATE" ? "Student" : "Session conversation";
   const displayName = conversation?.otherUserName || fallbackCounterpart;
   const avatarText = role === "STUDENT" ? "AM" : role === "ACADEMIC_MATE" ? "ST" : "TX";
+  const counterpartAvatar = conversation?.otherUserImage ? (
+    <Image src={conversation.otherUserImage} alt="" width={96} height={96} unoptimized className="h-11 w-11 rounded-full border border-[#eadfd9] object-cover sm:h-12 sm:w-12" />
+  ) : (
+    <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#7d1f2a]/10 text-sm font-bold text-[#7d1f2a] sm:h-12 sm:w-12 sm:text-base">{avatarText}</span>
+  );
   const messagingOpen = conversation?.studentMessagingEnabled ?? true;
   const pendingProposals = session && canRescheduleCurrentSession ? (session.rescheduleProposals ?? []).filter((proposal) => proposal.status === "PENDING") : [];
 
@@ -900,11 +906,11 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
             <BackIcon />
           </button>
           <div className="relative shrink-0">
-            {conversation?.otherUserImage ? (
-              <Image src={conversation.otherUserImage} alt="" width={96} height={96} unoptimized className="h-11 w-11 rounded-full border border-[#eadfd9] object-cover sm:h-12 sm:w-12" />
-            ) : (
-              <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#7d1f2a]/10 text-sm font-bold text-[#7d1f2a] sm:h-12 sm:w-12 sm:text-base">{avatarText}</span>
-            )}
+          {conversation?.otherUserProfileHref ? (
+            <Link href={conversation.otherUserProfileHref} aria-label={`View ${displayName}'s profile`} title="View profile" className="block rounded-full focus-visible:outline-2 focus-visible:outline-[#7d1f2a]">
+              {counterpartAvatar}
+            </Link>
+          ) : counterpartAvatar}
             <span aria-hidden="true" className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${messagingOpen ? "bg-emerald-500" : "bg-amber-500"}`} />
           </div>
           <div className="min-w-0 flex-1">

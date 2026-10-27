@@ -72,20 +72,22 @@ async function getSessionConversation(sessionId: string) {
           arrangementCancellationReason: true,
           studentProfile: {
             select: {
+              id: true,
               userId: true,
-              user: {
-                select: { name: true, image: true },
-              },
+              profileVisibility: true,
+              user: { select: { name: true, image: true } },
             },
           },
           offering: {
             select: {
               academicMateProfile: {
                 select: {
+                  id: true,
                   userId: true,
-                  user: {
-                    select: { name: true, image: true },
-                  },
+                  status: true,
+                  verificationStatus: true,
+                  profileVisibility: true,
+                  user: { select: { name: true, image: true } },
                 },
               },
               course: { select: { name: true } },
@@ -214,6 +216,17 @@ export async function GET(
       ? booking.request.offering.academicMateProfile.user
       : booking.request.studentProfile.user;
     const sessionStatus = getEffectiveSessionStatus(booking);
+    const requestIsActive = booking.request.status === "REQUESTED" || booking.request.status === "ACCEPTED";
+    const mateProfile = booking.request.offering.academicMateProfile;
+    let otherUserProfileHref: string | null = null;
+
+    if (requestIsActive) {
+      if (isStudent && mateProfile.status === "ACTIVE" && mateProfile.verificationStatus === "VERIFIED" && mateProfile.profileVisibility !== "PRIVATE") {
+        otherUserProfileHref = `/student/academic-mate/${encodeURIComponent(mateProfile.id)}`;
+      } else if (!isStudent && booking.request.studentProfile.profileVisibility !== "PRIVATE") {
+        otherUserProfileHref = `/student/mates/${encodeURIComponent(booking.request.studentProfile.id)}`;
+      }
+    }
 
     return NextResponse.json({
     
@@ -257,6 +270,7 @@ export async function GET(
         updatedAt: booking.request.conversation.updatedAt.toISOString(),
         otherUserName: otherUser.name,
         otherUserImage: otherUser.image,
+        otherUserProfileHref,
         session: {
           id: booking.id,
           scheduledStart: booking.scheduledStart.toISOString(),

@@ -1,4 +1,3 @@
-
 import { formatStatus, rateTypeLabel } from "./format";
 import { FOCUS, Icon, Surface } from "./profile-ui";
 import type { Offering, RequestsByOffering, Viewer } from "./types";
@@ -26,18 +25,18 @@ function OfferingCard({ offering, request, canRequest, busy, onRequest, onCancel
   return (
     <li className="rounded-xl border border-[#ece5de] bg-white p-3">
       <div className="flex items-start gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a] text-white">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#7d1f2a] text-white">
           <Icon name="book" className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold leading-5 text-[#282321]">{offering.course.name}</h3>
+          <h3 className="text-[13px] font-semibold leading-5 text-[#282321]">{offering.course.name}</h3>
           <p className="mt-0.5 text-xs leading-4 text-[#6d6260]">
             <span className="font-semibold text-[#7d1f2a]">{offering.course.code}</span>
             {subtitle !== offering.course.code ? <span> · {subtitle}</span> : null}
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-sm font-bold leading-5 text-[#282321]">{offering.currency} {offering.rate}</p>
+          <p className="text-[13px] font-bold leading-5 text-[#282321]">{offering.currency} {offering.rate}</p>
           <p className="text-[11px] leading-4 text-[#6d6260]">{rateTypeLabel[offering.rateType]}</p>
         </div>
       </div>

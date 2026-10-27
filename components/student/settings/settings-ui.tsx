@@ -1,14 +1,14 @@
-
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
 
-/** Shared look for every settings screen: tokens, icons and small presentational pieces. */
+/** Shared look for every settings screen: tokens, icons and small presentational pieces.
+    No borders anywhere: surfaces are separated by background tint and a soft shadow. */
 
 export const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2";
 export const INPUT =
-  "w-full rounded-lg border border-[#ded3ca] bg-white px-3 py-2 text-[13px] text-[#282321] outline-none transition placeholder:text-[#a79b95] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10";
+  "w-full rounded-lg bg-[#f3efeb] px-3 py-2 text-[13px] text-[#282321] outline-none transition placeholder:text-[#a79b95] focus:bg-white focus:ring-2 focus:ring-[#7d1f2a]/30";
 export const INPUT_READONLY =
-  "w-full rounded-lg border border-[#e8e0d8] bg-[#f3efeb] px-3 py-2 text-[13px] text-[#8a7f7a]";
+  "w-full rounded-lg bg-[#f7f4f1] px-3 py-2 text-[13px] text-[#8a7f7a]";
 export const LABEL = "block text-[13px] font-semibold text-[#282321]";
 export const HINT = "mt-1 text-[11px] leading-4 text-[#7a6f6a]";
 
@@ -45,7 +45,7 @@ export function InfoNote({ children }: { children: ReactNode }) {
 
 /** White surface that groups related content on a screen. */
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-xl border border-[#ece5de] bg-white p-3 sm:p-4 ${className}`}>{children}</div>;
+  return <div className={`rounded-xl bg-white p-3 shadow-sm sm:p-4 ${className}`}>{children}</div>;
 }
 
 export function Toggle({ checked, onChange, label, description, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; description: string; disabled?: boolean }) {

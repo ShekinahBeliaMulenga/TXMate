@@ -10,29 +10,29 @@ export const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring
 /** A titled block inside a tab. Headings carry a small maroon icon, no heavy card chrome. */
 export function Block({ title, icon, aside, children }: { title: string; icon?: IconName; aside?: ReactNode; children: ReactNode }) {
   return (
-    <section className="py-5 first:pt-0 last:pb-0">
+    <section className="py-3.5 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[15px] font-semibold text-[#282321]">
-          {icon ? <Icon name={icon} className="h-5 w-5 text-[#7d1f2a]" /> : null}
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-[#282321]">
+          {icon ? <Icon name={icon} className="h-4 w-4 text-[#7d1f2a]" /> : null}
           {title}
         </h2>
         {aside}
       </div>
-      <div className="mt-3">{children}</div>
+      <div className="mt-2.5">{children}</div>
     </section>
   );
 }
 
 /** White surface that groups the blocks of one tab. */
 export function Surface({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`divide-y divide-[#efe8e1] rounded-2xl border border-[#ece5de] bg-white p-4 sm:p-5 ${className}`}>{children}</div>;
+  return <div className={`divide-y divide-[#efe8e1] rounded-xl border border-[#ece5de] bg-white p-3 sm:p-4 ${className}`}>{children}</div>;
 }
 
 export function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-[#7a6f6a]">{text}</p>;
+  return <p className="text-[13px] text-[#7a6f6a]">{text}</p>;
 }
 
-export function Stars({ rating, className = "h-4 w-4" }: { rating: number; className?: string }) {
+export function Stars({ rating, className = "h-3.5 w-3.5" }: { rating: number; className?: string }) {
   return (
     <span className="inline-flex gap-0.5" role="img" aria-label={`${rating} out of 5 stars`}>
       {Array.from({ length: 5 }, (_, index) => (

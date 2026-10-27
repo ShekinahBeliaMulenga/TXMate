@@ -3,6 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon, type IconName } from "@/components/ui/icon";
+
 
 type NotificationItem = { id: string; type: string; title: string; body: string; url: string; read: boolean; createdAt: string };
 type NoticeKind = "attendance" | "session" | "message" | "completion" | "review" | "request" | "general";
@@ -45,7 +47,7 @@ function noticeKind(item: NotificationItem): NoticeKind {
   return "general";
 }
 
-const KIND_STYLES: Record<NoticeKind, { label: string; icon: string; color: string }> = {
+const KIND_STYLES: Record<NoticeKind, { label: string; icon: IconName; color: string }> = {
   attendance: { label: "Attendance", icon: "check", color: "bg-amber-50 text-amber-800 ring-amber-100" },
   completion: { label: "Completion", icon: "complete", color: "bg-emerald-50 text-emerald-800 ring-emerald-100" },
   review: { label: "Review", icon: "star", color: "bg-violet-50 text-violet-800 ring-violet-100" },
@@ -55,24 +57,6 @@ const KIND_STYLES: Record<NoticeKind, { label: string; icon: string; color: stri
   general: { label: "Update", icon: "bell", color: "bg-stone-100 text-stone-700 ring-stone-200" },
 };
 
-function Icon({ name, className = "" }: { name: string; className?: string }) {
-  const props = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} {...props}>
-      {name === "bell" && <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></>}
-      {name === "check" && <><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" /><path d="m8.5 12 2.3 2.3 4.7-5" /></>}
-      {name === "complete" && <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>}
-      {name === "star" && <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" />}
-      {name === "message" && <><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8 11h8M8 14h5" /></>}
-      {name === "request" && <><circle cx="9" cy="8" r="4" /><path d="M2 20v-2a7 7 0 0 1 10-6.3M17 13v8M13 17h8" /></>}
-      {name === "calendar" && <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>}
-      {name === "trash" && <><path d="M4 7h16M10 11v6M14 11v6" /><path d="m6 7 1 12h10l1-12M9 7V4h6v3" /></>}
-      {name === "close" && <path d="m6 6 12 12M18 6 6 18" />}
-      {name === "double-check" && <><path d="m2 12 4 4L16 6M9 14l3 3L22 7" /></>}
-      {name === "arrow" && <path d="M5 12h14m-6-6 6 6-6 6" />}
-    </svg>
-  );
-}
 
 export default function NotificationBell({ className = "", align = "right" }: { className?: string; align?: "left" | "right" }) {
   const router = useRouter();
@@ -193,7 +177,7 @@ export default function NotificationBell({ className = "", align = "right" }: { 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <button type="button" onClick={() => setOpen(value => !value)} aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"} aria-expanded={open} aria-haspopup="dialog" className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[#625954] transition-colors hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
-        <Icon name="bell" className="h-[22px] w-[22px]" />
+        <Icon name="bell" className="h-5 w-5" />
         {unread > 0 && <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#7d1f2a] px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{unread > 99 ? "99+" : unread}</span>}
       </button>
 

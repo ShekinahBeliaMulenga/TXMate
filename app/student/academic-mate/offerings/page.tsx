@@ -766,11 +766,11 @@ export default function AcademicMateOfferingsPage() {
         <div className="mb-8">
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#241f1c] sm:text-4xl">
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight">
                 Your Course offers
               </h1>
 
-              <p className="mt-2 max-w-xl text-sm text-[#625b55] sm:text-base">
+              <p className="mt-1 text-sm text-[#6d6260]">
                 Manage the courses you can support, your pricing arrangement,
                 and the terms students will see when they discover you.
               </p>

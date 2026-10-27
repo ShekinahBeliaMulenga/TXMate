@@ -23,25 +23,25 @@ export default function GroupCard({ groupId, sessions, now, onOpen }: { groupId:
       : null;
 
   return (
-    <article className={`rounded-2xl border bg-white shadow-[0_1px_2px_rgba(40,35,33,0.04)] ${action ? "border-[#e2c9c5]" : "border-[#e8e0d9]"}`}>
-      <button type="button" onClick={() => onOpen(groupId)} aria-label={`Open the ${first.course.name} attendance list`} className="flex w-full items-start gap-3 rounded-t-2xl p-4 pb-3 text-left transition hover:bg-[#fdfbfa] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40">
+    <article className={`rounded-xl border bg-white shadow-[0_1px_2px_rgba(40,35,33,0.04)] ${action ? "border-[#e2c9c5]" : "border-[#e8e0d9]"}`}>
+      <button type="button" onClick={() => onOpen(groupId)} aria-label={`Open the ${first.course.name} attendance list`} className="flex w-full items-start gap-2.5 rounded-t-xl p-3 pb-2 text-left transition hover:bg-[#fdfbfa] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#7d1f2a]/40">
         <DateBlock iso={first.scheduledStart} />
         <span className="min-w-0 flex-1">
-          <span className="block break-words text-[15px] font-semibold leading-5 text-[#282321]">{first.course.name}</span>
-          <span className="mt-0.5 flex items-center gap-1.5 text-xs text-[#81766f]">{first.course.code} · <Glyph name="users" className="h-3.5 w-3.5" />{count}</span>
-          <span className="mt-1.5 block text-xs tabular-nums text-[#625954]">{formatRange(first.scheduledStart, first.scheduledEnd)}{first.meetingLocation ? ` · ${first.meetingLocation}` : ""}</span>
+          <span className="block break-words text-[13px] font-semibold leading-4 text-[#282321]">{first.course.name}</span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-[11px] leading-4 text-[#81766f]">{first.course.code} · <Glyph name="users" className="h-3 w-3" />{count}</span>
+          <span className="block text-[11px] leading-4 tabular-nums text-[#625954]">{formatRange(first.scheduledStart, first.scheduledEnd)}{first.meetingLocation ? ` · ${first.meetingLocation}` : ""}</span>
         </span>
-        <span className="mt-1 text-[#c9bdb5]"><Glyph name="chevronRight" className="h-5 w-5" /></span>
+        <span className="mt-0.5 text-[#c9bdb5]"><Glyph name="chevronRight" className="h-4 w-4" /></span>
       </button>
-      <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
         <TimeChip status={tabOf(first, now)} />
         <ResolutionChip status={headline} />
-        {reviewCount > 0 && reviewCount < count && <span className="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-800 ring-1 ring-inset ring-red-200">{reviewCount} need review</span>}
+        {reviewCount > 0 && reviewCount < count && <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-px text-[10px] font-semibold text-red-800 ring-1 ring-inset ring-red-200">{reviewCount} need review</span>}
       </div>
       {action && (
-        <div className="mx-4 mb-4 flex items-center gap-3 rounded-xl bg-[#fdf6f3] p-3">
-          <p className="min-w-0 flex-1 text-xs leading-5 text-[#756b65]">{action.hint}</p>
-          <PrimaryButton onClick={() => onOpen(groupId)} className="shrink-0">{action.label}</PrimaryButton>
+        <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg bg-[#fdf6f3] p-2">
+          <p className="min-w-0 flex-1 text-[11px] leading-4 text-[#756b65]">{action.hint}</p>
+          <PrimaryButton onClick={() => onOpen(groupId)} className="min-h-8! shrink-0 px-3! text-xs!">{action.label}</PrimaryButton>
         </div>
       )}
     </article>

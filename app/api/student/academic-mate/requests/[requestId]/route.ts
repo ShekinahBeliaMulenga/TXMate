@@ -355,8 +355,8 @@ export async function PATCH(
             type: "SESSION_SCHEDULED",
             title: "Tutoring session scheduled",
             body: currentRequest.arrangementType === "RECURRING"
-              ? `Your recurring arrangement for ${offering.course.code} · ${offering.course.name} was accepted. The first session is scheduled${recurringSessions.count > 0 ? `, with ${recurringSessions.count} additional session${recurringSessions.count === 1 ? "" : "s"} scheduled in the current 30-day window` : ""}. TXMate will keep adding future sessions as they enter the scheduling window.`
-              : `Your request for ${offering.course.code} · ${offering.course.name} was accepted and the first session is scheduled.`,
+              ? `Recurring arrangement for ${offering.course.code} · ${offering.course.name} was accepted. The first session is scheduled${recurringSessions.count > 0 ? `, with ${recurringSessions.count} additional session${recurringSessions.count === 1 ? "" : "s"} scheduled in the current 30-day window` : ""}. TXMate will keep adding future sessions as they enter the scheduling window.`
+              : `Request for ${offering.course.code} · ${offering.course.name} was accepted and the first session is scheduled.`,
             data: sessionNotificationData,
           },
         ],

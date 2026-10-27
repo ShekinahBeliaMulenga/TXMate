@@ -249,8 +249,10 @@ export async function GET(request: Request) {
 
             studentProfile: {
               select: {
+                id: true,
+                profileVisibility: true,
                 user: {
-                  select: { name: true, image: true,},
+                  select: { name: true, image: true },
                 },
                 university: {
                   select: {
@@ -389,6 +391,8 @@ export async function GET(request: Request) {
       createdAt: record.createdAt.toISOString(),
 
       student: {
+        id: record.studentProfile.id,
+        profileVisibility: record.studentProfile.profileVisibility,
         name: record.studentProfile.user.name,
         image: record.studentProfile.user.image,
         university: record.studentProfile.university,

@@ -61,6 +61,10 @@ export async function GET() {
             },
             academicMateProfile: {
               select: {
+                id: true,
+                status: true,
+                verificationStatus: true,
+                profileVisibility: true,
                 user: {
                   select: { name: true, image: true },
                 },
@@ -113,10 +117,15 @@ export async function GET() {
           rate: request.offering.rate.toString(),
           currency: request.offering.currency,
           rateType: request.offering.rateType,
-          sessionDurationMinutes:
-            request.offering.sessionDurationMinutes,
+          sessionDurationMinutes: request.offering.sessionDurationMinutes,
           course: request.offering.course,
-          academicMate: request.offering.academicMateProfile.user,
+          academicMate: {
+            id: request.offering.academicMateProfile.id,
+            status: request.offering.academicMateProfile.status,
+            verificationStatus: request.offering.academicMateProfile.verificationStatus,
+            profileVisibility: request.offering.academicMateProfile.profileVisibility,
+            ...request.offering.academicMateProfile.user,
+          },
         },
         tutoringSession: request.tutoringSession
           ? {

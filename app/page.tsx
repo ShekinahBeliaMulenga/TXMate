@@ -327,6 +327,7 @@ export default function Home() {
         @keyframes gshift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
         @keyframes avail{0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)}100%{box-shadow:0 0 0 7px rgba(16,185,129,0)}}
         .gborder{background:linear-gradient(120deg,#7d1f2a,#f5b324,#7d1f2a,#e4dbd3);background-size:300% 300%;animation:gshift 7s ease infinite}
+        .mc-ring{background:linear-gradient(120deg,#7d1f2a,#f5b324,#7d1f2a)}
         .tilt{transition:transform .25s ease-out;will-change:transform}
         .spot{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(260px circle at var(--mx,50%) var(--my,50%),rgba(245,179,36,.16),transparent 70%)}
         .tilt:hover .spot{opacity:1}
@@ -366,41 +367,69 @@ export default function Home() {
 
         <Reveal>
           <Tilt>
-          <div className="gborder rounded-xl p-px shadow-xl shadow-[#7d1f2a]/10">
-          <article className="mcard relative overflow-hidden rounded-[11px] bg-white px-4 py-5 sm:px-5">
-            <span aria-hidden="true" className="spot" />
-            <span aria-hidden="true" className="shine" />
-            <div className="flex items-start gap-3">
-              <div aria-hidden="true" className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#8e2431] to-[#4a1119] text-xs font-semibold text-white shadow-md"><span className="halo" />SM</div>
-              <div className="min-w-0 flex-1">
-                <div className="st flex items-start justify-between gap-3" style={{ "--i": 0 } as React.CSSProperties}>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-2">
-                      <h2 className="text-sm font-semibold">Shekinah B Mulenga</h2>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700"><Tick /> Verified</span>
+            {/* Mirrors the real Academic Mate card on the Find page, same layout, sizes and wording. */}
+            <article className="mcard relative overflow-hidden rounded-xl border border-[#e4dbd3] bg-white p-3 shadow-[0_1px_2px_rgba(40,35,33,0.05),0_10px_24px_-14px_rgba(125,31,42,0.25)]">
+              <span aria-hidden="true" className="spot" />
+              <span aria-hidden="true" className="shine" />
+              <div className="flex items-start gap-2.5">
+                <span className="mc-ring mt-0.5 shrink-0 rounded-full p-[2px] shadow-sm">
+                  <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3ece7] text-xs font-semibold text-[#7d1f2a] ring-2 ring-white">SM</span>
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="st flex items-start justify-between gap-2" style={{ "--i": 0 } as React.CSSProperties}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <h2 className="text-sm font-semibold text-[#282321]">Shekinah B Mulenga</h2>
+                        <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#514844]">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 text-amber-500" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M12 3.2l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8L12 3.2Z" /></svg>
+                          4.8<span className="font-normal text-[#8a7f7a]">(12)</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700"><Tick /> Verified</span>
+                      </div>
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#6d6260]">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-[#9a8f89]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21V5l8-2v18M12 9h8v12M3 21h18" /></svg>
+                        <span>Computer Science</span>
+                      </p>
                     </div>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] font-medium leading-5 text-[#7d1f2a]">
-                      Computer Networks | Statistical Modelling
-                    </p>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold tabular-nums tracking-tight text-[#7d1f2a]">K 150</p>
+                      <p className="mt-0.5 text-[10px] text-[#8a7f7a]">per session</p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-base font-bold tabular-nums text-[#7d1f2a]">K 150</p>
-                    <p className="mt-0.5 text-[11px] text-[#8a7f7a]">per session</p>
+
+                  <p className="st mt-1.5 text-xs leading-4 text-[#282321]" style={{ "--i": 1 } as React.CSSProperties}>
+                    <span className="rounded bg-[#f3ece7] px-1.5 py-0.5 font-semibold text-[#7d1f2a]">CS 250</span>
+                    <span className="text-[#6d6260]"> · Data Structures &amp; Algorithms</span>
+                  </p>
+
+                  <div className="st mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] leading-4 text-[#6d6260]" style={{ "--i": 2 } as React.CSSProperties}>
+                    <span className="inline-flex items-center gap-1">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 text-[#9a8f89]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                      1 hour session
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-3 w-3 text-[#9a8f89]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="9" r="5" /><path d="m8.5 13.5-1.5 7 5-3 5 3-1.5-7" /></svg>
+                      2 yrs exp
+                    </span>
                   </div>
-                </div>
-                <p className="st mt-2 text-[13px] leading-5" style={{ "--i": 1 } as React.CSSProperties}><span className="rounded bg-[#f3ece7] px-1.5 py-0.5 font-semibold text-[#7d1f2a]">CS 250</span><span className="text-[#6d6260]"> · Data Structures &amp; Algorithms</span></p>
-                <p className="st mt-1 text-sm leading-5 text-[#4b423e]" style={{ "--i": 2 } as React.CSSProperties}>Lets cover lists, stacks, queues, trees, graphs, sorting and algorithm analysis</p>
-                <div className="st mt-1.5 flex flex-wrap items-center gap-x-3 text-xs leading-5 text-[#6d6260]" style={{ "--i": 3 } as React.CSSProperties}>
-                  <span>1 hour session</span><span aria-hidden="true" className="h-3 w-px bg-[#e4dbd3]" /><span>2 years experience</span><span aria-hidden="true" className="h-3 w-px bg-[#e4dbd3]" />
-                </div>
-                <div className="st mt-3 flex items-center justify-between" style={{ "--i": 4 } as React.CSSProperties}>
-                  <span className="text-xs font-semibold text-[#7d1f2a]">Details</span>
-                  <span className="reqbtn inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] px-4 text-[13px] font-semibold text-white shadow-md shadow-[#7d1f2a]/30">Request</span>
+
+                  <p className="st mt-1 line-clamp-1 text-xs leading-4 text-[#5c534f]" style={{ "--i": 3 } as React.CSSProperties}>Lets cover lists, stacks, queues, trees, graphs, sorting and algorithm analysis</p>
+
+                  <ul className="st mt-1.5 flex flex-wrap gap-1" aria-label="Topics covered" style={{ "--i": 3 } as React.CSSProperties}>
+                    {["Trees", "Graphs", "Sorting"].map((t) => (
+                      <li key={t} className="rounded-full border border-[#eadfd9] bg-[#fbf8f6] px-2 py-0.5 text-[10px] font-medium text-[#6d6260]">{t}</li>
+                    ))}
+                    <li className="px-1 py-0.5 text-[10px] font-medium text-[#8a7f7a]">+2 more</li>
+                  </ul>
+
+                  <div className="st mt-2 flex items-center justify-between gap-x-3 border-t border-[#f1ebe5] pt-2" style={{ "--i": 4 } as React.CSSProperties}>
+                    <span className="inline-flex min-h-7 items-center text-xs font-semibold text-[#7d1f2a]">Quick details</span>
+                    <span className="reqbtn inline-flex min-h-8 items-center justify-center rounded-lg bg-gradient-to-r from-[#7d1f2a] to-[#a52a3a] px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-[#7d1f2a]/25">Request</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </article>
-          </div>
+            </article>
           </Tilt>
         </Reveal>
       </section>
