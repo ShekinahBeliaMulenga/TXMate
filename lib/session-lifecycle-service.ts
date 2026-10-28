@@ -11,6 +11,7 @@
  */
 import type { TutoringSessionWhereInput } from "@/generated/prisma/models/TutoringSession";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_MEETING_LOCATION, checkVenue } from "@/lib/session-venue";
 import { groupUrl, notifyOnce, sessionUrl } from "@/lib/notify";
 import {
   acceptsResponses,
@@ -436,6 +437,7 @@ export async function getGroupSheet(groupId: string, userId: string, now = new D
       studentConfirmedCompletion: member.studentCompletionConfirmedAt !== null,
       needsReview: needsReview(snapshot, nowMs),
       status: member.status,
+      suggestedLocation: member.suggestedLocation,
     };
   });
   return {
@@ -443,7 +445,8 @@ export async function getGroupSheet(groupId: string, userId: string, now = new D
     course: group.offering.course,
     scheduledStart: group.scheduledStart.toISOString(),
     scheduledEnd: group.scheduledEnd.toISOString(),
-    meetingLocation: members[0]?.meetingLocation ?? "To be agreed in conversation",
+    meetingLocation: members[0]?.meetingLocation ?? DEFAULT_MEETING_LOCATION,
+    recurring: members.some((member) => member.request.arrangementType === "RECURRING"),
     attendanceOpensAt: new Date(attendanceOpensAt("ACADEMIC_MATE", group.scheduledStart.getTime(), group.scheduledEnd.getTime())).toISOString(),
     attendanceSubmittedAt: group.mateAttendanceSubmittedAt?.toISOString() ?? null,
     completionSubmittedAt: group.mateCompletionSubmittedAt?.toISOString() ?? null,
@@ -519,3 +522,139 @@ export async function confirmGroupCompletion(input: { groupId: string; userId: s
   }, { timeout: 30_000 });
 }
 
+
+// ---------------------------------------------------------------- venue
+//
+// The Academic Mate chooses where the session happens. A student can suggest a venue,
+// which the mate accepts or declines. Every write is conditional on the session still
+// being open and its arrangement still live, like the attendance and completion writes.
+
+const DAY = new Intl.DateTimeFormat("en-ZM", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Africa/Lusaka" });
+const isOpenSession = (record: SessionRecord) => (OPEN_STATUSES as readonly string[]).includes(record.status);
+const venueClosedMessage = "This session has ended or been cancelled, so its venue can't be changed.";
+
+/** Mate: set the venue for this slot (every student the mate teaches at the same time), optionally for future weekly sessions too. */
+export async function setSessionVenue(input: { sessionId: string; userId: string; location: string; alsoFuture?: boolean }): Promise<ActionResult> {
+  const checked = checkVenue(input.location);
+  if (!checked.ok) return fail(400, checked.message);
+  const location = checked.value;
+  const now = new Date();
+  return prisma.$transaction(async (tx) => {
+    const record = await loadLocked(tx, input.sessionId);
+    const role = record ? roleOf(record, input.userId) : null;
+    if (!record || !role) return fail(404, "Session not found.");
+    if (role !== "ACADEMIC_MATE") return fail(403, "Only the Academic Mate sets the venue. You can suggest one instead.");
+    if (!isOpenSession(record)) return fail(409, venueClosedMessage);
+
+    const offeringId = record.request.offeringId;
+    const live = { status: "ACCEPTED" as const, arrangementStatus: { in: ["ACTIVE", "PAUSED"] as ("ACTIVE" | "PAUSED")[] }, offeringId };
+    const slot = await tx.tutoringSession.findMany({
+      where: { scheduledStart: record.scheduledStart, status: { in: [...OPEN_STATUSES] }, request: { is: live } },
+      select: { id: true, meetingLocation: true, request: { select: { studentProfile: { select: { userId: true } } } } },
+    });
+    if (!slot.some((row) => row.id === record.id)) return fail(409, venueClosedMessage);
+    if (slot.every((row) => row.meetingLocation === location)) return { ok: true, message: "That is already the venue.", changed: false };
+
+    await tx.tutoringSession.updateMany({
+      where: { id: { in: slot.map((row) => row.id) }, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      data: { meetingLocation: location, suggestedLocation: null, suggestedLocationAt: null },
+    });
+
+    let futureCount = 0;
+    if (input.alsoFuture && record.request.arrangementType === "RECURRING") {
+      // Only touch later sessions still on the placeholder or on this session's old venue; a venue set on purpose stays.
+      const future = await tx.tutoringSession.updateMany({
+        where: {
+          arrangementId: record.arrangementId,
+          scheduledStart: { gt: record.scheduledStart },
+          status: "SCHEDULED",
+          meetingLocation: { in: [DEFAULT_MEETING_LOCATION, record.meetingLocation] },
+          ...LIVE_ARRANGEMENT,
+        },
+        data: { meetingLocation: location },
+      });
+      futureCount = future.count;
+    }
+
+    const mateName = record.request.offering.academicMateProfile.user.name || "Your Academic Mate";
+    const students = new Map(slot.map((row) => [row.id, row.request.studentProfile.userId]));
+    await notifyOnce(tx, [...students].filter(([, userId]) => userId !== input.userId).map(([sessionId, userId]) => ({
+      userId,
+      dedupeKey: `venue:set:${sessionId}:${now.getTime()}`,
+      title: "Meeting place set",
+      body: `${mateName} set the venue for ${courseLabel(record)} on ${DAY.format(record.scheduledStart)}: ${location}${futureCount > 0 ? " (also for later weekly sessions)" : ""}.`,
+      url: sessionUrl(sessionId),
+      data: { sessionId },
+    })));
+    return { ok: true, changed: true, message: futureCount > 0 ? `Venue saved, including ${futureCount} later ${futureCount === 1 ? "session" : "sessions"}.` : slot.length > 1 ? `Venue saved for all ${slot.length} students in this slot.` : "Venue saved." };
+  }, { timeout: 15_000 });
+}
+
+/** Student: propose a venue. The mate sees it and accepts or declines. */
+export async function suggestSessionVenue(input: { sessionId: string; userId: string; location: string }): Promise<ActionResult> {
+  const checked = checkVenue(input.location);
+  if (!checked.ok) return fail(400, checked.message);
+  const location = checked.value;
+  const now = new Date();
+  return prisma.$transaction(async (tx) => {
+    const record = await loadLocked(tx, input.sessionId);
+    const role = record ? roleOf(record, input.userId) : null;
+    if (!record || !role) return fail(404, "Session not found.");
+    if (role !== "STUDENT") return fail(403, "You are the Academic Mate, so you can set the venue directly.");
+    if (!isOpenSession(record)) return fail(409, venueClosedMessage);
+    if (record.meetingLocation.toLowerCase() === location.toLowerCase()) return { ok: true, message: "That is already the venue.", changed: false };
+    if (record.suggestedLocation?.toLowerCase() === location.toLowerCase()) return { ok: true, message: "You already suggested this venue. Waiting for your Academic Mate.", changed: false };
+
+    const claim = await tx.tutoringSession.updateMany({
+      where: { id: record.id, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      data: { suggestedLocation: location, suggestedLocationAt: now },
+    });
+    if (claim.count !== 1) return fail(409, venueClosedMessage);
+
+    const mate = record.request.offering.academicMateProfile;
+    await notifyOnce(tx, [{
+      userId: mate.userId,
+      dedupeKey: `venue:suggest:${record.id}:${now.getTime()}`,
+      title: "A student suggested a meeting place",
+      body: `${record.request.studentProfile.user.name || "A student"} suggests "${location}" for ${courseLabel(record)} on ${DAY.format(record.scheduledStart)}.`,
+      url: urlFor(record, mate.userId),
+      data: { sessionId: record.id },
+    }]);
+    return { ok: true, changed: true, message: "Suggestion sent. Your Academic Mate will accept it or choose another place." };
+  }, { timeout: 15_000 });
+}
+
+/** Mate: accept or decline the student's suggestion. Accepting applies to that student's session only. */
+export async function answerVenueSuggestion(input: { sessionId: string; userId: string; action: "ACCEPT" | "DECLINE" }): Promise<ActionResult> {
+  const now = new Date();
+  return prisma.$transaction(async (tx) => {
+    const record = await loadLocked(tx, input.sessionId);
+    const role = record ? roleOf(record, input.userId) : null;
+    if (!record || !role) return fail(404, "Session not found.");
+    if (role !== "ACADEMIC_MATE") return fail(403, "Only the Academic Mate can answer a venue suggestion.");
+    if (!isOpenSession(record)) return fail(409, venueClosedMessage);
+    const suggested = record.suggestedLocation;
+    if (!suggested) return fail(409, "There is no suggestion to answer. It may have been withdrawn or already answered.");
+
+    const accept = input.action === "ACCEPT";
+    const claim = await tx.tutoringSession.updateMany({
+      where: { id: record.id, suggestedLocation: suggested, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      data: { ...(accept ? { meetingLocation: suggested } : {}), suggestedLocation: null, suggestedLocationAt: null },
+    });
+    if (claim.count !== 1) return fail(409, "This suggestion just changed. Please refresh and try again.");
+
+    const student = record.request.studentProfile;
+    const mateName = record.request.offering.academicMateProfile.user.name || "Your Academic Mate";
+    await notifyOnce(tx, [{
+      userId: student.userId,
+      dedupeKey: `venue:${accept ? "accepted" : "declined"}:${record.id}:${now.getTime()}`,
+      title: accept ? "Meeting place confirmed" : "Meeting place suggestion declined",
+      body: accept
+        ? `${mateName} accepted "${suggested}" for ${courseLabel(record)} on ${DAY.format(record.scheduledStart)}.`
+        : `${mateName} can't meet at "${suggested}" for ${courseLabel(record)}. Check the session or chat for the venue.`,
+      url: sessionUrl(record.id),
+      data: { sessionId: record.id },
+    }]);
+    return { ok: true, changed: true, message: accept ? "Suggestion accepted. The venue is updated." : "Suggestion declined." };
+  }, { timeout: 15_000 });
+}

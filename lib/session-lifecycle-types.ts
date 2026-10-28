@@ -24,6 +24,8 @@ export type SessionLifecycleItem = {
   scheduledStart: string;
   scheduledEnd: string;
   meetingLocation: string;
+  /** A venue the student proposed that the Academic Mate has not answered yet. */
+  suggestedLocation: string | null;
   completedAt: string | null;
   studentCompletionConfirmedAt: string | null;
   mateCompletionConfirmedAt: string | null;
@@ -64,6 +66,8 @@ export type GroupSheetRow = {
   studentConfirmedCompletion: boolean;
   needsReview: boolean;
   status: string;
+  /** A venue this student proposed that the Academic Mate has not answered yet. */
+  suggestedLocation: string | null;
 };
 export type GroupSheet = {
   id: string;
@@ -71,6 +75,8 @@ export type GroupSheet = {
   scheduledStart: string;
   scheduledEnd: string;
   meetingLocation: string;
+  /** True when any student in the slot is on a weekly arrangement, so a venue can also cover later weeks. */
+  recurring: boolean;
   attendanceOpensAt: string;
   attendanceSubmittedAt: string | null;
   completionSubmittedAt: string | null;

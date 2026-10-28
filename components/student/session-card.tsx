@@ -56,6 +56,7 @@ export default function SessionCard({ session, now, onOpen, onChanged }: { sessi
         {!closed && <TimeChip status={tabOf(session, now)} />}
         <ResolutionChip status={resolution} />
         {session.arrangementType === "RECURRING" && <span className="inline-flex items-center rounded-full bg-[#f4f0ec] px-2 py-px text-[10px] font-medium text-[#6f655f]">Weekly</span>}
+        {role === "ACADEMIC_MATE" && !closed && session.suggestedLocation && <span className="inline-flex items-center rounded-full bg-[#fdf1ee] px-2 py-px text-[10px] font-semibold text-[#8a2630] ring-1 ring-inset ring-[#e2c9c5]">Venue suggestion</span>}
         <span className="ml-auto flex items-center gap-1.5">
           {!closed && <FlowTracker attendance={flow.attendance} completion={flow.completion} />}
           <IconButton icon="chat" label="Open chat" href={session.conversationUrl} className="h-8! w-8!" />

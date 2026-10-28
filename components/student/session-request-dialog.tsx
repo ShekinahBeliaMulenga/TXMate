@@ -246,7 +246,7 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
 
             {error && <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-xs leading-5 text-red-800">{error}</div>}
 
-            <p className="rounded-md border border-[#efe8e1] bg-[#fbf8f6] p-3 text-[11px] leading-5 text-[#625954]">This sends the support request and proposed first session together. The Academic Mate must accept before sessions are confirmed. For recurring arrangements, the selected weekly pattern is checked for conflicts before the request is sent; future sessions are added as they enter the 30-day scheduling window.</p>
+            <p className="rounded-md border border-[#efe8e1] bg-[#fbf8f6] p-3 text-[11px] leading-5 text-[#625954]">This sends the support request and proposed first session together. The Academic Mate must accept before sessions are confirmed. For recurring arrangements, future sessions are added as they enter the 30-day scheduling window.</p>
 
             <div className="flex flex-col-reverse gap-2 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
               <button type="button" disabled={submitting} onClick={() => dialogRef.current?.close()} className="min-h-9 rounded-md border border-[#d8cec5] bg-white px-4 py-2 text-xs font-semibold text-[#4b423e] hover:bg-[#faf8f6] disabled:opacity-50">Cancel</button>
@@ -261,10 +261,11 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
               <h3 className="text-sm font-semibold text-emerald-900">Request submitted</h3>
               <p className="mt-1 text-sm leading-5 text-emerald-800">{success}</p>
-              <p className="mt-2 text-xs leading-5 text-emerald-800">The Academic Mate will review your request and proposed first-session time. You will not need to book that first session separately after acceptance.</p>
+              <p className="mt-2 text-xs leading-5 text-emerald-800">The Academic Mate will review your request and proposed first-session time.</p>
             </div>
-            <div className="flex justify-end border-t border-[#eee7df] pt-3">
-              <button type="button" onClick={() => dialogRef.current?.close()} className="min-h-9 rounded-md bg-[#7d1f2a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#681923]">Done</button>
+            <div className="flex flex-col-reverse gap-2 border-t border-[#eee7df] pt-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => dialogRef.current?.close()} className="min-h-9 rounded-md border border-[#d8cec5] bg-white px-4 py-2 text-xs font-semibold text-[#4b423e] hover:bg-[#faf8f6]">Done</button>
+              <a href="/student/dashboard" className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md bg-[#7d1f2a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#681923]">View dashboard</a>
             </div>
           </div>
         )}

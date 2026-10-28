@@ -13,6 +13,7 @@ export default function GroupCard({ groupId, sessions, now, onOpen }: { groupId:
   const readyForCompletion = sessions.filter((s) => availableActions(snapshotOf(s), "ACADEMIC_MATE", now).completion).length;
   const studentsAnswered = sessions.filter((s) => s.attendance?.studentAttended !== null && s.attendance?.studentAttended !== undefined).length;
   const reviewCount = sessions.filter((s) => resolutionOf(s, now) === "NEEDS_REVIEW").length;
+  const suggestionCount = sessions.filter((s) => s.suggestedLocation).length;
   const resolutions = new Set(sessions.map((s) => resolutionOf(s, now)));
   const headline = reviewCount > 0 && reviewCount === count ? "NEEDS_REVIEW" : resolutions.has("AWAITING_CONFIRMATION") ? "AWAITING_CONFIRMATION" : "NONE";
 
@@ -36,6 +37,7 @@ export default function GroupCard({ groupId, sessions, now, onOpen }: { groupId:
       <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
         <TimeChip status={tabOf(first, now)} />
         <ResolutionChip status={headline} />
+        {suggestionCount > 0 && <span className="inline-flex items-center rounded-full bg-[#fdf1ee] px-2 py-px text-[10px] font-semibold text-[#8a2630] ring-1 ring-inset ring-[#e2c9c5]">{suggestionCount === 1 ? "Venue suggestion" : `${suggestionCount} venue suggestions`}</span>}
         {reviewCount > 0 && reviewCount < count && <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-px text-[10px] font-semibold text-red-800 ring-1 ring-inset ring-red-200">{reviewCount} need review</span>}
       </div>
       {action && (

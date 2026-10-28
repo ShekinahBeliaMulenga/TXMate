@@ -721,6 +721,9 @@ model TutoringSession {
   scheduledStart        DateTime
   scheduledEnd          DateTime
   meetingLocation       String
+  // A venue the student has proposed. The Academic Mate chooses the real venue and can accept or decline this.
+  suggestedLocation     String?
+  suggestedLocationAt   DateTime?
   status                TutoringSessionStatus      @default(SCHEDULED)
   completedAt           DateTime?
   studentCompletionConfirmedAt DateTime?

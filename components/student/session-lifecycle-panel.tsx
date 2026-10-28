@@ -12,6 +12,7 @@ import {
   toMs,
 } from "@/lib/session-lifecycle-rules";
 import ReviewForm from "./review-form";
+import SessionVenue from "./session-venue";
 import { snapshotOf } from "@/lib/session-lifecycle-serialize";
 import type { SessionLifecycleApiResponse, SessionLifecycleItem } from "@/lib/session-lifecycle-types";
 import {
@@ -62,15 +63,16 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.id]);
 
-  async function send(payload: Record<string, unknown>) {
-    if (busyRef.current) return;
+  async function send(payload: Record<string, unknown>, url = sessionActionUrl(active.id)): Promise<boolean> {
+    if (busyRef.current) return false;
     busyRef.current = true; setBusy(true); setMessage(null);
-    const result = await postJson(sessionActionUrl(active.id), payload);
+    const result = await postJson(url, payload);
     setMessage({ tone: result.ok ? "ok" : "error", text: result.message });
     if (result.ok) { setReporting(false); setReason(""); }
     const fresh = await refresh();
     try { await onUpdatedRef.current?.(fresh); } catch { /* the result above stays visible */ }
     busyRef.current = false; setBusy(false);
+    return result.ok;
   }
 
   const snapshot = useMemo(() => snapshotOf(active), [active]);
@@ -110,7 +112,7 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-y border-[#f0e9e4] py-3 text-[13px]">
         <div className="col-span-2"><dt className="text-[11px] font-medium uppercase tracking-wide text-[#9a8e86]">When</dt><dd className="mt-1 font-medium">{formatDateLong(active.scheduledStart)}<br /><span className="tabular-nums">{formatRange(active.scheduledStart, active.scheduledEnd)}</span></dd></div>
-        <div className="col-span-2"><dt className="text-[11px] font-medium uppercase tracking-wide text-[#9a8e86]">Where</dt><dd className="mt-1 break-words">{active.meetingLocation || "To be agreed in the chat"}</dd></div>
+        <div className="col-span-2"><dt className="text-[11px] font-medium uppercase tracking-wide text-[#9a8e86]">Where</dt><dd className="mt-1"><SessionVenue session={active} closed={closed} busy={busy} onSend={(payload) => send(payload, `${sessionActionUrl(active.id)}/venue`)} /></dd></div>
       </dl>
 
       {resolution === "CANCELLED" && <CancellationNote info={active.cancellation} detailed className="mt-4" />}
@@ -132,7 +134,7 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
                   <SecondaryButton disabled={busy} onClick={() => void send({ type: "ATTENDANCE", attended: false })}>{role === "STUDENT" ? "No, I didn't" : "Didn't attend"}</SecondaryButton>
                 </div>
               )}
-              {actions.changeAttendance && <ChangeAnswer saidYes={Boolean(own)} busy={busy} changesLeft={changesLeft} msLeft={answerChangeTimeLeftMs(snapshot, now)} onConfirm={() => send({ type: "ATTENDANCE", attended: !own })} />}
+              {actions.changeAttendance && <ChangeAnswer saidYes={Boolean(own)} busy={busy} changesLeft={changesLeft} msLeft={answerChangeTimeLeftMs(snapshot, now)} onConfirm={async () => { await send({ type: "ATTENDANCE", attended: !own }); }} />}
               {role === "STUDENT" && own !== null && !actions.changeAttendance && att?.mateConfirmedStudentAttended === null && <p className="text-[11px] text-[#9a8e86]">{changesLeft === 0 ? "You've used all your changes." : "Answers can no longer be changed."}</p>}
               {role === "ACADEMIC_MATE" && own === null && !actions.attendance && now >= attendanceOpensAt(role, start, end) && !closed && <p className="text-xs text-[#81766f]">Waiting for the student to answer first.</p>}
               {own === null && !actions.attendance && !closed && <p className="text-xs text-[#81766f]">{now < start ? `This opens once the session starts.` : `This opens at ${formatClock(new Date(attendanceOpensAt(role, start, end)).toISOString())}.`}</p>}

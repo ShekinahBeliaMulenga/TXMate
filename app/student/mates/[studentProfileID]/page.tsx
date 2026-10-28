@@ -95,9 +95,9 @@ function initials(name: string) {
 /** Profile photo, or the person's initials when there is no photo (or it fails to load). */
 function Avatar({ name, image }: { name: string; image: string | null }) {
   const [failed, setFailed] = useState(false);
-  const size = "h-16 w-16 sm:h-24 sm:w-24";
+  const size = "h-18 w-18 sm:h-20 sm:w-20";
   return image && !failed ? (
-    <Image src={image} alt={name} width={96} height={96} unoptimized onError={() => setFailed(true)} className={`${size} shrink-0 rounded-full bg-white object-cover ring-2 ring-white sm:ring-4`} />
+    <Image src={image} alt={name} width={96} height={96} unoptimized onError={() => setFailed(true)} className={`${size} shrink-0 rounded-full bg-white object-cover ring-4 ring-white sm:ring-4`} />
   ) : (
     <div aria-hidden="true" className={`${size} flex shrink-0 select-none items-center justify-center rounded-full bg-[#f4eceb] text-lg font-semibold tracking-wide text-[#7d1f2a] ring-2 ring-white sm:text-3xl sm:ring-4`}>
       {initials(name)}
@@ -166,8 +166,6 @@ function ProfileSkeleton() {
             </div>
             <div className="mt-4">
               <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
-              <div className="mt-1.5 flex h-[22px] items-center"><div className="h-4 w-64 max-w-full rounded bg-[#eee8e2]" /></div>
-              <div className="mt-1 flex h-5 items-center"><div className="h-3.5 w-full max-w-md rounded bg-[#f0ebe5]" /></div>
               <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
                 <div className="h-6 w-28 rounded-full bg-[#f0ebe5]" />
                 <div className="h-6 w-40 rounded-full bg-[#f0ebe5]" />
@@ -319,11 +317,6 @@ export default function StudentMateProfilePage() {
               <p className="mt-0.5 text-xs text-[#3f3734] sm:mt-1 sm:text-[13px]">
                 {programme.name}
                 <span className="text-[#8a7f7a]"> · Year {programmeYear.yearNumber}</span>
-              </p>
-              <p className="mt-0.5 text-[11px] leading-4 text-[#6d6260] sm:text-xs">
-                {university.name}
-                <span className="text-[#8a7f7a]"> · {programme.school.name}</span>
-                {programme.department && <span className="text-[#8a7f7a]">{" · "}{programme.department.name}</span>}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
                 <span className={chip}><Icon name="academic" className="h-3.5 w-3.5" />{programme.code}</span>

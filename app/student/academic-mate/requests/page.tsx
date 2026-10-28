@@ -952,7 +952,7 @@ export default function AcademicMateRequestsPage() {
               </h2>
               <p className="mt-3 text-sm leading-6 text-[#625954]">
                 {confirmation.action === "ACCEPTED"
-                  ? `You are about to accept ${confirmation.item.student.name}'s request for ${confirmation.item.offering.course.code}. You will still need to arrange the tutoring session separately.`
+                  ? `Accepting ${confirmation.item.student.name}'s request for ${confirmation.item.offering.course.code} will approve the request and confirm the proposed first session${confirmation.item.requestedStart ? ` scheduled for ${formatDateTime(confirmation.item.requestedStart)}` : ""}.`
                   : `You are about to decline ${confirmation.item.student.name}'s request for ${confirmation.item.offering.course.code}.`}
               </p>
               {actionError && (

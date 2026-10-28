@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { RECURRING_GENERATION_HORIZON_DAYS, getRecurringOccurrenceStarts, type RecurringArrangementPlan } from "@/lib/recurring-arrangements";
 import { hasScheduleConflict } from "@/lib/recurring-arrangement-conflicts";
+import { DEFAULT_MEETING_LOCATION, isVenueUnset } from "@/lib/session-venue";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -196,13 +197,21 @@ async function generateOneOccurrence(
       return "conflict";
     }
 
+    // A weekly slot usually keeps its place: reuse the venue the Academic Mate set on the previous session.
+    const previous = await tx.tutoringSession.findFirst({
+      where: { arrangementId: arrangement.id, scheduledStart: { lt: scheduledStart }, status: { not: "CANCELLED" } },
+      orderBy: { scheduledStart: "desc" },
+      select: { meetingLocation: true },
+    });
+    const meetingLocation = previous && !isVenueUnset(previous.meetingLocation) ? previous.meetingLocation : DEFAULT_MEETING_LOCATION;
+
     const createdSession = await tx.tutoringSession.create({
       data: {
         arrangementId: arrangement.id,
         scheduledStart,
         scheduledEnd,
         occurrenceSlotStart: scheduledStart,
-        meetingLocation: "To be agreed in conversation",
+        meetingLocation,
         status: "SCHEDULED",
       },
       select: { id: true },

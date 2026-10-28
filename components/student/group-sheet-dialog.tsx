@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Sheet from "./sheet";
-import { Avatar, CheckIcon, FlowTracker, Glyph, PrimaryButton, formatClock, formatDateShort, formatRange, groupActionUrl, postJson, useNow, type StepState } from "./session-ui";
+import GroupVenue, { type GroupVenuePayload } from "./group-venue";
+import { Avatar, CheckIcon, FlowTracker, Glyph, PrimaryButton, formatClock, formatDateShort, formatRange, groupActionUrl, postJson, sessionActionUrl, useNow, type StepState } from "./session-ui";
 import type { GroupSheet, GroupSheetRow } from "@/lib/session-lifecycle-types";
 
 type Banner = { tone: "ok" | "error"; text: string };
@@ -74,6 +75,16 @@ export default function GroupSheetDialog({ groupId, onClose, onChanged }: { grou
     try { await onChanged?.(); } catch { /* the result above stays visible */ }
     setBusy(false);
   }
+  async function sendVenue(sessionId: string, payload: GroupVenuePayload): Promise<boolean> {
+    if (busy) return false;
+    setBusy(true); setBanner(null);
+    const result = await postJson(`${sessionActionUrl(sessionId)}/venue`, payload);
+    setBanner({ tone: result.ok ? "ok" : "error", text: result.message });
+    await load();
+    try { await onChanged?.(); } catch { /* the result above stays visible */ }
+    setBusy(false);
+    return result.ok;
+  }
   const submitAttendance = () => void run({ type: "ATTENDANCE", responses: answerable.map((row) => ({ sessionId: row.sessionId, attended: answers[row.sessionId] === true })) }, true);
   const confirmCompletion = () => void run({ type: "COMPLETION" }, false);
   const markAll = () => setAnswers((current) => { const next = { ...current }; for (const row of answerable) next[row.sessionId] = true; return next; });
@@ -122,7 +133,7 @@ export default function GroupSheetDialog({ groupId, onClose, onChanged }: { grou
         <div className="pr-12">
           <h2 className="text-lg font-semibold leading-6 sm:text-xl">{sheet.course.name}</h2>
           <p className="mt-0.5 text-xs text-[#756b65]">{sheet.course.code} · {formatDateShort(sheet.scheduledStart)} · <span className="tabular-nums">{formatRange(sheet.scheduledStart, sheet.scheduledEnd)}</span></p>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-[#756b65]"><Glyph name="location" className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{sheet.meetingLocation}</span></p>
+          <GroupVenue sheet={sheet} busy={busy} onSend={sendVenue} />
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-[#e8e0d9]">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-[#584c45]"><Glyph name="users" className="h-4 w-4 text-[#7d1f2a]" />{answered} of {sheet.rows.length} answered<span className="font-normal text-[#9a8e86]">· {phase}</span></p>
