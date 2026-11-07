@@ -54,7 +54,7 @@ function buildEntries(sessions: SessionLifecycleItem[]): Entry[] {
 const membersOf = (entry: Entry) => entry.kind === "group" ? entry.sessions : [entry.session];
 
 function SearchIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
 }
 
 function SessionsView() {
@@ -211,8 +211,8 @@ function SessionsView() {
         <div className="relative mt-3">
           <label htmlFor="session-search" className="sr-only">Search by course, person or place</label>
           <SearchIcon />
-          <input id="session-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search sessions" className="h-9 w-full rounded-lg border border-[#e2d8d0] bg-white pl-9 pr-9 text-[13px] outline-none placeholder:text-[#a3978f] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
-          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
+          <input id="session-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by course, person or place" className="h-11 w-full rounded-xl border border-[#e2d8d0] bg-white pl-10 pr-10 text-sm outline-none placeholder:text-[#a3978f] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+          {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
         </div>
 
         {needAnswer.length > 0 && filter !== "AWAITING_CONFIRMATION" && (
@@ -223,9 +223,9 @@ function SessionsView() {
           </button>
         )}
 
-        <div role="tablist" aria-label="Session time" className="mt-3 grid grid-cols-3 gap-0.5 rounded-lg bg-[#efeae5] p-0.5">
+        <div role="tablist" aria-label="Session time" className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-[#efeae5] p-1">
           {TABS.map((item) => (
-            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-8 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[13px] font-semibold transition sm:gap-1.5 sm:px-2 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
               {item.label}
               <span className={`rounded-full px-1.5 text-[10px] leading-4 tabular-nums ${tab === item.id ? "bg-[#f4e5e2] text-[#7d1f2a]" : "bg-[#e3dcd6] text-[#6f655f]"}`}>{counts[item.id]}{item.id === "PAST" && hasMoreHistory ? "+" : ""}</span>
             </button>

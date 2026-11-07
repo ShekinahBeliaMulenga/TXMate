@@ -32,3 +32,15 @@ export function changePasswordErrorMessage(error: { code?: string; message?: str
   if (error?.status === 401) return "Your session has expired. Please sign in again.";
   return "We couldn't change your password. Please try again.";
 }
+
+export type SetPasswordInput = { next: string; confirm: string };
+export type SetPasswordErrors = Partial<Record<keyof SetPasswordInput, string>>;
+
+/** For people who signed up with Google and have no password yet. There is no "current password" to check. */
+export function validateSetPassword({ next, confirm }: SetPasswordInput): SetPasswordErrors {
+  const errors: SetPasswordErrors = {};
+  if (next.length < PASSWORD_MIN_LENGTH) errors.next = `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+  else if (next.length > PASSWORD_MAX_LENGTH) errors.next = `Use ${PASSWORD_MAX_LENGTH} characters or fewer.`;
+  else if (next !== confirm) errors.confirm = "The two passwords don't match.";
+  return errors;
+}

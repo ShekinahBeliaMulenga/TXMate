@@ -5,7 +5,7 @@ import type { UserRoleFilter, UserStatusFilter } from "@/lib/admin/user-types";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** GET /api/admin/users?q=&role=all|students|mates&status=all|suspended&cursor= */
+/** GET /api/admin/users?q=&role=all|students|mates&status=all|suspended&from=YYYY-MM-DD&to=YYYY-MM-DD&cursor= */
 export async function GET(request: Request) {
   try {
     const result = await authorizeAdmin("users:view");
@@ -19,6 +19,8 @@ export async function GET(request: Request) {
       q: params.get("q") ?? "",
       role: (role === "students" || role === "mates" ? role : "all") as UserRoleFilter,
       status: (status === "suspended" ? "suspended" : "all") as UserStatusFilter,
+      from: (params.get("from") ?? "").slice(0, 10),
+      to: (params.get("to") ?? "").slice(0, 10),
       cursor: cursor && cursor.length <= 100 ? cursor : null,
     });
     return NextResponse.json(page, { headers: NO_STORE });

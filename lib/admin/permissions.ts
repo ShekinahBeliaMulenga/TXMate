@@ -18,6 +18,14 @@ export const ADMIN_PERMISSIONS = [
   "users:suspend",
   "audit:view",
   "admins:manage",
+  "universities:manage",
+  "tutoring:view",
+  "system:view",
+  "support:manage",
+  "reviews:moderate",
+  "messages:view",
+  "users:anonymise",
+  "analytics:view",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -32,6 +40,12 @@ const ROLE_PERMISSIONS: Record<AdminRoleName, ReadonlySet<AdminPermission>> = {
     "users:view",
     "users:suspend",
     "audit:view",
+    "tutoring:view",
+    "system:view",
+    "support:manage",
+    "reviews:moderate",
+    "messages:view",
+    "analytics:view",
   ]),
   MODERATOR: new Set<AdminPermission>([
     "dashboard:view",
@@ -39,8 +53,12 @@ const ROLE_PERMISSIONS: Record<AdminRoleName, ReadonlySet<AdminPermission>> = {
     "disputes:view",
     "disputes:resolve",
     "users:view",
+    "tutoring:view",
+    "support:manage",
+    "reviews:moderate",
+    "analytics:view",
   ]),
-  SUPPORT: new Set<AdminPermission>(["dashboard:view", "disputes:view", "users:view"]),
+  SUPPORT: new Set<AdminPermission>(["dashboard:view", "disputes:view", "users:view", "tutoring:view", "support:manage"]),
 };
 
 export const ADMIN_ROLE_LABEL: Record<AdminRoleName, string> = {

@@ -28,7 +28,7 @@ export default function AdminSignOutButton() {
       disabled={busy}
       aria-label="Sign out"
       title="Sign out"
-      className="flex h-10 w-10 items-center justify-center rounded-xl text-[#7d1f2a] transition hover:bg-[#7d1f2a]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-60"
+      className="flex h-10 w-10 items-center justify-center rounded-md text-[#7d1f2a] transition hover:bg-[#7d1f2a]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-60"
     >
       <Icon name="logout" className="h-5 w-5" />
     </button>

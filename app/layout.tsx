@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import FirebaseForegroundPushListener from "@/components/firebase-foreground-push-listener";
@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TXMate",
   description: "TXMate is a platform that connects students with verified academic mates for personalized tutoring and academic support.",
+  applicationName: "TXMate",
+  appleWebApp: { capable: true, title: "TXMate", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#7d1f2a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

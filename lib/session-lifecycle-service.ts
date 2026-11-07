@@ -530,7 +530,8 @@ export async function confirmGroupCompletion(input: { groupId: string; userId: s
 // being open and its arrangement still live, like the attendance and completion writes.
 
 const DAY = new Intl.DateTimeFormat("en-ZM", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Africa/Lusaka" });
-const isOpenSession = (record: SessionRecord) => (OPEN_STATUSES as readonly string[]).includes(record.status);
+/** A venue can only change while the session is still ahead of us or running; once it has ended the place is a record of what happened. */
+const isOpenSession = (record: SessionRecord) => (OPEN_STATUSES as readonly string[]).includes(record.status) && record.scheduledEnd.getTime() > Date.now();
 const venueClosedMessage = "This session has ended or been cancelled, so its venue can't be changed.";
 
 /** Mate: set the venue for this slot (every student the mate teaches at the same time), optionally for future weekly sessions too. */
@@ -549,14 +550,14 @@ export async function setSessionVenue(input: { sessionId: string; userId: string
     const offeringId = record.request.offeringId;
     const live = { status: "ACCEPTED" as const, arrangementStatus: { in: ["ACTIVE", "PAUSED"] as ("ACTIVE" | "PAUSED")[] }, offeringId };
     const slot = await tx.tutoringSession.findMany({
-      where: { scheduledStart: record.scheduledStart, status: { in: [...OPEN_STATUSES] }, request: { is: live } },
+      where: { scheduledStart: record.scheduledStart, status: { in: [...OPEN_STATUSES] }, scheduledEnd: { gt: new Date() }, request: { is: live } },
       select: { id: true, meetingLocation: true, request: { select: { studentProfile: { select: { userId: true } } } } },
     });
     if (!slot.some((row) => row.id === record.id)) return fail(409, venueClosedMessage);
     if (slot.every((row) => row.meetingLocation === location)) return { ok: true, message: "That is already the venue.", changed: false };
 
     await tx.tutoringSession.updateMany({
-      where: { id: { in: slot.map((row) => row.id) }, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      where: { id: { in: slot.map((row) => row.id) }, status: { in: [...OPEN_STATUSES] }, scheduledEnd: { gt: new Date() }, ...LIVE_ARRANGEMENT },
       data: { meetingLocation: location, suggestedLocation: null, suggestedLocationAt: null },
     });
 
@@ -606,7 +607,7 @@ export async function suggestSessionVenue(input: { sessionId: string; userId: st
     if (record.suggestedLocation?.toLowerCase() === location.toLowerCase()) return { ok: true, message: "You already suggested this venue. Waiting for your Academic Mate.", changed: false };
 
     const claim = await tx.tutoringSession.updateMany({
-      where: { id: record.id, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      where: { id: record.id, status: { in: [...OPEN_STATUSES] }, scheduledEnd: { gt: new Date() }, ...LIVE_ARRANGEMENT },
       data: { suggestedLocation: location, suggestedLocationAt: now },
     });
     if (claim.count !== 1) return fail(409, venueClosedMessage);
@@ -638,7 +639,7 @@ export async function answerVenueSuggestion(input: { sessionId: string; userId: 
 
     const accept = input.action === "ACCEPT";
     const claim = await tx.tutoringSession.updateMany({
-      where: { id: record.id, suggestedLocation: suggested, status: { in: [...OPEN_STATUSES] }, ...LIVE_ARRANGEMENT },
+      where: { id: record.id, suggestedLocation: suggested, status: { in: [...OPEN_STATUSES] }, scheduledEnd: { gt: new Date() }, ...LIVE_ARRANGEMENT },
       data: { ...(accept ? { meetingLocation: suggested } : {}), suggestedLocation: null, suggestedLocationAt: null },
     });
     if (claim.count !== 1) return fail(409, "This suggestion just changed. Please refresh and try again.");

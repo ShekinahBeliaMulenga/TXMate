@@ -139,6 +139,7 @@ export async function GET(_request: Request, context: RouteContext) {
           },
         },
         reviews: {
+          where: { hiddenAt: null },
           orderBy: { createdAt: "desc" },
           take: 50,
           select: {

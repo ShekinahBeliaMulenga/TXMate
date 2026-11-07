@@ -27,7 +27,7 @@ export default function PersonalInfoSection({ email, values, onChange, phone }: 
       <div>
         <label htmlFor="settings-email" className={LABEL}>Email address</label>
         <input id="settings-email" type="email" value={email} readOnly disabled className={`mt-2 ${INPUT_READONLY}`} />
-        <p className={HINT}>Your email address cannot be changed here.</p>
+        <p className={HINT}>To change your email address, open Email and sign-in.</p>
       </div>
 
       <div>

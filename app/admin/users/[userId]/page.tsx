@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AnonymiseCard from "@/components/admin/anonymise-card";
 import AccountStatusCard from "@/components/admin/account-status-card";
 import AdminPage from "@/components/admin/admin-page";
-import { Card, EmptyState } from "@/components/admin/admin-ui";
-import { Icon } from "@/components/ui/icon";
-import { AUDIT_ACTION_LABEL } from "@/lib/admin/audit-types";
+import { Badge, EmptyState, Panel } from "@/components/admin/admin-ui";
+import { AUDIT_ACTION_LABEL, auditTone } from "@/lib/admin/audit-types";
 import { requireAdminPage } from "@/lib/admin/guard";
 import { roleHasPermission } from "@/lib/admin/permissions";
 import { getUserDetail } from "@/lib/admin/users";
@@ -26,14 +26,10 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       title={user.name}
       description={`${user.email} · ${user.university} · Joined ${DATE.format(new Date(user.createdAt))}`}
       width="4xl"
-      actions={
-        <Link href="/admin/users" aria-label="Back to users" title="Back to users" className="flex h-10 w-10 items-center justify-center rounded-full text-[#7d1f2a] hover:bg-[#7d1f2a]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
-          <Icon name="chevronLeft" className="h-6 w-6" />
-        </Link>
-      }
+      crumbs={[{ label: "Users", href: "/admin/users" }, { label: user.name }]}
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <Card title="Accounts" className="divide-y divide-[#f0e9e2]">
+        <Panel title="Accounts" className="divide-y divide-[#eee9e3]">
           {user.student ? (
             <AccountStatusCard
               userId={user.id}
@@ -61,23 +57,24 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               <Link href={`/admin/academic-mates/${user.mate.profileId}`} className="text-sm font-semibold text-[#7d1f2a] hover:underline">Open verification record</Link>
             </div>
           ) : null}
-        </Card>
+          {user.anonymised ? <p className="p-4 text-[13px] text-[#6b635d]">This account has been anonymised. Its personal details are gone.</p> : roleHasPermission(admin.role, "users:anonymise") && user.id !== admin.userId ? <AnonymiseCard userId={user.id} email={user.email} name={user.name} /> : null}
+        </Panel>
 
-        <Card title="Admin history">
+        <Panel title="Admin history">
           {user.history.length === 0 ? (
             <EmptyState icon="audit" title="No admin actions yet" />
           ) : (
-            <ul className="divide-y divide-[#f0e9e2]">
+            <ul className="divide-y divide-[#eee9e3]">
               {user.history.map((entry) => (
                 <li key={entry.id} className="px-4 py-3">
-                  <p className="text-sm font-semibold">{AUDIT_ACTION_LABEL[entry.action] ?? entry.action}</p>
+                  <Badge tone={auditTone(entry.action)}>{AUDIT_ACTION_LABEL[entry.action] ?? entry.action}</Badge>
                   {entry.summary ? <p className="text-[13px] text-[#6d6260]">{entry.summary}</p> : null}
                   <p className="mt-0.5 text-xs text-[#7a6f6a]">{entry.actorName} · {WHEN.format(new Date(entry.createdAt))}</p>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
       </div>
     </AdminPage>
   );

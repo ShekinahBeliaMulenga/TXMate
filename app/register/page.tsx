@@ -1,13 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import VerificationPending from "@/components/auth/verification-pending";
 import { authClient } from "@/lib/auth-client";
 
 export default function RegisterPage() {
-  const router = useRouter();
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +16,7 @@ export default function RegisterPage() {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +51,7 @@ export default function RegisterPage() {
       name: normalizedName,
       email: normalizedEmail,
       password,
-      callbackURL: "/onboarding/student",
+      callbackURL: "/verify-email",
     });
 
     setLoading(false);
@@ -62,7 +61,8 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/onboarding/student");
+    // No session exists yet: the account can be used only after the emailed link is opened.
+    setSentTo(normalizedEmail);
   }
 
   return (
@@ -90,6 +90,15 @@ export default function RegisterPage() {
 
         {/* Auth Card */}
         <div className="rounded-3xl border border-gray-200/80 bg-white/90 p-8 shadow-xl shadow-gray-200/50 backdrop-blur-md">
+          {sentTo ? (
+            <VerificationPending
+              email={sentTo}
+              lead="Your account has been created."
+              callbackURL="/verify-email"
+              backLabel="Wrong email? Go back and correct it"
+              onBack={() => { setSentTo(null); setPassword(""); setConfirmPassword(""); }}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Full Name Field */}
             <div>
@@ -421,6 +430,7 @@ export default function RegisterPage() {
               )}
             </button>
           </form>
+          )}
 
           {/* Footer Link */}
           <div className="mt-6 border-t border-gray-100 pt-6 text-center text-sm text-gray-600">

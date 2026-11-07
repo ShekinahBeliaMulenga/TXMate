@@ -3,59 +3,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon, type IconName } from "@/components/ui/icon";
-
-
-type NotificationItem = { id: string; type: string; title: string; body: string; url: string; read: boolean; createdAt: string };
-type NoticeKind = "attendance" | "session" | "message" | "completion" | "review" | "request" | "general";
-
-const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function ago(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "";
-  const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return RELATIVE.format(-minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return RELATIVE.format(-hours, "hour");
-  const days = Math.round(hours / 24);
-  if (days < 7) return RELATIVE.format(-days, "day");
-  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", ...(date.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) }).format(date);
-}
-
-function dayLabel(value: string) {
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Earlier";
-  const today = new Date();
-  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const days = Math.round((start(today) - start(date)) / 86_400_000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days > 1 && days < 7) return "This week";
-  return "Earlier";
-}
-
-function noticeKind(item: NotificationItem): NoticeKind {
-  const value = `${item.type} ${item.title} ${item.body}`.toLowerCase();
-  if (/attend|present|absence|no.show/.test(value)) return "attendance";
-  if (/complet|finished|session.confirm|confirm.session/.test(value)) return "completion";
-  if (/review|rating|rated/.test(value)) return "review";
-  if (/message|chat|reply/.test(value)) return "message";
-  if (/request|accept|declin|mate/.test(value)) return "request";
-  if (/session|schedule|reschedul|cancel|remind/.test(value)) return "session";
-  return "general";
-}
-
-const KIND_STYLES: Record<NoticeKind, { label: string; icon: IconName; color: string }> = {
-  attendance: { label: "Attendance", icon: "check", color: "bg-amber-50 text-amber-800 ring-amber-100" },
-  completion: { label: "Completion", icon: "complete", color: "bg-emerald-50 text-emerald-800 ring-emerald-100" },
-  review: { label: "Review", icon: "star", color: "bg-violet-50 text-violet-800 ring-violet-100" },
-  message: { label: "Message", icon: "message", color: "bg-sky-50 text-sky-800 ring-sky-100" },
-  request: { label: "Request", icon: "request", color: "bg-rose-50 text-rose-800 ring-rose-100" },
-  session: { label: "Session", icon: "calendar", color: "bg-[#f7f0ed] text-[#7d1f2a] ring-[#eee0db]" },
-  general: { label: "Update", icon: "bell", color: "bg-stone-100 text-stone-700 ring-stone-200" },
-};
+import Link from "next/link";
+import { Icon } from "@/components/ui/icon";
+import { KIND_STYLES, NOTIFICATIONS_CHANGED_EVENT, ago, dayLabel, noticeKind, type NotificationItem } from "./notification-format";
 
 
 export default function NotificationBell({ className = "", align = "right" }: { className?: string; align?: "left" | "right" }) {
@@ -115,8 +65,11 @@ export default function NotificationBell({ className = "", align = "right" }: { 
     const timer = window.setInterval(poll, 30_000);
     document.addEventListener("visibilitychange", poll);
     window.addEventListener("focus", poll);
-  
+    // The notifications page announces when it has read or deleted something.
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, poll);
+
     return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, poll);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", poll);
       window.removeEventListener("focus", poll);
@@ -238,6 +191,12 @@ export default function NotificationBell({ className = "", align = "right" }: { 
               </section>
             ))}
           </div>
+          <footer className="shrink-0 border-t border-[#eee8e2] bg-[#faf8f6] px-4 py-2.5">
+            <Link href="/student/notifications" onClick={() => setOpen(false)} className="flex items-center justify-between rounded-lg px-1 py-1 text-xs font-semibold text-[#7d1f2a] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
+              <span>See all notifications</span>
+              <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+          </footer>
         </div>
       )}
     </div>

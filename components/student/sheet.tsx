@@ -29,11 +29,11 @@ export default function Sheet({ label, onClose, children, footer }: { label: str
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       <div aria-hidden="true" onClick={onClose} className="absolute inset-0 bg-[#1f1715]/50 animate-in fade-in duration-200" />
-      <div role="dialog" aria-modal="true" aria-label={label} className="relative flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-[#f9f8f6] shadow-2xl animate-in slide-in-from-bottom-8 fade-in duration-300 sm:max-h-[86dvh] sm:rounded-3xl">
-        <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#625954] shadow-sm ring-1 ring-[#e8e0d9] transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/50">
-          <Glyph name="x" className="h-5 w-5" />
+      <div role="dialog" aria-modal="true" aria-label={label} className="relative flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl bg-[#f9f8f6] shadow-2xl animate-in slide-in-from-bottom-8 fade-in duration-300 sm:max-h-[86dvh] sm:rounded-2xl">
+        <button ref={closeRef} type="button" onClick={onClose} aria-label="Close" title="Close" className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#625954] shadow-sm ring-1 ring-[#e8e0d9] transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/50">
+          <Glyph name="x" className="h-4 w-4" />
         </button>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{children}</div>
         {footer ? <div className="border-t border-[#e8e0d9] bg-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">{footer}</div> : null}
       </div>
     </div>

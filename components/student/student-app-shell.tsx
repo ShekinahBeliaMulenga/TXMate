@@ -146,6 +146,12 @@ const NAVIGATION_GROUPS: {
         keywords: "photo name phone bio details",
       },
       {
+        label: "Notifications",
+        href: "/student/notifications",
+        icon: "bell",
+        keywords: "alerts updates unread inbox history search filter",
+      },
+      {
         label: "Settings",
         href: "/student/settings",
         icon: "settings",

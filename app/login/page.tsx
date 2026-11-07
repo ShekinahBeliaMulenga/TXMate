@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import VerificationPending from "@/components/auth/verification-pending";
 import { authClient } from "@/lib/auth-client";
+import { googleErrorMessage, isEmailNotVerified } from "@/lib/auth-policy";
 
 /* ---------- 3D scene content ---------- */
 
@@ -81,6 +83,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [verifiedNotice, setVerifiedNotice] = useState(false);
 
   const sceneRef = useRef<HTMLDivElement>(null);
 
@@ -92,22 +96,13 @@ export default function LoginPage() {
     return () => clearTimeout(t);
   }, [error]);
 
+  // Messages carried back from the verification link and from a refused Google sign-in.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("google") !== "success") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await fetch("/api/auth/redirect", { method: "GET", credentials: "include", headers: { Accept: "application/json" }, cache: "no-store" });
-        if (!response.ok) throw new Error("Redirect lookup failed");
-        const data = (await response.json()) as { redirectTo?: string };
-        if (!data.redirectTo) throw new Error("Missing redirect destination");
-        if (!cancelled) router.replace(data.redirectTo);
-      } catch {
-        if (!cancelled) { setError("Unable to complete Google sign-in. Please try again."); setLoading(false); }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [router]);
+    const query = new URLSearchParams(window.location.search);
+    const googleError = googleErrorMessage(query.get("error"));
+    if (googleError) setError(googleError); // eslint-disable-line react-hooks/set-state-in-effect
+    if (query.get("verified") === "1") setVerifiedNotice(true);
+  }, []);
 
   function handlePointerMove(e: React.PointerEvent<HTMLElement>) {
     if (e.pointerType === "touch") return;
@@ -129,7 +124,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await authClient.signIn.social({ provider: "google", callbackURL: "/login?google=success" });
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/auth/google/callback",
+        newUserCallbackURL: "/auth/google/callback",
+        errorCallbackURL: "/auth/google/callback?status=error",
+      });
       if (result.error) { setError(result.error.message || "Unable to sign in with Google."); setLoading(false); }
     } catch {
       setError("Unable to sign in with Google. Please try again.");
@@ -162,7 +162,13 @@ export default function LoginPage() {
       });
 
       if (result.error) {
-        setError(result.error.message || "Unable to sign in.");
+        if (isEmailNotVerified(result.error)) {
+          // The correct password was given but the address is not verified. Better Auth has sent a fresh link.
+          setUnverifiedEmail(normalizedEmail);
+          setPassword("");
+        } else {
+          setError(result.error.status === 429 ? "Too many attempts. Wait a minute and try again." : result.error.message || "Unable to sign in.");
+        }
         setLoading(false);
         return;
       }
@@ -330,6 +336,17 @@ export default function LoginPage() {
           </div>
 
           <div className={`mt-7 sm:rounded-3xl sm:border sm:border-gray-200/80 sm:bg-white sm:p-8 sm:shadow-xl sm:shadow-gray-200/50 ${shake ? "shake" : ""}`}>
+            {unverifiedEmail ? (
+              <VerificationPending
+                email={unverifiedEmail}
+                lead="Your email address isn’t verified yet, so we couldn’t sign you in."
+                callbackURL="/verify-email"
+                backLabel="Back to sign in"
+                onBack={() => setUnverifiedEmail(null)}
+              />
+            ) : (
+            <>
+            {verifiedNotice ? <p role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Your email is verified. Sign in to continue.</p> : null}
             <form method = "post" onSubmit={handleSubmit} className="space-y-5" noValidate>
               {/* Email */}
               <div className="rise" style={{ "--i": 2 } as React.CSSProperties}>
@@ -393,6 +410,10 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <div className="-mt-2 text-right">
+                <Link href="/forgot-password" className="text-sm font-semibold text-[#4d0014] underline-offset-2 hover:text-[#8f4e00] hover:underline">Forgot password?</Link>
+              </div>
+
               {/* Error */}
               {error && (
                 <div role="alert" className="tline flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">
@@ -432,6 +453,8 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
+            </>
+            )}
 
             <div className="rise mt-6 border-t border-gray-100 pt-6 text-center text-sm text-gray-600" style={{ "--i": 5 } as React.CSSProperties}>
               Don&apos;t have an account?{" "}

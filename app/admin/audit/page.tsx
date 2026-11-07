@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminAuditPage() {
   await requireAdminPage("audit:view");
   return (
-    <AdminPage title="Audit log" description="A permanent record of what admins did, who did it and when. Entries can’t be edited or removed." width="4xl">
+    <AdminPage title="Audit log" description="A permanent record of what admins did, who did it and when. Entries can’t be edited or removed.">
       <AuditViewer />
     </AdminPage>
   );

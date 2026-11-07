@@ -107,3 +107,21 @@ import {
     );
   }
   
+  /** A link to a private file that stops working after `seconds`. Used for documents only admins may open. */
+  export async function getR2PrivateUrl(
+    key: string,
+    seconds: number,
+    contentType: string,
+  ): Promise<string> {
+    return getSignedUrl(
+      getR2Client(),
+      new GetObjectCommand({
+        Bucket: getR2BucketName(),
+        Key: key,
+        ResponseContentType: contentType,
+        ResponseContentDisposition: "inline",
+        ResponseCacheControl: "no-store",
+      }),
+      { expiresIn: seconds },
+    );
+  }

@@ -24,11 +24,11 @@ import {
 function Step({ index, state, title, children }: { index: number; state: StepState; title: string; children: React.ReactNode }) {
   const tone = state === "done" ? "bg-emerald-100 text-emerald-800" : state === "problem" ? "bg-red-100 text-red-800" : state === "current" ? "bg-[#7d1f2a] text-white" : "bg-[#f0eae5] text-[#81766f]";
   return (
-    <li className="flex gap-3">
-      <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${tone}`}>{state === "done" ? <CheckIcon className="h-3.5 w-3.5" /> : index}</span>
-      <div className="min-w-0 flex-1 pb-1">
-        <h3 className="text-sm font-semibold text-[#282321]">{title}</h3>
-        <div className="mt-1.5 space-y-2.5 text-sm text-[#625954]">{children}</div>
+    <li className="flex gap-2.5">
+      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${tone}`}>{state === "done" ? <CheckIcon className="h-3.5 w-3.5" /> : index}</span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-[13px] font-semibold text-[#282321]">{title}</h3>
+        <div className="mt-0.5 space-y-1.5 text-[13px] leading-5 text-[#625954]">{children}</div>
       </div>
     </li>
   );
@@ -97,30 +97,32 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
   const changesLeft = answerChangesLeft(snapshot);
 
   return (
-    <section aria-labelledby={`session-${active.id}`} className={`min-w-0 rounded-2xl border border-[#e8e0d9] bg-white ${full ? "p-4 sm:p-5" : "p-4"}`}>
+    <section aria-labelledby={`session-${active.id}`} className={`min-w-0 rounded-xl border border-[#e8e0d9] bg-white ${full ? "p-3 sm:p-4" : "p-3"}`}>
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8a2630]">{active.course.code}</p>
-        <h2 id={`session-${active.id}`} className="mt-1 text-lg font-semibold leading-6">{active.course.name}</h2>
-        <p className="mt-0.5 text-[13px] text-[#756b65]">{role === "STUDENT" ? "With" : "Student:"} {active.otherParticipantName}</p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className={full ? "pr-9" : ""}>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8a2630]">{active.course.code}</p>
+        <h2 id={`session-${active.id}`} className="text-base font-semibold leading-5">{active.course.name}</h2>
+        <p className="text-xs text-[#756b65]">{role === "STUDENT" ? "With" : "Student:"} {active.otherParticipantName}</p>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {!closed && <TimeChip status={tabOf(active, now)} />}
           <ResolutionChip status={resolution} />
           <span className="ml-auto"><FlowTracker attendance={attendanceState} completion={completionState} /></span>
-          {active.arrangementType === "RECURRING" && <span className="inline-flex items-center rounded-full bg-[#f4f0ec] px-2.5 py-0.5 text-[11px] font-medium text-[#6f655f]">Repeats weekly</span>}
+          {active.arrangementType === "RECURRING" && <span className="inline-flex items-center rounded-full bg-[#f4f0ec] px-2 py-0.5 text-[10px] font-medium text-[#6f655f]">Repeats weekly</span>}
         </div>
       </header>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-y border-[#f0e9e4] py-3 text-[13px]">
-        <div className="col-span-2"><dt className="text-[11px] font-medium uppercase tracking-wide text-[#9a8e86]">When</dt><dd className="mt-1 font-medium">{formatDateLong(active.scheduledStart)}<br /><span className="tabular-nums">{formatRange(active.scheduledStart, active.scheduledEnd)}</span></dd></div>
-        <div className="col-span-2"><dt className="text-[11px] font-medium uppercase tracking-wide text-[#9a8e86]">Where</dt><dd className="mt-1"><SessionVenue session={active} closed={closed} busy={busy} onSend={(payload) => send(payload, `${sessionActionUrl(active.id)}/venue`)} /></dd></div>
+      <dl className="mt-2.5 space-y-1.5 border-y border-[#f0e9e4] py-2 text-[13px]">
+        <div className="flex gap-3"><dt className="w-11 shrink-0 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9a8e86]">When</dt><dd className="min-w-0 font-medium">{formatDateLong(active.scheduledStart)} · <span className="tabular-nums">{formatRange(active.scheduledStart, active.scheduledEnd)}</span></dd></div>
+        <div className="flex gap-3"><dt className="w-11 shrink-0 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-[#9a8e86]">Where</dt><dd className="min-w-0 flex-1"><SessionVenue session={active} closed={closed || now >= end} busy={busy} onSend={(payload) => send(payload, `${sessionActionUrl(active.id)}/venue`)} /></dd></div>
       </dl>
 
-      {resolution === "CANCELLED" && <CancellationNote info={active.cancellation} detailed className="mt-4" />}
-      {message && <p role={message.tone === "error" ? "alert" : "status"} className={`mt-4 rounded-lg px-3 py-2.5 text-sm ${message.tone === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>{message.text}</p>}
-      {active.arrangementStatus === "PAUSED" && !closed && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">This arrangement is paused, so new answers are on hold until it resumes.</p>}
-      {underReview && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-5 text-red-800">{active.completionDisputeReason ? `A problem was reported: “${active.completionDisputeReason}”. ` : ""}{next.hint}</p>}
+      {resolution === "CANCELLED" && <CancellationNote info={active.cancellation} detailed className="mt-2.5" />}
+      {message && <p role={message.tone === "error" ? "alert" : "status"} className={`mt-2.5 rounded-lg px-3 py-2 text-[13px] ${message.tone === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>{message.text}</p>}
+      {active.arrangementStatus === "PAUSED" && !closed && <p className="mt-2.5 rounded-lg bg-amber-50 p-2.5 text-[13px] text-amber-900">This arrangement is paused, so new answers are on hold until it resumes.</p>}
+      {underReview && <p className="mt-2.5 rounded-lg border border-red-200 bg-red-50 p-2.5 text-[13px] leading-5 text-red-800">{active.completionDisputeReason ? `A problem was reported: “${active.completionDisputeReason}”. ` : ""}{next.hint}</p>}
 
-      <ol className="mt-4 space-y-4">
+      <ol className="mt-2.5 space-y-2.5">
         <Step index={1} state={attendanceState} title="Attendance">
           {outcome === "VERIFIED" && <p>You both confirmed the attendance.</p>}
           {outcome === "NO_SHOW" && <p>You both said nobody attended, so this was recorded as a no-show.</p>}
@@ -130,8 +132,8 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
               <p>{own === null ? (role === "STUDENT" ? "Tell us whether you attended." : "Tell us whether the student attended.") : `You answered: ${own ? "attended" : "didn't attend"}. Waiting for ${otherName}.`}</p>
               {actions.attendance && (
                 <div className="grid grid-cols-2 gap-2">
-                  <PrimaryButton disabled={busy} onClick={() => void send({ type: "ATTENDANCE", attended: true })}><CheckIcon />{role === "STUDENT" ? "Yes, I attended" : "Attended"}</PrimaryButton>
-                  <SecondaryButton disabled={busy} onClick={() => void send({ type: "ATTENDANCE", attended: false })}>{role === "STUDENT" ? "No, I didn't" : "Didn't attend"}</SecondaryButton>
+                  <PrimaryButton disabled={busy} className="min-h-9!" onClick={() => void send({ type: "ATTENDANCE", attended: true })}><CheckIcon />{role === "STUDENT" ? "Yes, I attended" : "Attended"}</PrimaryButton>
+                  <SecondaryButton disabled={busy} className="min-h-9!" onClick={() => void send({ type: "ATTENDANCE", attended: false })}>{role === "STUDENT" ? "No, I didn't" : "Didn't attend"}</SecondaryButton>
                 </div>
               )}
               {actions.changeAttendance && <ChangeAnswer saidYes={Boolean(own)} busy={busy} changesLeft={changesLeft} msLeft={answerChangeTimeLeftMs(snapshot, now)} onConfirm={async () => { await send({ type: "ATTENDANCE", attended: !own }); }} />}
@@ -154,7 +156,7 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
                   : "Confirm that the session went ahead as planned."}
               </p>
               {deadline !== null && !underReview && !(ownDone && otherDone) && <p className="text-xs text-[#81766f]">The other person must confirm by {formatDateLong(new Date(deadline).toISOString())}, {formatClock(new Date(deadline).toISOString())}. After that it goes to review.</p>}
-              {actions.completion && <PrimaryButton disabled={busy} onClick={() => void send({ type: "COMPLETION", action: "CONFIRM" })} className="w-full sm:w-auto"><CheckIcon />Yes, it was completed</PrimaryButton>}
+              {actions.completion && <PrimaryButton disabled={busy} onClick={() => void send({ type: "COMPLETION", action: "CONFIRM" })} className="min-h-9! w-full sm:w-auto"><CheckIcon />Yes, it was completed</PrimaryButton>}
             </>
           )}
         </Step>
@@ -163,26 +165,26 @@ export default function SessionLifecyclePanel({ session, onUpdated, full = false
       {role === "STUDENT" && resolution === "COMPLETED" && <ReviewForm sessionId={active.id} />}
 
       {actions.dispute && (
-        <div className="mt-5 border-t border-[#f0e9e4] pt-4">
+        <div className="mt-3 border-t border-[#f0e9e4] pt-2.5">
           {!reporting ? (
-            <button type="button" onClick={() => setReporting(true)} className="text-sm font-semibold text-[#7d1f2a] hover:underline">Something went wrong? Report a problem</button>
+            <button type="button" onClick={() => setReporting(true)} className="text-[13px] font-semibold text-[#7d1f2a] hover:underline">Something went wrong? Report a problem</button>
           ) : (
             <div>
               <label htmlFor={`problem-${active.id}`} className="block text-sm font-semibold">What went wrong?</label>
-              <textarea id={`problem-${active.id}`} value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={500} placeholder="For example: the session was cut short, or it never happened." className="mt-1.5 w-full resize-y rounded-lg border border-[#ded4cd] px-3 py-2 text-sm outline-none placeholder:text-[#a79b92] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+              <textarea id={`problem-${active.id}`} value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={500} placeholder="For example: the session was cut short, or it never happened." className="mt-1.5 w-full resize-y rounded-lg border border-[#ded4cd] px-3 py-2 text-sm outline-none placeholder:text-[#a79b92] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
               <p className="mt-1 text-xs text-[#81766f]">The session will be sent to the TXMate team for review.</p>
               <div className="mt-2.5 flex gap-2">
-                <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => void send({ type: "COMPLETION", action: "DISPUTE", reason: reason.trim() })} className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">Send for review</button>
-                <SecondaryButton onClick={() => { setReporting(false); setReason(""); }}>Cancel</SecondaryButton>
+                <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => void send({ type: "COMPLETION", action: "DISPUTE", reason: reason.trim() })} className="min-h-9 rounded-lg bg-red-700 px-4 text-[13px] font-semibold text-white hover:bg-red-800 disabled:opacity-50">Send for review</button>
+                <SecondaryButton className="min-h-9!" onClick={() => { setReporting(false); setReason(""); }}>Cancel</SecondaryButton>
               </div>
             </div>
           )}
         </div>
       )}
 
-      <footer className="mt-4 flex items-center gap-1 border-t border-[#f0e9e4] pt-3">
-        <IconButton icon="chat" label="Open chat" href={active.conversationUrl} />
-        {role === "ACADEMIC_MATE" && active.groupId && !closed && <IconButton icon="list" label="Open attendance list" href={`/student/sessions?group=${encodeURIComponent(active.groupId)}`} />}
+      <footer className="mt-2.5 flex items-center gap-1 border-t border-[#f0e9e4] pt-2">
+        <IconButton icon="chat" label="Open chat" href={active.conversationUrl} className="h-9! w-9!" />
+        {role === "ACADEMIC_MATE" && active.groupId && !closed && <IconButton icon="list" label="Open attendance list" href={`/student/sessions?group=${encodeURIComponent(active.groupId)}`} className="h-9! w-9!" />}
       </footer>
     </section>
   );

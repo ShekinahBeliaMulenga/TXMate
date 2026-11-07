@@ -60,13 +60,13 @@ export default function AccountStatusCard({ userId, scope, title, status, detail
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[#282321]">{title}</p>
-          {detail ? <p className="truncate text-[13px] text-[#6d6260]">{detail}</p> : null}
+          {detail ? <p className="break-words text-[13px] text-[#6d6260]">{detail}</p> : null}
         </div>
         <Badge tone={status === "ACTIVE" ? "success" : status === "SUSPENDED" ? "danger" : "neutral"}>{ACCOUNT_STATUS_LABEL[status] ?? status}</Badge>
       </div>
 
       {canChange && next && !action ? (
-        <button type="button" onClick={() => setAction(next)} className={`mt-3 h-10 rounded-xl px-4 text-sm font-semibold ${FOCUS} ${next === "SUSPEND" ? "border border-[#e3b5b7] text-[#a3262a] hover:bg-[#fdf1f1]" : "bg-[#7d1f2a] text-white hover:bg-[#691923]"}`}>
+        <button type="button" onClick={() => setAction(next)} className={`mt-3 h-10 rounded-md px-4 text-sm font-semibold ${FOCUS} ${next === "SUSPEND" ? "border border-[#e3b5b7] text-[#a3262a] hover:bg-[#fdf1f1]" : "bg-[#7d1f2a] text-white hover:bg-[#691923]"}`}>
           {next === "SUSPEND" ? "Suspend…" : "Reactivate…"}
         </button>
       ) : null}
@@ -74,7 +74,7 @@ export default function AccountStatusCard({ userId, scope, title, status, detail
       {status !== "ACTIVE" && status !== "SUSPENDED" ? <p className="mt-3 text-xs text-[#7a6f6a]">Only active or suspended accounts can be changed here.</p> : null}
 
       {action ? (
-        <div className="mt-3 rounded-xl bg-[#f6f2ee] p-3">
+        <div className="mt-3 rounded-md bg-[#f6f2ee] p-3">
           {action === "SUSPEND" ? <p className="text-[13px] leading-5 text-[#514844]">{suspendEffect}</p> : <p className="text-[13px] leading-5 text-[#514844]">The account becomes active again and the person is told.</p>}
           <label className="mt-3 block text-xs font-semibold text-[#514844]" htmlFor={`reason-${scope}`}>Reason (shown to the person and kept in the audit log)</label>
           <textarea
@@ -83,12 +83,12 @@ export default function AccountStatusCard({ userId, scope, title, status, detail
             onChange={(event) => setReason(event.target.value)}
             maxLength={REASON_MAX}
             rows={3}
-            className={`mt-1 w-full rounded-xl border border-[#e2d9d0] bg-white p-3 text-sm ${FOCUS}`}
+            className={`mt-1 w-full rounded-md border border-[#e2d9d0] bg-white p-3 text-sm ${FOCUS}`}
           />
           {error ? <p role="alert" className="mt-2 text-[13px] text-[#a3262a]">{error}</p> : null}
           <div className="mt-3 flex justify-end gap-2">
-            <button type="button" onClick={() => { setAction(null); setReason(""); setError(null); }} disabled={busy} className={`h-10 rounded-xl px-4 text-sm font-semibold text-[#4e4742] hover:bg-white ${FOCUS}`}>Cancel</button>
-            <button type="button" onClick={() => void submit()} disabled={!reasonOk || busy} className={`h-10 rounded-xl bg-[#7d1f2a] px-5 text-sm font-semibold text-white hover:bg-[#691923] disabled:opacity-50 ${FOCUS}`}>
+            <button type="button" onClick={() => { setAction(null); setReason(""); setError(null); }} disabled={busy} className={`h-10 rounded-md px-4 text-sm font-semibold text-[#4e4742] hover:bg-white ${FOCUS}`}>Cancel</button>
+            <button type="button" onClick={() => void submit()} disabled={!reasonOk || busy} className={`h-10 rounded-md bg-[#7d1f2a] px-5 text-sm font-semibold text-white hover:bg-[#691923] disabled:opacity-50 ${FOCUS}`}>
               {busy ? "Saving…" : action === "SUSPEND" ? "Confirm suspension" : "Confirm reactivation"}
             </button>
           </div>

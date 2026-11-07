@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+
+
 export async function GET() {
     try {
         const session = await auth.api.getSession({
@@ -44,22 +46,31 @@ export async function GET() {
 
         // A suspended student can't use the app. Their sessions are revoked when suspended; this stops a fresh sign-in.
         const student = await prisma.studentProfile.findUnique({
-            where: { userId: session.user.id },
-            select: { status: true },
-        });
-        if (student?.status === "SUSPENDED") {
+            where: {
+              userId: session.user.id,
+            },
+            select: {
+              id: true,
+              status: true,
+            },
+          });
+          
+          if (student?.status === "SUSPENDED") {
             return NextResponse.json(
-                {
-                    error: "This account has been suspended. Contact TXMate support if you think this is a mistake.",
-                    code: "ACCOUNT_SUSPENDED",
-                },
-                { status: 403 },
+              {
+                error:
+                  "This account has been suspended. Contact TXMate support if you think this is a mistake.",
+                code: "ACCOUNT_SUSPENDED",
+              },
+              { status: 403 }
             );
-        }
-
-        return NextResponse.json({
-            redirectTo: "/student/dashboard",
-        });
+          }
+          
+          return NextResponse.json({
+            redirectTo: student
+              ? "/student/dashboard"
+              : "/onboarding/student",
+          });
     } catch (error) {
         console.error(
             "GET /api/auth/redirect failed:",

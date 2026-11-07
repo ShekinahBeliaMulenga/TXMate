@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     const cursor = params.get("cursor");
     const page = await listAudit(result.admin, {
       action: action && (AUDIT_ACTIONS as readonly string[]).includes(action) ? action : null,
+      actor: (params.get("actor") ?? "").slice(0, 100) || null,
+      from: (params.get("from") ?? "").slice(0, 10),
+      to: (params.get("to") ?? "").slice(0, 10),
       cursor: cursor && cursor.length <= 100 ? cursor : null,
     });
     return NextResponse.json(page, { headers: NO_STORE });

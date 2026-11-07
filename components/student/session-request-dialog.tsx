@@ -49,6 +49,13 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+/** Adds calendar days to a YYYY-MM-DD date without any timezone shifting. */
+function addDays(value: string, days: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
 function formatMoney(value: string, currency: string) {
   const amount = Number(value);
   return Number.isFinite(amount)
@@ -63,6 +70,7 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
   const [message, setMessage] = useState("");
   const [arrangementType, setArrangementType] = useState<ArrangementType>("ONE_TIME");
   const [recurrenceEveryWeeks, setRecurrenceEveryWeeks] = useState("1");
+  const [recurrenceEndsOn, setRecurrenceEndsOn] = useState("");
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +111,10 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedStart || submitting || !slots.some((slot) => slot.start === selectedStart)) return;
+    if (arrangementType === "RECURRING" && !recurrenceEndsOn) {
+      setError("Choose the date your recurring sessions should end.");
+      return;
+    }
     if (message.trim().length > 1000) {
       setError("Your message must be 1,000 characters or fewer.");
       return;
@@ -120,6 +132,7 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
           requestedStart: selectedStart,
           arrangementType,
           recurrenceEveryWeeks: arrangementType === "RECURRING" ? Number(recurrenceEveryWeeks) : null,
+          ...(arrangementType === "RECURRING" ? { recurrenceEndsOn } : {}),
         }),
       });
       const body = (await response.json().catch(() => ({}))) as RequestResponse;
@@ -231,6 +244,21 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
                       <option value="3">Every 3 weeks</option>
                       <option value="4">Every 4 weeks</option>
                     </select>
+                  </div>
+                  <div>
+                    <label htmlFor="recurrence-ends-on" className="block text-xs font-semibold text-[#282321]">Last day of sessions</label>
+                    <input
+                      id="recurrence-ends-on"
+                      type="date"
+                      value={recurrenceEndsOn}
+                      onChange={(event) => setRecurrenceEndsOn(event.target.value)}
+                      min={selectedSlot ? addDays(selectedSlot.localDate, Number(recurrenceEveryWeeks) * 7) : undefined}
+                      max={selectedSlot ? addDays(selectedSlot.localDate, 365) : undefined}
+                      required
+                      disabled={submitting}
+                      className="mt-2 min-h-10 w-full rounded-md border border-[#d8cec5] bg-white px-3 py-2 text-base outline-none focus:border-[#7d1f2a] disabled:bg-[#faf8f6] sm:text-sm"
+                    />
+                    <p className="mt-1 text-[11px] leading-4 text-[#6d6260]">Sessions stop after this date. They can run for up to a year, and either of you can end them sooner.</p>
                   </div>
                   {selectedSlot && <p className="rounded-md bg-[#fbf8f6] p-2 text-[11px] leading-4 text-[#625954]">Repeats every {recurrenceEveryWeeks} week{recurrenceEveryWeeks === "1" ? "" : "s"}, on the same weekday and at {selectedSlot.localStart} ({selectedSlot.timezone}). Future sessions use the same local weekday and time as your first session.</p>}
                 </>

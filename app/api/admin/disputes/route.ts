@@ -5,7 +5,7 @@ import type { DisputeListKind } from "@/lib/admin/dispute-types";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
-/** GET /api/admin/disputes?kind=open|resolved&cursor=<sessionId> */
+/** GET /api/admin/disputes?kind=open|resolved&q=&from=YYYY-MM-DD&to=YYYY-MM-DD&cursor=<sessionId> */
 export async function GET(request: Request) {
   try {
     const result = await authorizeAdmin("disputes:view");
@@ -21,7 +21,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid cursor." }, { status: 400, headers: NO_STORE });
     }
 
-    const page = await listDisputes(result.admin, kind as DisputeListKind, cursor);
+    const page = await listDisputes(result.admin, kind as DisputeListKind, cursor, undefined, {
+      q: (url.searchParams.get("q") ?? "").slice(0, 100),
+      from: (url.searchParams.get("from") ?? "").slice(0, 10),
+      to: (url.searchParams.get("to") ?? "").slice(0, 10),
+    });
     return NextResponse.json(page, { headers: NO_STORE });
   } catch (error) {
     console.error("GET /api/admin/disputes failed:", error);

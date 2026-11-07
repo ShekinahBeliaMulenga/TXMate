@@ -83,37 +83,37 @@ export default function ReviewForm({ sessionId, onSaved }: { sessionId: string; 
   if (!showForm && !review) return null;
 
   return (
-    <section aria-label="Your review" className="mt-5 border-t border-[#f0e9e4] pt-4">
+    <section aria-label="Your review" className="mt-3 border-t border-[#f0e9e4] pt-2.5">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[#282321]">{review && !editing ? "Your review" : "How was this session?"}</h3>
+        <h3 className="text-[13px] font-semibold text-[#282321]">{review && !editing ? "Your review" : "How was this session?"}</h3>
         {review && !editing && review.editable && (
-          <button type="button" onClick={() => { setRating(review.rating); setComment(review.comment ?? ""); setEditing(true); }} aria-label="Edit your review" title="Edit" className="flex h-9 w-9 items-center justify-center rounded-full text-[#7a6f6a] hover:bg-[#f4f0ec] hover:text-[#7d1f2a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"><Glyph name="edit" className="h-4 w-4" /></button>
+          <button type="button" onClick={() => { setRating(review.rating); setComment(review.comment ?? ""); setEditing(true); }} aria-label="Edit your review" title="Edit" className="flex h-8 w-8 items-center justify-center rounded-full text-[#7a6f6a] hover:bg-[#f4f0ec] hover:text-[#7d1f2a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"><Glyph name="edit" className="h-4 w-4" /></button>
         )}
       </div>
 
       {showForm ? (
-        <div className="mt-2">
+        <div className="mt-1">
           <div className="flex items-center gap-3">
-            <StarInput value={rating} onChange={setRating} disabled={busy} />
+            <StarInput value={rating} onChange={setRating} disabled={busy} size="h-8 w-8" />
             <span className="text-xs font-medium text-[#756b65]" aria-live="polite">{rating > 0 ? WORDS[rating] : "Tap a star"}</span>
           </div>
           {rating > 0 && (
-            <div className="mt-3">
+            <div className="mt-2">
               <label htmlFor={`review-${sessionId}`} className="sr-only">Comment (optional)</label>
-              <textarea id={`review-${sessionId}`} value={comment} onChange={(event) => setComment(event.target.value)} rows={3} maxLength={REVIEW_COMMENT_MAX} placeholder="Say more (optional). What went well? Everyone can see this on their profile." className="w-full resize-y rounded-lg border border-[#ded4cd] px-3 py-2 text-sm outline-none placeholder:text-[#a79b92] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
-              <p className="mt-1 text-right text-[11px] tabular-nums text-[#9a8e86]">{comment.length}/{REVIEW_COMMENT_MAX}</p>
+              <textarea id={`review-${sessionId}`} value={comment} onChange={(event) => setComment(event.target.value)} rows={2} maxLength={REVIEW_COMMENT_MAX} placeholder="Say more (optional). What went well? Everyone can see this on their profile." className="w-full resize-y rounded-lg border border-[#ded4cd] px-3 py-1.5 text-[13px] outline-none placeholder:text-[#a79b92] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10" />
+              <p className="text-right text-[10px] tabular-nums text-[#9a8e86]">{comment.length}/{REVIEW_COMMENT_MAX}</p>
             </div>
           )}
           {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
-          <div className="mt-3 flex items-center gap-2">
-            <PrimaryButton disabled={busy || rating < 1} onClick={() => void save()}><CheckIcon />{busy ? "Saving…" : review ? "Save changes" : "Submit review"}</PrimaryButton>
-            {editing && <button type="button" onClick={() => { setEditing(false); setError(""); }} aria-label="Cancel editing" title="Cancel" className="flex h-11 w-11 items-center justify-center rounded-full text-[#625954] hover:bg-[#f4f0ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"><Glyph name="x" className="h-5 w-5" /></button>}
+          <div className="mt-2 flex items-center gap-2">
+            <PrimaryButton className="min-h-9!" disabled={busy || rating < 1} onClick={() => void save()}><CheckIcon />{busy ? "Saving…" : review ? "Save changes" : "Submit review"}</PrimaryButton>
+            {editing && <button type="button" onClick={() => { setEditing(false); setError(""); }} aria-label="Cancel editing" title="Cancel" className="flex h-9 w-9 items-center justify-center rounded-full text-[#625954] hover:bg-[#f4f0ec] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40"><Glyph name="x" className="h-4 w-4" /></button>}
           </div>
         </div>
       ) : review ? (
-        <div className="mt-2">
-          <div className="flex items-center gap-0.5" role="img" aria-label={`You rated ${review.rating} out of 5`}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} filled={n <= review.rating} />)}</div>
-          {review.comment && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#514844]">{review.comment}</p>}
+        <div className="mt-1">
+          <div className="flex items-center gap-0.5" role="img" aria-label={`You rated ${review.rating} out of 5`}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} filled={n <= review.rating} className="h-4 w-4" />)}</div>
+          {review.comment && <p className="mt-1 whitespace-pre-wrap text-[13px] leading-5 text-[#514844]">{review.comment}</p>}
         </div>
       ) : null}
     </section>

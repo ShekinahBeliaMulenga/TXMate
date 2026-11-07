@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import VerificationEvidence, { type EvidenceItem } from "@/components/student/verification-evidence";
 
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -50,8 +51,12 @@ type VerificationResponse = {
     studentProfile: boolean;
     academicBackground: boolean;
     offerings: boolean;
+    evidence: boolean;
     readyForVerification: boolean;
   };
+
+  evidence: EvidenceItem[];
+  evidenceMissing: string[];
 
   history: Array<{
     id: string;
@@ -233,9 +238,10 @@ export default function AcademicMateVerificationPage() {
   // Sleek Tab Navigation State
   const [activeView, setActiveView] = useState<"STATUS" | "HISTORY">("STATUS");
 
-  async function loadVerification() {
+  /** `silent` refreshes the data without swapping the page for the loading screen. */
+  async function loadVerification(silent = false) {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       const response = await fetch("/api/student/academic-mate/verification", {
@@ -525,6 +531,7 @@ export default function AcademicMateVerificationPage() {
                     <ReadinessItem label="Linked active student profile" complete={readiness.studentProfile} />
                     <ReadinessItem label="University, programme and year available" complete={readiness.academicBackground} />
                     <ReadinessItem label="At least one active course offering" complete={readiness.offerings} />
+                    <ReadinessItem label="Student ID and proof of enrolment or results uploaded" complete={readiness.evidence} />
                   </div>
 
                   {!readiness.readyForVerification && (
@@ -532,6 +539,14 @@ export default function AcademicMateVerificationPage() {
                       Complete the missing profile information before requesting verification.
                     </div>
                   )}
+                </Section>
+
+                {/* IDENTITY DOCUMENTS */}
+                <Section
+                  title="Identity documents"
+                  subtitle="These prove you are the student you say you are."
+                >
+                  <VerificationEvidence items={data.evidence} locked={profile.verificationStatus === "PENDING" || profile.verificationStatus === "VERIFIED"} onChanged={() => loadVerification(true)} />
                 </Section>
 
                 {/* WHAT IS REVIEWED */}
@@ -545,6 +560,7 @@ export default function AcademicMateVerificationPage() {
                       ["Academic Mate profile", "Your headline, bio and teaching experience."],
                       ["Courses supported", "The courses you have listed as Academic Mate offerings."],
                       ["Experience and qualifications", "Relevant information you have added to your profile."],
+                      ["Identity documents", "Your student ID and proof of enrolment or results, checked one by one."],
                     ].map(([title, description]) => (
                       <div key={title} className="flex items-start gap-3">
                         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f6eaec] text-[#7d1f2a]">

@@ -3,6 +3,7 @@ import { authorizeAdmin, type AdminContext } from "@/lib/admin/guard";
 import { recordAudit } from "@/lib/admin/audit";
 import { canAccessUniversity as adminCanAccessUniversity } from "@/lib/admin/permissions";
 import { prisma } from "@/lib/prisma";
+import { blockersForApproval, purgeDate } from "@/lib/verification-evidence";
 type VerificationDecision = "VERIFIED" | "REJECTED";
 function canAccessUniversity(admin: AdminContext, universityId: string) {
     return adminCanAccessUniversity(admin.scope, universityId);
@@ -286,6 +287,21 @@ export async function GET(
                             },
                         },
                     },
+                    evidence: {
+                        orderBy: { createdAt: "asc" },
+                        select: {
+                            id: true,
+                            kind: true,
+                            contentType: true,
+                            sizeBytes: true,
+                            reviewStatus: true,
+                            rejectionReason: true,
+                            reviewedAt: true,
+                            submittedAt: true,
+                            createdAt: true,
+                            reviewedByAdmin: { select: { user: { select: { name: true } } } },
+                        },
+                    },
                     verificationHistory: {
                         orderBy: {
                             createdAt: "desc",
@@ -452,6 +468,18 @@ export async function GET(
                         review.reviewerUser.name,
                 }),
             ),
+            evidence: academicMate.evidence.map((item) => ({
+                id: item.id,
+                kind: item.kind,
+                contentType: item.contentType,
+                sizeBytes: item.sizeBytes,
+                reviewStatus: item.reviewStatus,
+                rejectionReason: item.rejectionReason,
+                reviewedAt: serializeDate(item.reviewedAt),
+                reviewedBy: item.reviewedByAdmin?.user.name ?? null,
+                uploadedAt: item.createdAt.toISOString(),
+            })),
+            evidenceBlockers: blockersForApproval(academicMate.evidence),
             verificationHistory:
                 academicMate.verificationHistory.map(
                     (entry) => ({
@@ -606,6 +634,7 @@ export async function PATCH(
                 },
                 select: {
                     id: true,
+                    userId: true,
                     universityId: true,
                     status: true,
                     verificationStatus: true,
@@ -637,6 +666,13 @@ export async function PATCH(
                     error:
                         "You do not have access to this university's Academic Mate records.",
                 },
+                { status: 403 },
+            );
+        }
+        // An admin who is also an applicant must not approve or reject their own application.
+        if (academicMate.userId === admin.userId) {
+            return NextResponse.json(
+                { error: "This is your own application, so another admin has to review it." },
                 { status: 403 },
             );
         }
@@ -708,6 +744,18 @@ export async function PATCH(
                         "ACADEMIC_MATE_NOT_ACTIVE",
                     );
                 }
+                const evidence = await tx.academicMateEvidence.findMany({
+                    where: { academicMateProfileId: academicMate.id },
+                    select: { kind: true, reviewStatus: true },
+                });
+                if (decision === "VERIFIED" && blockersForApproval(evidence).length > 0) {
+                    throw new Error("EVIDENCE_INCOMPLETE");
+                }
+                // Documents are deleted a while after the decision, by the clean-up script.
+                await tx.academicMateEvidence.updateMany({
+                    where: { academicMateProfileId: academicMate.id },
+                    data: { purgeAfter: purgeDate(decision as VerificationDecision, reviewedAt) },
+                });
                 const updated =
                     await tx.academicMateProfile.update(
                         {
@@ -822,6 +870,12 @@ export async function PATCH(
                     error:
                         "This verification was already processed by another administrator.",
                 },
+                { status: 409 },
+            );
+        }
+        if (error instanceof Error && error.message === "EVIDENCE_INCOMPLETE") {
+            return NextResponse.json(
+                { error: "The identity documents have not all been reviewed and accepted. Open the Evidence tab to finish." },
                 { status: 409 },
             );
         }

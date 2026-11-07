@@ -190,6 +190,27 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum SupportCaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportCasePriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum SupportCaseCategory {
+  ACCOUNT
+  TUTORING
+  CONDUCT
+  TECHNICAL
+  OTHER
+}
+
 enum AdminRole {
   PLATFORM_ADMIN
   UNIVERSITY_ADMIN
@@ -206,6 +227,8 @@ model User {
   createdAt                     DateTime
   updatedAt                     DateTime
   username                      String?                    @unique
+  anonymisedAt                  DateTime?
+  supportCasesAbout             SupportCase[]              @relation("SupportCaseSubject")
   sessions                      Session[]
   accounts                      Account[]
   studentProfile                StudentProfile?            @relation("UserStudentProfile")
@@ -235,6 +258,7 @@ model Session {
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminMfa  AdminSessionMfa?
 
   @@map("session")
 }
@@ -269,6 +293,15 @@ model Verification {
   @@map("verification")
 }
 
+/// Verification and change-email links that have been opened. Only a hash is kept, so each link works once.
+model UsedEmailToken {
+  tokenHash String   @id
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
 model University {
   id                   String                  @id @default(uuid())
   code                 String                  @unique
@@ -287,6 +320,7 @@ model University {
   mateOfferings        MateOffering[]
   mateRequests         MateRequest[]
   adminAccess          AdminUniversityAccess[]
+  supportCases         SupportCase[]
 }
 
 model UniversitySettings {
@@ -533,12 +567,54 @@ model AcademicMateProfile {
   qualifications      AcademicMateQualification[]
   reviews             Review[]                    @relation("ReviewsReceived")
   verificationHistory AcademicMateVerification[]
+  evidence            AcademicMateEvidence[]
   payments            Payment[]
   payouts             Payout[]
 
   @@unique([id, universityId])
   @@index([universityId, status])
   @@index([universityId, verificationStatus])
+}
+
+enum EvidenceKind {
+  STUDENT_ID
+  PROOF_OF_ENROLMENT
+  ACADEMIC_RESULTS
+}
+
+enum EvidenceReview {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// A private document (student ID, proof of enrolment, results) uploaded to prove an Academic Mate's identity.
+/// The file lives in private storage under storageKey and is only ever opened through short-lived admin links.
+model AcademicMateEvidence {
+  id                    String         @id @default(uuid())
+  academicMateProfileId String
+  kind                  EvidenceKind
+  storageKey            String         @unique
+  contentType           String
+  sizeBytes             Int
+  sha256                String
+  reviewStatus          EvidenceReview @default(PENDING)
+  rejectionReason       String?
+  reviewedByAdminId     String?
+  reviewedAt            DateTime?
+  /// Set when the file was included in a verification request.
+  submittedAt           DateTime?
+  /// After this date the clean-up script deletes the file and this row.
+  purgeAfter            DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  academicMateProfile AcademicMateProfile @relation(fields: [academicMateProfileId], references: [id], onDelete: Cascade)
+  reviewedByAdmin     AdminProfile?       @relation("AdminReviewedEvidence", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([academicMateProfileId, sha256])
+  @@index([academicMateProfileId, kind])
+  @@index([purgeAfter])
 }
 
 model AcademicMateVerification {
@@ -839,6 +915,10 @@ model Review {
   mateProfileId  String
   rating         Int
   comment        String?
+  /// Set when an admin hides the review. Hidden reviews stay on record but are not shown or counted.
+  hiddenAt       DateTime?
+  hiddenByAdminId String?
+  hiddenReason   String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   session        TutoringSession     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
@@ -847,6 +927,7 @@ model Review {
 
   @@index([mateProfileId, createdAt])
   @@index([reviewerUserId])
+  @@index([hiddenAt])
 }
 
 model Conversation {
@@ -1060,7 +1141,10 @@ model AdminProfile {
   verifiedMateOfferings             MateOfferingVerification[] @relation("AdminVerifiedMateOfferings")
   resolvedAttendances               Attendance[]               @relation("AdminResolvedAttendance")
   reviewedAcademicMateVerifications AcademicMateVerification[] @relation("AdminReviewedAcademicMateVerifications")
+  reviewedEvidence                  AcademicMateEvidence[]     @relation("AdminReviewedEvidence")
   auditLogs                         AdminAuditLog[]            @relation("AdminAuditLogs")
+  assignedSupportCases              SupportCase[]              @relation("AdminAssignedCases")
+  twoFactor                         AdminTwoFactor?
 }
 
 /// Append-only record of sensitive admin actions. Actor name and role are snapshotted so the
@@ -1099,4 +1183,81 @@ model AdminUniversityAccess {
 
   @@unique([adminProfileId, universityId])
   @@index([universityId])
+}
+
+/// A problem an admin is tracking: who it is about, who owns it, what was decided.
+model SupportCase {
+  id               String              @id @default(uuid())
+  universityId     String?
+  subjectUserId    String?
+  category         SupportCaseCategory @default(OTHER)
+  priority         SupportCasePriority @default(NORMAL)
+  status           SupportCaseStatus   @default(OPEN)
+  title            String
+  description      String
+  assignedAdminId  String?
+  resolution       String?
+  createdByName    String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  resolvedAt       DateTime?
+  university       University?         @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  subjectUser      User?               @relation("SupportCaseSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  assignedAdmin    AdminProfile?       @relation("AdminAssignedCases", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  notes            SupportCaseNote[]
+
+  @@index([status, priority, createdAt])
+  @@index([universityId, status])
+  @@index([subjectUserId])
+  @@index([assignedAdminId, status])
+}
+
+model SupportCaseNote {
+  id         String      @id @default(uuid())
+  caseId     String
+  authorName String
+  body       String
+  createdAt  DateTime    @default(now())
+  supportCase SupportCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+}
+
+/// An admin's authenticator-app secret for two-step sign-in. The secret is stored encrypted and is not
+/// usable until the first code has been entered (confirmedAt).
+model AdminTwoFactor {
+  id              String            @id @default(uuid())
+  adminProfileId  String            @unique
+  secretEncrypted String
+  confirmedAt     DateTime?
+  /// Last accepted 30-second step, so one code cannot be used twice.
+  lastUsedStep    Int?
+  failedAttempts  Int               @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  adminProfile    AdminProfile      @relation(fields: [adminProfileId], references: [id], onDelete: Cascade)
+  backupCodes     AdminBackupCode[]
+}
+
+/// One-time recovery codes, kept only as keyed hashes.
+model AdminBackupCode {
+  id          String         @id @default(uuid())
+  twoFactorId String
+  codeHash    String
+  usedAt      DateTime?
+  createdAt   DateTime       @default(now())
+  twoFactor   AdminTwoFactor @relation(fields: [twoFactorId], references: [id], onDelete: Cascade)
+
+  @@unique([twoFactorId, codeHash])
+}
+
+/// Marks a sign-in session as having passed two-step verification. An admin session without a row here
+/// can do nothing in the admin portal. Deleted with the session.
+model AdminSessionMfa {
+  sessionId  String   @id
+  verifiedAt DateTime @default(now())
+  /// TOTP or BACKUP
+  method     String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

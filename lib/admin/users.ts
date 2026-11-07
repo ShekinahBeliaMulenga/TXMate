@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notifyOnce } from "@/lib/notify";
 import type { UserWhereInput } from "@/generated/prisma/models/User";
+import { dayRangeFilter } from "./date-range";
 import { recordAudit } from "./audit";
 import type { AdminContext } from "./guard";
 import { canAccessUniversity, universityScopeFilter } from "./permissions";
@@ -11,7 +12,7 @@ export type Result<T> = ({ ok: true } & T) | { ok: false; status: 400 | 403 | 40
 const fail = (status: 400 | 403 | 404 | 409, error: string) => ({ ok: false as const, status, error });
 
 /** Users who are students and/or Academic Mates inside the admin's universities. Admin accounts are never listed. */
-function listWhere(admin: AdminContext, q: string, role: UserRoleFilter, status: UserStatusFilter): UserWhereInput {
+function listWhere(admin: AdminContext, q: string, role: UserRoleFilter, status: UserStatusFilter, joined?: { gte?: Date; lt?: Date }): UserWhereInput {
   const scope = universityScopeFilter(admin.scope);
   const profileFilters: UserWhereInput[] = [];
   const studentStatus = status === "suspended" ? { status: "SUSPENDED" as const } : {};
@@ -20,6 +21,7 @@ function listWhere(admin: AdminContext, q: string, role: UserRoleFilter, status:
   if (role !== "students") profileFilters.push({ academicMate: { is: { ...scope, ...mateStatus } } });
 
   const and: UserWhereInput[] = [{ adminProfile: { is: null } }, { OR: profileFilters }];
+  if (joined) and.push({ createdAt: joined });
   if (q) {
     and.push({
       OR: [
@@ -32,10 +34,10 @@ function listWhere(admin: AdminContext, q: string, role: UserRoleFilter, status:
   return { AND: and };
 }
 
-export async function listUsers(admin: AdminContext, input: { q?: string; role?: UserRoleFilter; status?: UserStatusFilter; cursor?: string | null }): Promise<UserPage> {
+export async function listUsers(admin: AdminContext, input: { q?: string; role?: UserRoleFilter; status?: UserStatusFilter; from?: string; to?: string; cursor?: string | null }): Promise<UserPage> {
   const q = (input.q ?? "").trim().slice(0, SEARCH_MAX);
   const rows = await prisma.user.findMany({
-    where: listWhere(admin, q, input.role ?? "all", input.status ?? "all"),
+    where: listWhere(admin, q, input.role ?? "all", input.status ?? "all", dayRangeFilter(input.from, input.to)),
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: USER_PAGE_SIZE + 1,
     ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
@@ -145,6 +147,7 @@ export type UserDetail = {
   name: string;
   email: string;
   createdAt: string;
+  anonymised: boolean;
   university: string;
   student: { studentId: string; status: string; programme: string } | null;
   mate: { status: string; verification: string; headline: string | null; profileId: string } | null;
@@ -160,6 +163,7 @@ export async function getUserDetail(admin: AdminContext, userId: string): Promis
       name: true,
       email: true,
       createdAt: true,
+      anonymisedAt: true,
       adminProfile: { select: { id: true } },
       studentProfile: { select: { id: true, universityId: true, studentId: true, status: true, university: { select: { name: true } }, programme: { select: { name: true } } } },
       academicMate: { select: { id: true, universityId: true, status: true, verificationStatus: true, headline: true, university: { select: { name: true } } } },
@@ -182,6 +186,7 @@ export async function getUserDetail(admin: AdminContext, userId: string): Promis
     name: user.name,
     email: user.email,
     createdAt: user.createdAt.toISOString(),
+    anonymised: user.anonymisedAt !== null,
     university: user.studentProfile?.university.name ?? user.academicMate?.university.name ?? "—",
     student: user.studentProfile ? { studentId: user.studentProfile.studentId, status: user.studentProfile.status, programme: user.studentProfile.programme.name } : null,
     mate: user.academicMate ? { status: user.academicMate.status, verification: user.academicMate.verificationStatus, headline: user.academicMate.headline, profileId: user.academicMate.id } : null,

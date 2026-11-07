@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { DisputeItem, DisputeListKind, DisputePage } from "@/lib/admin/dispute-types";
+import { DateRangeFields, GhostButton, PrimaryButton, SearchField, Tabs, Toolbar } from "./admin-controls";
+import { EmptyState, Panel } from "./admin-ui";
 import ResolveDisputeDialog from "./resolve-dispute-dialog";
 
 const WHEN = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -14,8 +16,11 @@ const TABS: ReadonlyArray<{ kind: DisputeListKind; label: string }> = [
   { kind: "resolved", label: "Resolved" },
 ];
 
-async function fetchPage(kind: DisputeListKind, cursor: string | null, signal: AbortSignal): Promise<DisputePage> {
+async function fetchPage(kind: DisputeListKind, filter: { q: string; from: string; to: string }, cursor: string | null, signal: AbortSignal): Promise<DisputePage> {
   const query = new URLSearchParams({ kind });
+  if (filter.q) query.set("q", filter.q);
+  if (filter.from) query.set("from", filter.from);
+  if (filter.to) query.set("to", filter.to);
   if (cursor) query.set("cursor", cursor);
   const response = await fetch(`/api/admin/disputes?${query.toString()}`, { headers: { Accept: "application/json" }, cache: "no-store", signal });
   if (response.status === 401) {
@@ -31,29 +36,25 @@ function DisputeCard({ item, kind, canResolve, onResolve }: { item: DisputeItem;
   const start = new Date(item.scheduledStart);
   const end = new Date(item.scheduledEnd);
   return (
-    <li className="rounded-2xl border border-[#ece5de] bg-white p-4">
+    <li className="px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-semibold text-[#282321]"><span className="text-[#7d1f2a]">{item.course.code}</span> · {item.course.name}</h3>
-          <p className="mt-0.5 text-[13px] text-[#6d6260]">{WHEN.format(start)} – {TIME.format(end)} · {item.location}</p>
+          <h3 className="text-sm font-semibold text-[#1f1a17]"><span className="text-[#7d1f2a]">{item.course.code}</span> · {item.course.name}</h3>
+          <p className="mt-0.5 text-[13px] text-[#6b635d]">{WHEN.format(start)} – {TIME.format(end)} · {item.location}</p>
         </div>
-        <div className="flex gap-1.5">
-          <span className="rounded-full bg-[#f3efeb] px-2.5 py-1 text-[11px] font-semibold text-[#6d6260]">{item.university}</span>
-          {item.groupId ? <span className="rounded-full bg-[#f3efeb] px-2.5 py-1 text-[11px] font-semibold text-[#6d6260]">Group session</span> : null}
-          {item.arrangementType === "ONE_TIME" ? <span className="rounded-full bg-[#f3efeb] px-2.5 py-1 text-[11px] font-semibold text-[#6d6260]">One-time</span> : null}
-        </div>
+        <p className="text-xs text-[#7a716a]">{[item.university, item.groupId ? "Group session" : null, item.arrangementType === "ONE_TIME" ? "One-time" : null].filter(Boolean).join(" · ")}</p>
       </div>
 
-      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-        <div className="rounded-xl bg-[#f6f2ee] p-3">
-          <dt className="text-xs text-[#7a6f6a]">Student</dt>
-          <dd className="font-medium">{item.student.name} <span className="font-normal text-[#7a6f6a]">· {item.student.studentId}</span></dd>
-          <dd className="mt-1 text-[13px]">Said: <strong>{item.studentAnswer}</strong></dd>
+      <dl className="mt-3 grid divide-y divide-[#eee9e3] overflow-hidden rounded-md border border-[#eee9e3] text-sm sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+        <div className="px-3 py-2.5">
+          <dt className="text-[11px] font-semibold uppercase tracking-wider text-[#7a716a]">Student</dt>
+          <dd className="mt-0.5 font-medium">{item.student.name} <span className="font-normal text-[#7a716a]">· {item.student.studentId}</span></dd>
+          <dd className="text-[13px] text-[#4e4742]">Said: <strong>{item.studentAnswer}</strong></dd>
         </div>
-        <div className="rounded-xl bg-[#f6f2ee] p-3">
-          <dt className="text-xs text-[#7a6f6a]">Academic Mate</dt>
-          <dd className="font-medium">{item.mate.name}</dd>
-          <dd className="mt-1 text-[13px]">Said the student: <strong>{item.mateAnswer}</strong></dd>
+        <div className="px-3 py-2.5">
+          <dt className="text-[11px] font-semibold uppercase tracking-wider text-[#7a716a]">Academic Mate</dt>
+          <dd className="mt-0.5 font-medium">{item.mate.name}</dd>
+          <dd className="text-[13px] text-[#4e4742]">Said the student: <strong>{item.mateAnswer}</strong></dd>
         </div>
       </dl>
 
@@ -69,14 +70,12 @@ function DisputeCard({ item, kind, canResolve, onResolve }: { item: DisputeItem;
       ) : null}
 
       {kind === "open" && canResolve ? (
-        <div className="mt-4 flex justify-end border-t border-[#efe8e1] pt-3">
-          <button type="button" onClick={onResolve} className="h-10 rounded-xl bg-[#7d1f2a] px-5 text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">
-            Review and decide
-          </button>
+        <div className="mt-3 flex justify-end">
+          <PrimaryButton onClick={onResolve} className="w-full sm:w-auto">Review and decide</PrimaryButton>
         </div>
       ) : null}
       {kind === "resolved" && item.resolvedAt ? (
-        <p className="mt-3 border-t border-[#efe8e1] pt-3 text-xs text-[#7a6f6a]">Resolved by {item.resolvedBy ?? "an admin"} on {WHEN.format(new Date(item.resolvedAt))}. The reason is in the audit log.</p>
+        <p className="mt-3 text-xs text-[#7a716a]">Resolved by {item.resolvedBy ?? "an admin"} on {WHEN.format(new Date(item.resolvedAt))}. The reason is in the audit log.</p>
       ) : null}
     </li>
   );
@@ -91,6 +90,11 @@ export default function DisputesQueue({ canResolve }: { canResolve: boolean }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [input, setInput] = useState("");
+  const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const filtered = Boolean(q || from || to);
   const [resolving, setResolving] = useState<DisputeItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -98,7 +102,7 @@ export default function DisputesQueue({ canResolve }: { canResolve: boolean }) {
     const controller = new AbortController();
     setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
     setError(null);
-    fetchPage(kind, null, controller.signal)
+    fetchPage(kind, { q, from, to }, null, controller.signal)
       .then((page) => {
         setItems(page.items);
         setNextCursor(page.nextCursor);
@@ -111,7 +115,12 @@ export default function DisputesQueue({ canResolve }: { canResolve: boolean }) {
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [kind, reloadKey]);
+  }, [kind, q, from, to, reloadKey]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQ(input.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [input]);
 
   useEffect(() => {
     if (!toast) return;
@@ -123,7 +132,7 @@ export default function DisputesQueue({ canResolve }: { canResolve: boolean }) {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await fetchPage(kind, nextCursor, new AbortController().signal);
+      const page = await fetchPage(kind, { q, from, to }, nextCursor, new AbortController().signal);
       setItems((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.id === item.id))]);
       setNextCursor(page.nextCursor);
     } catch (err) {
@@ -144,49 +153,42 @@ export default function DisputesQueue({ canResolve }: { canResolve: boolean }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-xl border border-[#e2d9d0] bg-white p-1" role="tablist" aria-label="Session list">
-          {TABS.map((tab) => (
-            <button key={tab.kind} type="button" role="tab" aria-selected={kind === tab.kind} onClick={() => setKind(tab.kind)} className={`rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${kind === tab.kind ? "bg-[#7d1f2a] text-white" : "text-[#6d6260] hover:bg-[#f6f1ec]"}`}>
-              {tab.label}
-            </button>
-          ))}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Tabs tabs={TABS.map((tab) => ({ id: tab.kind, label: tab.label }))} value={kind} onChange={setKind} label="Session list" />
         </div>
-        <button type="button" onClick={() => setReloadKey((value) => value + 1)} disabled={loading} aria-label="Refresh" title="Refresh" className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#d8cec6] bg-white text-[#4e4541] transition hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-60">
-          <Icon name="refresh" className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
+        <GhostButton onClick={() => setReloadKey((value) => value + 1)} disabled={loading} className="mb-1">
+          <Icon name="refresh" className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh
+        </GhostButton>
       </div>
 
       <div className="mt-4">
+        <Toolbar>
+          <SearchField value={input} onChange={setInput} placeholder="Search student, mate, course or student ID" label="Search sessions" />
+          <DateRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} fromLabel="Session starts from" toLabel="Session starts to" />
+        </Toolbar>
+      </div>
+
+      <Panel className="mt-4">
         {loading ? (
-          <div className="space-y-3" aria-busy="true">
-            {[0, 1].map((key) => <div key={key} className="h-44 animate-pulse rounded-2xl border border-[#ece5de] bg-white" />)}
-          </div>
+          <div aria-busy="true">{[0, 1].map((key) => <div key={key} className="h-40 animate-pulse border-b border-[#eee9e3] bg-[#faf9f7]" />)}</div>
         ) : error && items.length === 0 ? (
-          <div role="alert" className="rounded-2xl border border-[#e3cfd2] bg-white p-5 text-sm text-[#7d1f2a]">
+          <div role="alert" className="p-5 text-sm text-[#a3262a]">
             {error}
             <button type="button" onClick={() => setReloadKey((value) => value + 1)} className="ml-3 font-semibold underline underline-offset-2">Try again</button>
           </div>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-[#ece5de] bg-white p-6 text-center text-sm text-[#7a6f6a]">
-            {kind === "open" ? "Nothing needs review right now." : "No decisions recorded yet."}
-          </p>
+          <EmptyState icon="alert" title={filtered ? "No sessions match" : kind === "open" ? "Nothing needs review right now" : "No decisions recorded yet"} hint={filtered ? "Try a different search or clear the dates." : kind === "open" ? "Sessions with mismatched answers or reported problems appear here." : undefined} />
         ) : (
-          <>
-            <ul className="space-y-3">
-              {items.map((item) => <DisputeCard key={item.id} item={item} kind={kind} canResolve={canResolve} onResolve={() => setResolving(item)} />)}
-            </ul>
-            {error ? <p role="alert" className="mt-3 text-sm text-[#7d1f2a]">{error}</p> : null}
-            {nextCursor ? (
-              <div className="mt-4 flex justify-center">
-                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="h-10 rounded-xl border border-[#d8cec6] bg-white px-5 text-sm font-semibold text-[#4e4541] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-60">
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              </div>
-            ) : null}
-          </>
+          <ul className="divide-y divide-[#eee9e3]">
+            {items.map((item) => <DisputeCard key={item.id} item={item} kind={kind} canResolve={canResolve} onResolve={() => setResolving(item)} />)}
+          </ul>
         )}
-      </div>
+      </Panel>
+      {error && items.length > 0 ? <p role="alert" className="mt-3 text-sm text-[#a3262a]">{error}</p> : null}
+      {nextCursor && !loading ? (
+        <div className="mt-4 flex justify-center"><GhostButton onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? "Loading…" : "Load more"}</GhostButton></div>
+      ) : null}
 
       {resolving ? <ResolveDisputeDialog item={resolving} onClose={closeDialog} onResolved={handleResolved} /> : null}
 

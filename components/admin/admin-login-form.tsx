@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Icon } from "@/components/ui/icon";
 import { authClient } from "@/lib/auth-client";
+import { isEmailNotVerified } from "@/lib/auth-policy";
 
 /** One message for every failure (wrong password, unknown email, not an admin) so the form cannot be used to probe accounts. */
 const GENERIC_ERROR = "Incorrect email or password.";
@@ -30,6 +31,12 @@ export default function AdminLoginForm({ expired }: { expired: boolean }) {
     try {
       const result = await authClient.signIn.email({ email: normalizedEmail, password });
       if (result.error) {
+        // Only reachable with the right password, so it does not reveal which emails exist.
+        if (isEmailNotVerified(result.error)) {
+          setError("Your email address isn’t verified. We’ve sent a verification link; open it, then sign in again.");
+          setPassword("");
+          return;
+        }
         setError(result.error.status === 429 ? "Too many attempts. Wait a minute and try again." : GENERIC_ERROR);
         setPassword("");
         return;
@@ -45,7 +52,9 @@ export default function AdminLoginForm({ expired }: { expired: boolean }) {
         return;
       }
 
-      router.replace("/admin");
+      // The password was right; the second step (or its first-time setup) comes next.
+      const info = (await check.json().catch(() => ({}))) as { twoStep?: string };
+      router.replace(info.twoStep === "done" ? "/admin" : "/admin/two-step");
     } catch {
       setError("Something went wrong. Check your connection and try again.");
     } finally {
@@ -75,6 +84,7 @@ export default function AdminLoginForm({ expired }: { expired: boolean }) {
           </button>
         </div>
       </div>
+      <p className="text-right"><a href="/forgot-password" className="text-sm font-semibold text-[#7d1f2a] hover:underline">Forgot password?</a></p>
       {error ? <p role="alert" className="text-sm font-medium text-[#7d1f2a]">{error}</p> : null}
       <button
         type="submit"

@@ -1,3 +1,4 @@
+import { dayRangeFilter } from "./date-range";
 import { prisma } from "@/lib/prisma";
 import { notifyOnce } from "@/lib/notify";
 import type { TutoringSessionWhereInput } from "@/generated/prisma/models/TutoringSession";
@@ -66,9 +67,35 @@ const LIST_SELECT = {
 
 const YES_NO = (value: boolean | null | undefined) => (value === true ? "Attended" : value === false ? "Didn't attend" : "No answer");
 
-export async function listDisputes(admin: AdminContext, kind: DisputeListKind, cursor: string | null, take = DISPUTE_PAGE_SIZE): Promise<DisputePage> {
+export type DisputeFilter = { q?: string; from?: string; to?: string };
+
+/** Search by student, mate, course or student ID, and by the day the session started (Zambia time). */
+function filterWhere(filter: DisputeFilter) {
+  const q = (filter.q ?? "").trim().slice(0, 100);
+  const started = dayRangeFilter(filter.from, filter.to);
+  const contains = { contains: q, mode: "insensitive" as const };
+  return [
+    ...(started ? [{ scheduledStart: started }] : []),
+    ...(q
+      ? [{
+          request: {
+            is: {
+              OR: [
+                { studentProfile: { is: { user: { is: { name: contains } } } } },
+                { studentProfile: { is: { studentId: contains } } },
+                { offering: { is: { academicMateProfile: { is: { user: { is: { name: contains } } } } } } },
+                { offering: { is: { course: { is: { OR: [{ code: contains }, { name: contains }] } } } } },
+              ],
+            },
+          },
+        }]
+      : []),
+  ];
+}
+
+export async function listDisputes(admin: AdminContext, kind: DisputeListKind, cursor: string | null, take = DISPUTE_PAGE_SIZE, filter: DisputeFilter = {}): Promise<DisputePage> {
   const rows = await prisma.tutoringSession.findMany({
-    where: { AND: [kind === "open" ? OPEN_DISPUTE_WHERE : RESOLVED_DISPUTE_WHERE, sessionScope(admin)] },
+    where: { AND: [kind === "open" ? OPEN_DISPUTE_WHERE : RESOLVED_DISPUTE_WHERE, sessionScope(admin), ...filterWhere(filter)] },
     orderBy: kind === "open" ? [{ scheduledEnd: "desc" }, { id: "desc" }] : [{ attendance: { resolvedAt: "desc" } }, { id: "desc" }],
     take: take + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -157,6 +184,11 @@ export async function resolveDispute(
     }
     if (!canAccessUniversity(admin.scope, session.request.universityId)) {
       return fail(403, "You do not have access to this university's sessions.");
+    }
+
+    // An admin who is also a student or Academic Mate must not decide a session they took part in.
+    if (session.request.studentProfile.user.id === admin.userId || session.request.offering.academicMateProfile.user.id === admin.userId) {
+      return fail(403, "You took part in this session, so another admin has to decide it.");
     }
 
     const nextStatus = input.outcome === "COMPLETED" ? "COMPLETED" : "NO_SHOW";

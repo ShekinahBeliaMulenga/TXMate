@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import AccountSection from "@/components/student/settings/account-section";
+import EmailSection from "@/components/student/settings/email-section";
 import NotificationsSection from "@/components/student/settings/notifications-section";
 import PasswordSection from "@/components/student/settings/password-section";
 import PersonalInfoSection from "@/components/student/settings/personal-info-section";
@@ -229,6 +230,8 @@ export default function StudentSettingsPage() {
         );
       case "account":
         return <AccountSection studentProfile={studentProfile} />;
+      case "email":
+        return <EmailSection email={user.email} />;
       case "security":
         return <PasswordSection />;
       case "notifications":

@@ -4,13 +4,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { safeInternalUrl } from "@/lib/notify";
+import { foldCategoryCounts } from "@/lib/notification-categories";
+import { encodeCursor, notificationWhere, parseNotificationQuery } from "@/lib/notifications-query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 50;
 const MAX_IDS = 100;
 
 function linkFor(type: string, data: unknown): string {
@@ -34,16 +34,26 @@ export async function GET(request: Request) {
     const unreadCount = await prisma.notification.count({ where: { userId, readAt: null, deletedAt: null } });
     if (params.get("countOnly") === "1") return NextResponse.json({ unreadCount }, { headers: NO_STORE });
 
-    const limit = Math.min(Math.max(Number.parseInt(params.get("limit") ?? "", 10) || DEFAULT_LIMIT, 1), MAX_LIMIT);
+    const parsed = parseNotificationQuery(params);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400, headers: NO_STORE });
+    const { query } = parsed;
     const rows = await prisma.notification.findMany({
-      where: { userId, deletedAt: null },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit,
+      where: notificationWhere(userId, query),
+      orderBy: query.order === "oldest" ? [{ createdAt: "asc" }, { id: "asc" }] : [{ createdAt: "desc" }, { id: "desc" }],
+      take: query.limit + 1,
       select: { id: true, type: true, title: true, body: true, data: true, readAt: true, createdAt: true },
     });
+    const page = rows.slice(0, query.limit);
+    const last = page[page.length - 1];
+    // How many notifications match the filters is only worked out for the first page.
+    const matchCount = query.cursor ? null : await prisma.notification.count({ where: notificationWhere(userId, query, false) });
+    const unreadByType = await prisma.notification.groupBy({ by: ["type"], where: { userId, readAt: null, deletedAt: null }, _count: { _all: true } });
     return NextResponse.json({
       unreadCount,
-      notifications: rows.map((row) => ({
+      categoryUnread: foldCategoryCounts(unreadByType.map((row) => ({ type: row.type, count: row._count._all }))),
+      matchCount,
+      nextCursor: rows.length > query.limit && last ? encodeCursor(last.createdAt, last.id) : null,
+      notifications: page.map((row) => ({
         id: row.id,
         type: row.type,
         title: row.title,

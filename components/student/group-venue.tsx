@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { VENUE_MAX_LENGTH, checkVenue, isVenueUnset } from "@/lib/session-venue";
 import type { GroupSheet } from "@/lib/session-lifecycle-types";
-import { Glyph, PrimaryButton, SecondaryButton } from "./session-ui";
+import { Glyph, PrimaryButton, SecondaryButton, useNow } from "./session-ui";
 
 export type GroupVenuePayload =
   | { action: "SET"; location: string; alsoFuture: boolean }
@@ -21,7 +21,10 @@ export default function GroupVenue({ sheet, busy, onSend }: {
   /** Sends the change for one student's session and refreshes the list. Resolves true when saved. */
   onSend: (sessionId: string, payload: GroupVenuePayload) => Promise<boolean>;
 }) {
-  const openRows = sheet.rows.filter((row) => OPEN.includes(row.status));
+  // Once the slot has ended its place can no longer be changed. The clock ticks, so this updates without a reload.
+  const now = useNow();
+  const ended = new Date(sheet.scheduledEnd).getTime() <= now;
+  const openRows = ended ? [] : sheet.rows.filter((row) => OPEN.includes(row.status));
   const target = openRows[0]?.sessionId;
   const unset = isVenueUnset(sheet.meetingLocation);
   const suggestions = openRows.filter((row) => row.suggestedLocation);

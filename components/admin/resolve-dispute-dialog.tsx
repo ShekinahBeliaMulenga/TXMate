@@ -61,7 +61,7 @@ export default function ResolveDisputeDialog({ item, onClose, onResolved }: { it
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="resolve-title" className="text-lg font-semibold text-[#282321]">Record a decision</h2>
-            <p className="mt-0.5 truncate text-sm text-[#6d6260]">{item.course.code} · {item.student.name}</p>
+            <p className="mt-0.5 break-words text-sm text-[#6d6260]">{item.course.code} · {item.student.name}</p>
           </div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#6d6260] hover:bg-[#f3efeb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-50">
             <span aria-hidden="true" className="text-xl leading-none">×</span>
@@ -73,7 +73,7 @@ export default function ResolveDisputeDialog({ item, onClose, onResolved }: { it
           {OPTIONS.map((option) => {
             const selected = outcome === option.value;
             return (
-              <label key={option.value} className={`flex cursor-pointer items-start gap-3.5 rounded-xl border px-4 py-3.5 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#7d1f2a]/40 ${selected ? "border-[#7d1f2a] bg-[#fdf6f7]" : "border-[#e2d9d0] hover:bg-[#faf8f6]"}`}>
+              <label key={option.value} className={`flex cursor-pointer items-start gap-3.5 rounded-md border px-4 py-3.5 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#7d1f2a]/40 ${selected ? "border-[#7d1f2a] bg-[#fdf6f7]" : "border-[#e2d9d0] hover:bg-[#faf8f6]"}`}>
                 <input type="radio" name="outcome" value={option.value} checked={selected} onChange={() => { setOutcome(option.value); noteRef.current?.focus(); }} className="sr-only" />
                 <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-[#7d1f2a]" : "border-[#c9bdb4]"}`}>
                   {selected ? <span className="h-2.5 w-2.5 rounded-full bg-[#7d1f2a]" /> : null}
@@ -101,7 +101,7 @@ export default function ResolveDisputeDialog({ item, onClose, onResolved }: { it
             rows={4}
             disabled={busy}
             placeholder="What did you check, and why did you decide this?"
-            className="mt-2 w-full resize-y rounded-xl border border-[#ded3ca] px-4 py-3 text-sm leading-6 outline-none focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10"
+            className="mt-2 w-full resize-y rounded-md border border-[#ded3ca] px-4 py-3 text-sm leading-6 outline-none focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10"
           />
           <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-5 text-[#7a6f6a]">
             <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -112,8 +112,8 @@ export default function ResolveDisputeDialog({ item, onClose, onResolved }: { it
         {error ? <p role="alert" className="mt-3 text-sm font-medium text-[#7d1f2a]">{error}</p> : null}
 
         <div className="mt-5 flex gap-2">
-          <button type="button" onClick={onClose} disabled={busy} className="h-12 rounded-xl border border-[#d9cec5] px-5 text-sm font-semibold text-[#4e4742] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-50">Cancel</button>
-          <button type="submit" disabled={!valid || busy} className="h-12 flex-1 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={busy} className="h-12 rounded-md border border-[#d9cec5] px-5 text-sm font-semibold text-[#4e4742] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-50">Cancel</button>
+          <button type="submit" disabled={!valid || busy} className="h-12 flex-1 rounded-md bg-[#7d1f2a] text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             {busy ? "Saving…" : "Confirm decision"}
           </button>
         </div>

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Icon } from "@/components/ui/icon";
 import { ACCOUNT_STATUS_LABEL, type UserPage, type UserRoleFilter, type UserRow, type UserStatusFilter } from "@/lib/admin/user-types";
-import { Badge, Card, EmptyState } from "./admin-ui";
+import { DateRangeFields, SearchField, SelectField, Toolbar, GhostButton } from "./admin-controls";
+import { Badge, EmptyState, Panel, TABLE } from "./admin-ui";
 
 const ROLES: ReadonlyArray<{ id: UserRoleFilter; label: string }> = [
   { id: "all", label: "Everyone" },
@@ -16,7 +16,6 @@ const STATUSES: ReadonlyArray<{ id: UserStatusFilter; label: string }> = [
   { id: "suspended", label: "Suspended" },
 ];
 
-const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40";
 
 async function fetchUsers(params: URLSearchParams, signal: AbortSignal): Promise<UserPage> {
   const response = await fetch(`/api/admin/users?${params.toString()}`, { headers: { Accept: "application/json" }, cache: "no-store", signal });
@@ -33,30 +32,13 @@ function tone(status: string) {
   return status === "ACTIVE" ? "success" : status === "SUSPENDED" ? "danger" : "neutral";
 }
 
-function Row({ user }: { user: UserRow }) {
-  return (
-    <li>
-      <Link href={`/admin/users/${user.id}`} className={`flex items-center gap-3 px-4 py-3 transition hover:bg-[#faf7f4] ${FOCUS}`}>
-        <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-sm font-bold text-[#7d1f2a]">{user.name.trim().charAt(0).toUpperCase() || "?"}</span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[#282321]">{user.name}</p>
-          <p className="truncate text-[13px] text-[#6d6260]">{user.email} · {user.university}{user.student ? ` · ${user.student.studentId}` : ""}</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-          {user.student ? <Badge tone={tone(user.student.status)}>Student · {ACCOUNT_STATUS_LABEL[user.student.status] ?? user.student.status}</Badge> : null}
-          {user.mate ? <Badge tone={tone(user.mate.status)}>Mate · {ACCOUNT_STATUS_LABEL[user.mate.status] ?? user.mate.status}</Badge> : null}
-        </div>
-        <Icon name="chevronRight" className="hidden h-4 w-4 shrink-0 text-[#b3a79f] sm:block" />
-      </Link>
-    </li>
-  );
-}
-
 export default function UsersDirectory() {
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
   const [role, setRole] = useState<UserRoleFilter>("all");
   const [status, setStatus] = useState<UserStatusFilter>("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [items, setItems] = useState<UserRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +55,7 @@ export default function UsersDirectory() {
     const controller = new AbortController();
     setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
     setError(null);
-    fetchUsers(new URLSearchParams({ q, role, status }), controller.signal)
+    fetchUsers(new URLSearchParams({ q, role, status, from, to }), controller.signal)
       .then((page) => { setItems(page.items); setNextCursor(page.nextCursor); })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -83,13 +65,13 @@ export default function UsersDirectory() {
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [q, role, status]);
+  }, [q, role, status, from, to]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await fetchUsers(new URLSearchParams({ q, role, status, cursor: nextCursor }), new AbortController().signal);
+      const page = await fetchUsers(new URLSearchParams({ q, role, status, from, to, cursor: nextCursor }), new AbortController().signal);
       setItems((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.id === item.id))]);
       setNextCursor(page.nextCursor);
     } catch (err) {
@@ -99,46 +81,61 @@ export default function UsersDirectory() {
     }
   }
 
-  const chip = (active: boolean) => `h-9 rounded-full px-3.5 text-[13px] font-semibold transition ${FOCUS} ${active ? "bg-[#7d1f2a] text-white" : "bg-white text-[#5f5652] ring-1 ring-[#e2d9d0] hover:bg-[#f6f1ec]"}`;
-
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#9a8e86]" />
-        <input
-          type="search"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Search by name, email or student ID"
-          aria-label="Search users"
-          maxLength={100}
-          className={`h-11 w-full rounded-xl border border-[#e2d9d0] bg-white pl-11 pr-3 text-sm ${FOCUS}`}
-        />
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {ROLES.map((entry) => <button key={entry.id} type="button" onClick={() => setRole(entry.id)} aria-pressed={role === entry.id} className={chip(role === entry.id)}>{entry.label}</button>)}
-        <span aria-hidden="true" className="mx-1 hidden w-px bg-[#e2d9d0] sm:block" />
-        {STATUSES.map((entry) => <button key={entry.id} type="button" onClick={() => setStatus(entry.id)} aria-pressed={status === entry.id} className={chip(status === entry.id)}>{entry.label}</button>)}
-      </div>
+      <Toolbar>
+        <SearchField value={input} onChange={setInput} placeholder="Search name, email or student ID" label="Search users" />
+        <div className="grid grid-cols-2 gap-2 sm:flex">
+          <SelectField label="Show" value={role} onChange={setRole} options={ROLES} />
+          <SelectField label="Status" value={status} onChange={setStatus} options={STATUSES} />
+        </div>
+        <DateRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} fromLabel="Joined from" toLabel="Joined to" />
+      </Toolbar>
 
-      <Card>
+      <Panel>
         {loading ? (
-          <div className="space-y-px" aria-busy="true">{[0, 1, 2, 3, 4].map((n) => <div key={n} className="h-[4.25rem] animate-pulse bg-[#f6f1ec]/70" />)}</div>
+          <div aria-busy="true">{[0, 1, 2, 3, 4].map((n) => <div key={n} className="h-14 animate-pulse border-b border-[#eee9e3] bg-[#faf9f7]" />)}</div>
         ) : error ? (
           <div role="alert" className="p-6 text-center text-sm text-[#a3262a]">{error}</div>
         ) : items.length === 0 ? (
           <EmptyState icon="users" title="No users found" hint="Try a different search or clear the filters." />
         ) : (
-          <ul className="divide-y divide-[#f0e9e2]">{items.map((user) => <Row key={user.id} user={user} />)}</ul>
+          <div className={TABLE.wrap}>
+            <table className={TABLE.table}>
+              <thead>
+                <tr>
+                  <th className={TABLE.th}>Person</th>
+                  <th className={`${TABLE.th} ${TABLE.hide}`}>University</th>
+                  <th className={`${TABLE.th} ${TABLE.hideSm}`}>Student ID</th>
+                  <th className={TABLE.th}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((user) => (
+                  <tr key={user.id} className={TABLE.row}>
+                    <td className={TABLE.td}>
+                      <Link href={`/admin/users/${user.id}`} className="font-medium hover:text-[#7d1f2a] hover:underline">{user.name}</Link>
+                      <p className="mt-0.5 break-words text-[13px] text-[#6b635d]">{user.email}</p>
+                      <p className="mt-0.5 text-[13px] text-[#6b635d] md:hidden">{user.university}{user.student ? ` · ${user.student.studentId}` : ""}</p>
+                    </td>
+                    <td className={`${TABLE.td} ${TABLE.hide} text-[#4e4742]`}>{user.university}</td>
+                    <td className={`${TABLE.td} ${TABLE.hideSm} font-mono text-[13px] text-[#4e4742]`}>{user.student?.studentId ?? "—"}</td>
+                    <td className={TABLE.td}>
+                      <div className="flex flex-col gap-1">
+                        {user.student ? <Badge tone={tone(user.student.status)}>Student · {ACCOUNT_STATUS_LABEL[user.student.status] ?? user.student.status}</Badge> : null}
+                        {user.mate ? <Badge tone={tone(user.mate.status)}>Mate · {ACCOUNT_STATUS_LABEL[user.mate.status] ?? user.mate.status}</Badge> : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </Panel>
 
       {nextCursor && !loading ? (
-        <div className="flex justify-center">
-          <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className={`h-10 rounded-xl border border-[#e2d9d0] bg-white px-5 text-sm font-semibold text-[#4e4742] hover:bg-[#f6f1ec] disabled:opacity-60 ${FOCUS}`}>
-            {loadingMore ? "Loading…" : "Show more"}
-          </button>
-        </div>
+        <div className="flex justify-center"><GhostButton onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? "Loading…" : "Show more"}</GhostButton></div>
       ) : null}
     </div>
   );

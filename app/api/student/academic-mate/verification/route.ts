@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { missingForSubmission } from "@/lib/verification-evidence";
 
 async function getAuthenticatedUser() {
     const session = await auth.api.getSession({
@@ -103,6 +104,19 @@ export async function GET() {
                         },
                     },
 
+                    evidence: {
+                        orderBy: { createdAt: "asc" },
+                        select: {
+                            id: true,
+                            kind: true,
+                            contentType: true,
+                            sizeBytes: true,
+                            reviewStatus: true,
+                            rejectionReason: true,
+                            createdAt: true,
+                        },
+                    },
+
                     verificationHistory: {
                         orderBy: {
                             createdAt: "desc",
@@ -154,13 +168,15 @@ export async function GET() {
             ),
 
             offerings: academicMate.offerings.length > 0,
+            evidence: missingForSubmission(academicMate.evidence).length === 0,
         };
 
         const readyForVerification =
             readiness.profile &&
             readiness.studentProfile &&
             readiness.academicBackground &&
-            readiness.offerings;
+            readiness.offerings &&
+            readiness.evidence;
 
         return NextResponse.json({
             profile: {
@@ -178,6 +194,12 @@ export async function GET() {
             },
 
             student: academicMate.studentProfile,
+
+            evidence: academicMate.evidence.map((item) => ({
+                ...item,
+                createdAt: item.createdAt.toISOString(),
+            })),
+            evidenceMissing: missingForSubmission(academicMate.evidence),
 
             counts: {
                 activeOfferings: academicMate.offerings.length,
@@ -270,6 +292,13 @@ export async function POST() {
                         },
                         select: {
                             id: true,
+                        },
+                    },
+
+                    evidence: {
+                        select: {
+                            kind: true,
+                            reviewStatus: true,
                         },
                     },
                 },
@@ -376,6 +405,17 @@ export async function POST() {
             );
         }
 
+        const missingEvidence = missingForSubmission(academicMate.evidence);
+
+        if (missingEvidence.length > 0) {
+            return NextResponse.json(
+                {
+                    error: `Upload ${missingEvidence.join(" and ")} before requesting verification.`,
+                },
+                { status: 400 },
+            );
+        }
+
         /*
          * Update the Academic Mate profile and create the
          * verification-history record atomically.
@@ -421,6 +461,16 @@ export async function POST() {
                         "Your Academic Mate profile is already verified.",
                     );
                 }
+
+                // Documents are now part of this request, and are kept while it is open.
+                await tx.academicMateEvidence.updateMany({
+                    where: { academicMateProfileId: academicMate.id, submittedAt: null },
+                    data: { submittedAt: new Date() },
+                });
+                await tx.academicMateEvidence.updateMany({
+                    where: { academicMateProfileId: academicMate.id },
+                    data: { purgeAfter: null },
+                });
 
                 const updated =
                     await tx.academicMateProfile.update({

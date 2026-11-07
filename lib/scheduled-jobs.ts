@@ -1,3 +1,4 @@
+import { removeStaleUnverifiedAccounts } from "@/lib/account-cleanup";
 import { prisma } from "@/lib/prisma";
 import { ensureRecurringSessions } from "@/lib/recurring-session-generator";
 import { expirePendingRescheduleProposals } from "@/lib/reschedule-proposal-expiry";
@@ -35,6 +36,14 @@ export async function runScheduledJobs(now = new Date(), options: { includeHeavy
   } catch (error) {
     recurringGeneration.failed++;
     console.error("Recurring-session generation failed:", error);
+  }
+
+  let accountCleanup = { deleted: 0, failed: 0 };
+  try {
+    if (includeHeavy) accountCleanup = await removeStaleUnverifiedAccounts(now);
+  } catch (error) {
+    accountCleanup.failed++;
+    console.error("Unverified account cleanup failed:", error);
   }
 
   const reminderDeadline = new Date(now.getTime() + REMINDER_WINDOW_MS);
@@ -244,6 +253,7 @@ export async function runScheduledJobs(now = new Date(), options: { includeHeavy
       recurringGeneration,
       rescheduleProposalExpiry,
       sessionLifecycle,
+      accountCleanup,
       processedAt: new Date().toISOString(),
     };
   } catch (error) {

@@ -2,6 +2,9 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
+import AdminPage from "@/components/admin/admin-page";
+import { GhostButton, SearchField, Tabs } from "@/components/admin/admin-controls";
+import { Badge, EmptyState, Panel, TABLE } from "@/components/admin/admin-ui";
 import Link from "next/link";
 
 type VerificationStatus = "PENDING" | "VERIFIED" | "REJECTED" | "UNVERIFIED";
@@ -123,13 +126,6 @@ const statuses: Array<{
   },
 ];
 
-const statusClasses: Record<VerificationStatus, string> = {
-  PENDING: "bg-amber-50 text-amber-800 ring-amber-200",
-  VERIFIED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  REJECTED: "bg-red-50 text-red-800 ring-red-200",
-  UNVERIFIED: "bg-stone-100 text-stone-700 ring-stone-200",
-};
-
 function Icon({
   name,
   className = "h-5 w-5",
@@ -248,123 +244,16 @@ function initials(name: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
+const STATUS_TONE: Record<VerificationStatus, "warning" | "success" | "danger" | "neutral"> = {
+  PENDING: "warning",
+  VERIFIED: "success",
+  REJECTED: "danger",
+  UNVERIFIED: "neutral",
+};
+
 function StatusBadge({ status }: { status: VerificationStatus }) {
   const label = statuses.find((item) => item.value === status)?.label ?? status;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${statusClasses[status]}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {label}
-    </span>
-  );
-}
-
-function ProfileCard({ profile }: { profile: VerificationProfile }) {
-  return (
-    <Link
-      href={`/admin/academic-mates/${profile.id}`}
-      className="group block rounded-2xl border border-[#e2d9d0] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#cbbdb5] hover:shadow-[0_8px_24px_rgba(40,35,33,0.06)]"
-    >
-      <div className="flex items-start gap-4">
-        {profile.user.image ? (
-          <Image
-            src={profile.user.image}
-            alt="" width={64} height={64} unoptimized
-            className="h-12 w-12 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-sm font-semibold text-[#7d1f2a]">
-            {initials(profile.user.name)}
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-[15px] font-semibold text-[#282321] group-hover:text-[#7d1f2a]">
-                {profile.user.name}
-              </h2>
-
-              <p className="mt-0.5 truncate text-xs text-[#8a7f7a]">
-                {profile.user.email}
-              </p>
-            </div>
-
-            <StatusBadge status={profile.verificationStatus} />
-          </div>
-
-          <p className="mt-3 text-sm font-medium text-[#3f3734]">
-            {profile.headline || "Academic support profile"}
-          </p>
-
-          <div className="mt-3 grid gap-2 text-xs text-[#6d6260] sm:grid-cols-2">
-            <div className="flex items-center gap-2">
-              <Icon
-                name="shield"
-                className="h-3.5 w-3.5 shrink-0 text-[#7d1f2a]"
-              />
-
-              <span className="truncate">{profile.university.name}</span>
-            </div>
-
-            {profile.studentProfile?.programme.department && (
-              <div className="flex items-center gap-2">
-                <Icon name="book" className="h-3.5 w-3.5 shrink-0 text-[#7d1f2a]" />
-                <span className="truncate">
-                  {profile.studentProfile.programme.department.name}
-                </span>
-              </div>
-            )}
-
-            {profile.studentProfile ? (
-              <div className="flex items-center gap-2">
-                <Icon
-                  name="book"
-                  className="h-3.5 w-3.5 shrink-0 text-[#7d1f2a]"
-                />
-
-                <span className="truncate">
-                  {profile.studentProfile.programme.name}
-                  {" · Year "}
-                  {profile.studentProfile.programmeYear.yearNumber}
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#eee7df] pt-4 text-xs text-[#8a7f7a]">
-            <span>
-              {profile.offerings.length}{" "}
-              {profile.offerings.length === 1 ? "offering" : "offerings"}
-            </span>
-
-            <span>
-              {profile.experiences.length} experience{" "}
-              {profile.experiences.length === 1 ? "entry" : "entries"}
-            </span>
-
-            <span>
-              {profile.qualifications.length}{" "}
-              {profile.qualifications.length === 1
-                ? "qualification"
-                : "qualifications"}
-            </span>
-
-            <span className="ml-auto">
-              {formatRelativeDate(profile.verificationSubmittedAt)}
-            </span>
-          </div>
-        </div>
-
-        <Icon
-          name="arrow"
-          className="mt-1 hidden h-4 w-4 shrink-0 text-[#b3a7a1] transition group-hover:translate-x-0.5 group-hover:text-[#7d1f2a] sm:block"
-        />
-      </div>
-    </Link>
-  );
+  return <Badge tone={STATUS_TONE[status]}>{label}</Badge>;
 }
 
 export default function AdminAcademicMatesPage() {
@@ -469,144 +358,87 @@ export default function AdminAcademicMatesPage() {
   });
 
   return (
-    <div className="antialiased">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* HEADER */}
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[#282321]">
-              Academic Mate verification
-            </h1>
+    <AdminPage
+      title="Academic Mate verification"
+      description="Review profiles submitted for verification and manage their status."
+      actions={
+        <GhostButton onClick={() => void loadProfiles(true)} disabled={refreshing}>
+          <Icon name="refresh" className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </GhostButton>
+      }
+    >
+      <Tabs tabs={statuses.map((item) => ({ id: item.value, label: item.label }))} value={status} onChange={setStatus} label="Verification status" />
 
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6d6260]">
-              Review Academic Mate profiles submitted for verification and
-              manage their verification status.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 self-start lg:self-auto">
-            <button
-              type="button"
-              onClick={() => void loadProfiles(true)}
-              disabled={refreshing}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-[#d8cec6] bg-white px-4 py-2.5 text-sm font-semibold text-[#4e4541] transition hover:border-[#bcaea6] hover:bg-[#faf8f6] disabled:cursor-not-allowed disabled:opacity-60 lg:self-auto"
-            >
-              <Icon
-                name="refresh"
-                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* STATUS TABS */}
-        <div className="mt-8 overflow-x-auto">
-          <div className="flex min-w-max gap-1 rounded-xl border border-[#e2d9d0] bg-white p-1">
-            {statuses.map((item) => {
-              const active = status === item.value;
-
-              return (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setStatus(item.value)}
-                  className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    active
-                      ? "bg-[#7d1f2a] text-white"
-                      : "text-[#6d6260] hover:bg-[#f6f1ec] hover:text-[#282321]"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* TOOLBAR */}
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-md">
-            <Icon
-              name="search"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9b8f89]"
-            />
-
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name, email, university, department or programme"
-              className="w-full rounded-lg border border-[#d8cec6] bg-white py-2.5 pl-10 pr-4 text-sm text-[#282321] outline-none placeholder:text-[#a39892] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10"
-            />
-          </div>
-
-          <p className="text-xs text-[#8a7f7a]">
-            {filteredProfiles.length} of {total}{" "}
-            {total === 1 ? "profile" : "profiles"}
-          </p>
-        </div>
-
-        {/* ERROR */}
-        {error ? (
-          <div
-            role="alert"
-            className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-800"
-          >
-            <Icon name="alert" className="mt-0.5 h-5 w-5 shrink-0" />
-
-            <div>
-              <p className="font-semibold">Unable to load the queue</p>
-
-              <p className="mt-1">{error}</p>
-            </div>
-          </div>
-        ) : null}
-
-        {/* CONTENT */}
-        <div className="mt-6">
-          {loading ? (
-            <div className="space-y-4">
-              {Array.from({
-                length: 4,
-              }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-36 animate-pulse rounded-2xl border border-[#e2d9d0] bg-white"
-                />
-              ))}
-            </div>
-          ) : filteredProfiles.length === 0 ? (
-            <div className="rounded-2xl border border-[#e2d9d0] bg-white px-6 py-16 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f6f1ec] text-[#7d1f2a]">
-                <Icon name="shield" className="h-6 w-6" />
-              </div>
-
-              <h2 className="mt-5 text-lg font-semibold text-[#282321]">
-                {search
-                  ? "No matching profiles"
-                  : `No ${statuses
-                      .find((item) => item.value === status)
-                      ?.label.toLowerCase()} Academic Mates`}
-              </h2>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#8a7f7a]">
-                {search
-                  ? "Try a different search term."
-                  : status === "PENDING"
-                  ? "Verification requests will appear here when Academic Mates submit their profiles for review."
-                  : "There are currently no profiles in this verification category."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredProfiles.map((profile) => (
-                <ProfileCard key={profile.id} profile={profile} />
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <SearchField value={search} onChange={setSearch} placeholder="Search name, email, university or programme" label="Search profiles" />
+        <p className="text-xs text-[#7a716a]">{filteredProfiles.length} of {total} {total === 1 ? "profile" : "profiles"}</p>
       </div>
-    </div>
+
+      {error ? (
+        <div role="alert" className="mt-4 flex items-start gap-3 rounded-md border border-[#f0c9c9] bg-[#fdf3f3] px-4 py-3 text-sm text-[#8f2323]">
+          <Icon name="alert" className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-semibold">Unable to load the queue</p>
+            <p className="mt-1">{error}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <Panel className="mt-4">
+        {loading ? (
+          <div aria-busy="true">{[0, 1, 2, 3].map((n) => <div key={n} className="h-16 animate-pulse border-b border-[#eee9e3] bg-[#faf9f7]" />)}</div>
+        ) : filteredProfiles.length === 0 ? (
+          <EmptyState
+            icon="shield"
+            title={search ? "No matching profiles" : `No ${statuses.find((item) => item.value === status)?.label.toLowerCase()} Academic Mates`}
+            hint={search ? "Try a different search term." : status === "PENDING" ? "Verification requests appear here when Academic Mates submit their profiles." : "There are no profiles in this category."}
+          />
+        ) : (
+          <div className={TABLE.wrap}>
+            <table className={TABLE.table}>
+              <thead>
+                <tr>
+                  <th className={TABLE.th}>Applicant</th>
+                  <th className={`${TABLE.th} ${TABLE.hide}`}>University &amp; programme</th>
+                  <th className={`${TABLE.th} ${TABLE.hideSm}`}>Profile</th>
+                  <th className={TABLE.th}>Status</th>
+                  <th className={`${TABLE.th} text-right`}>Submitted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProfiles.map((profile) => (
+                  <tr key={profile.id} className={TABLE.row}>
+                    <td className={TABLE.td}>
+                      <Link href={`/admin/academic-mates/${profile.id}`} className="flex items-center gap-3">
+                        {profile.user.image ? (
+                          <Image src={profile.user.image} alt="" width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f1ece7] text-xs font-semibold text-[#7d1f2a]">{initials(profile.user.name)}</span>
+                        )}
+                        <span className="min-w-0">
+                          <span className="block break-words font-medium hover:text-[#7d1f2a] hover:underline">{profile.user.name}</span>
+                          <span className="block break-words text-[13px] text-[#6b635d]">{profile.user.email}</span>
+                          <span className="block text-[13px] text-[#6b635d] md:hidden">{profile.university.code}</span>
+                        </span>
+                      </Link>
+                    </td>
+                    <td className={`${TABLE.td} ${TABLE.hide}`}>
+                      <p className="text-[#1f1a17]">{profile.university.name}</p>
+                      {profile.studentProfile ? <p className="text-[13px] text-[#6b635d]">{profile.studentProfile.programme.name} · Year {profile.studentProfile.programmeYear.yearNumber}</p> : null}
+                    </td>
+                    <td className={`${TABLE.td} ${TABLE.hideSm} text-[13px] text-[#6b635d]`}>
+                      {profile.offerings.length} {profile.offerings.length === 1 ? "course" : "courses"} · {profile.experiences.length} exp. · {profile.qualifications.length} qual.
+                    </td>
+                    <td className={TABLE.td}><StatusBadge status={profile.verificationStatus} /></td>
+                    <td className={`${TABLE.td} whitespace-nowrap text-right text-[13px] text-[#6b635d]`}>{formatRelativeDate(profile.verificationSubmittedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+    </AdminPage>
   );
 }

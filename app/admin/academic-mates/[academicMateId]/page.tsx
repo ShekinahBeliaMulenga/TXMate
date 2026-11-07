@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import VerificationEvidenceReview, { type AdminEvidence } from "@/components/admin/verification-evidence-review";
 
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -182,6 +183,8 @@ type DetailResponse = {
   qualifications: Qualification[];
   reviews: Review[];
   verificationHistory: VerificationHistory[];
+  evidence: AdminEvidence[];
+  evidenceBlockers: string[];
 };
 
 const DAY_LABELS: Record<Availability["day"], string> = {
@@ -197,6 +200,7 @@ const DAY_LABELS: Record<Availability["day"], string> = {
 /* The review is split into focused views. Only one is shown at a time. */
 const SECTIONS = [
   { id: "overview", label: "Overview" },
+  { id: "evidence", label: "Identity documents" },
   { id: "academic", label: "Academic record" },
   { id: "profile", label: "Profile" },
   { id: "offerings", label: "Courses offered" },
@@ -383,6 +387,7 @@ function IconAlert(props: IconProps) {
 
 const SECTION_ICONS: Record<SectionId, typeof IconOverview> = {
   overview: IconOverview,
+  evidence: IconBackground,
   academic: IconAcademic,
   profile: IconProfile,
   offerings: IconCourses,
@@ -874,9 +879,14 @@ export default function AcademicMateVerificationDetailPage() {
         label: "Academic identity",
         complete: Boolean(student?.programme && student.programmeYear),
       },
+      {
+        label: "Identity documents accepted",
+        complete: data.evidenceBlockers.length === 0,
+      },
     ];
 
     const sectionCounts: Partial<Record<SectionId, number>> = {
+      evidence: data.evidence.length,
       academic: student?.courses.length ?? 0,
       offerings: offerings.length,
       background: experiences.length + qualifications.length,
@@ -1224,6 +1234,16 @@ export default function AcademicMateVerificationDetailPage() {
                       </ul>
                     </div>
                   </div>
+                )}
+
+                {activeSection === "evidence" && (
+                  <VerificationEvidenceReview
+                    academicMateId={academicMateId}
+                    items={data.evidence}
+                    blockers={data.evidenceBlockers}
+                    reviewable={profile.verificationStatus === "PENDING"}
+                    onChanged={() => loadProfile(false)}
+                  />
                 )}
 
                 {activeSection === "academic" && (
@@ -1715,7 +1735,8 @@ export default function AcademicMateVerificationDetailPage() {
                   <div className="mt-4 grid gap-2">
                     <button
                       type="button"
-                      disabled={submitting}
+                      disabled={submitting || data.evidenceBlockers.length > 0}
+                      title={data.evidenceBlockers.length > 0 ? "Review and accept the identity documents first" : undefined}
                       onClick={() => setDecision("VERIFIED")}
                       className={`inline-flex items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#681923] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`}
                     >

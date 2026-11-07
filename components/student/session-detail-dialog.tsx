@@ -25,15 +25,15 @@ export default function SessionDetailDialog({ sessionId, onClose, onChanged }: {
 
   return (
     <Sheet label="Session details" onClose={onClose}>
-      <div className="p-3 pt-14 sm:p-5 sm:pt-14">
+      <div className="p-2 sm:p-3">
         {session ? (
           <SessionLifecyclePanel session={session} full onUpdated={async (updated) => { if (updated) setSession(updated); else await load(); await onChanged?.(); }} />
         ) : error ? (
-          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 pr-11 text-sm text-red-800">
             {error} <button type="button" onClick={() => void load()} className="font-semibold underline">Try again</button>
           </div>
         ) : (
-          <div role="status" aria-busy="true" className="h-64 animate-pulse rounded-2xl bg-white ring-1 ring-[#e8e0d9] motion-reduce:animate-none"><span className="sr-only">Loading session…</span></div>
+          <div role="status" aria-busy="true" className="h-48 animate-pulse rounded-xl bg-white ring-1 ring-[#e8e0d9] motion-reduce:animate-none"><span className="sr-only">Loading session…</span></div>
         )}
       </div>
     </Sheet>

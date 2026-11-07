@@ -247,7 +247,7 @@ export async function GET(request: Request) {
     // One grouped query for every Academic Mate in the results.
     const mateIds = [...new Set(offerings.map((offering) => offering.academicMateProfile.id))];
     const ratingRows = mateIds.length
-      ? await prisma.review.groupBy({ by: ["mateProfileId"], where: { mateProfileId: { in: mateIds } }, _avg: { rating: true }, _count: { _all: true } })
+      ? await prisma.review.groupBy({ by: ["mateProfileId"], where: { mateProfileId: { in: mateIds }, hiddenAt: null }, _avg: { rating: true }, _count: { _all: true } })
       : [];
     const ratingByMate = new Map(ratingRows.map((row) => [row.mateProfileId, { average: row._avg.rating === null ? null : Number(row._avg.rating.toFixed(1)), count: row._count._all }]));
     const academicMates = offerings.map((offering) => ({

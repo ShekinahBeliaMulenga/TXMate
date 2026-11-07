@@ -154,6 +154,7 @@ export async function GET() {
           },
         },
         reviews: {
+          where: { hiddenAt: null },
           orderBy: { createdAt: "desc" },
           take: 50,
           select: {

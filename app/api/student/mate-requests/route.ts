@@ -15,6 +15,7 @@ import {
   RECURRING_INTERVAL_OPTIONS,
   type RecurringArrangementPlan,
 } from "@/lib/recurring-arrangements";
+import { checkRecurrenceEnd } from "@/lib/recurring-end";
 import { hasScheduleConflict } from "@/lib/recurring-arrangement-conflicts";
 
 export const runtime = "nodejs";
@@ -34,6 +35,7 @@ type ErrorResult = {
     | "mate-busy"
     | "pending-conflict"
     | "invalid-recurrence"
+    | "invalid-end"
     | "schedule-conflict";
 };
 
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
 
     const allowedFields = new Set([
       "offeringId", "message", "requestedStart", "arrangementType",
-      "recurrenceEveryWeeks",
+      "recurrenceEveryWeeks", "recurrenceEndsOn",
     ]);
     if (!Object.keys(body).every((key) => allowedFields.has(key))) {
       return NextResponse.json({ error: "Request contains unsupported fields." }, { status: 400 });
@@ -99,8 +101,12 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json({ error: "Choose how often recurring sessions should take place." }, { status: 400 });
       }
+      if (typeof body.recurrenceEndsOn !== "string" || !body.recurrenceEndsOn) {
+        return NextResponse.json({ error: "Choose the date your recurring sessions should end." }, { status: 400 });
+      }
     } else if (
-      (recurrenceEveryWeeks !== undefined && recurrenceEveryWeeks !== null)
+      (recurrenceEveryWeeks !== undefined && recurrenceEveryWeeks !== null) ||
+      (body.recurrenceEndsOn !== undefined && body.recurrenceEndsOn !== null)
     ) {
       return NextResponse.json({ error: "One-time arrangements cannot include recurring settings." }, { status: 400 });
     }
@@ -161,6 +167,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You cannot request academic support from yourself." }, { status: 400 });
     }
 
+    let endProblem = "";
     const result = await prisma.$transaction(async (tx) => {
       // Serialize request proposals and acceptances for the same student or Academic Mate.
       const lockKeys = [`student:${student.id}`, `academic-mate:${initialOffering.academicMateProfile.id}`].sort();
@@ -237,7 +244,7 @@ export async function POST(request: Request) {
       let recurrenceWeekday = null as RecurringArrangementPlan["weekday"];
       let recurrenceLocalStartMinute = null as RecurringArrangementPlan["localStartMinute"];
       let recurrenceTimezone = null as RecurringArrangementPlan["timezone"];
-      const recurrenceEndsAt: Date | null = null;
+      let recurrenceEndsAt: Date | null = null;
       let occurrenceStarts = [requestedStart];
 
       if (arrangementType === "RECURRING") {
@@ -246,6 +253,13 @@ export async function POST(request: Request) {
         recurrenceWeekday = localSchedule.weekday;
         recurrenceLocalStartMinute = localSchedule.localStartMinute;
         recurrenceTimezone = matchingAvailability.timezone;
+
+        const endCheck = checkRecurrenceEnd({ endsOn: body.recurrenceEndsOn, firstStart: requestedStart, timezone: matchingAvailability.timezone, everyWeeks: recurrenceEveryWeeks as number });
+        if (!endCheck.ok) {
+          endProblem = endCheck.message;
+          return { kind: "invalid-end" } as ErrorResult;
+        }
+        recurrenceEndsAt = endCheck.endsAt;
 
         const plan: RecurringArrangementPlan = {
           anchorStart: requestedStart,
@@ -377,6 +391,7 @@ export async function POST(request: Request) {
         "mate-busy": { error: "The Academic Mate already has another session at that time. Refresh the available times and choose another slot.", status: 409 },
         "session-conflict": { error: "You or the Academic Mate already has a session during that time. Choose another slot.", status: 409 },
         "pending-conflict": { error: "That time has already been proposed in another pending request. Choose another available slot.", status: 409 },
+        "invalid-end": { error: endProblem || "Choose the date your recurring sessions should end.", status: 400 },
         "invalid-recurrence": { error: "Choose a recurring schedule that includes at least one future session within the next 30 days.", status: 400 },
         "schedule-conflict": {
           error: arrangementType === "RECURRING"

@@ -94,6 +94,6 @@ export async function submitReview(input: { userId: string; sessionId: string; r
 
 /** Star counts, average and total for one Academic Mate. */
 export async function getRatingSummary(mateProfileId: string): Promise<RatingSummary> {
-  const rows = await prisma.review.groupBy({ by: ["rating"], where: { mateProfileId }, _count: { _all: true } });
+  const rows = await prisma.review.groupBy({ by: ["rating"], where: { mateProfileId, hiddenAt: null }, _count: { _all: true } });
   return summarizeRatings(rows.map((row) => ({ rating: row.rating, count: row._count._all })));
 }

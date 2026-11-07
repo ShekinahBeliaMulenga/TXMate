@@ -8,6 +8,7 @@ export default async function AdminLoginPage({ searchParams }: { searchParams: P
   // Already signed in as an admin: skip the form.
   const resolved = await resolveAdmin();
   if (resolved.status === "ok") redirect("/admin");
+  if (resolved.status === "mfa") redirect("/admin/two-step");
 
   const { expired } = await searchParams;
 

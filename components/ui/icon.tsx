@@ -3,7 +3,7 @@ import {
   Bell,BellRing,Trash2,Info,BookOpen,University,CalendarDays,Clock,Star,
   Briefcase,Award,ShieldCheck,ArrowRight,Tag,GraduationCap,Pencil,LogOut,
   LayoutDashboard,AlertTriangle,RefreshCw,ClipboardList,Users,Menu,X,Search,
-  PanelLeft,Settings,Inbox,MessageCircle,Layers,List,UserCheck,CheckCircle,UserRoundPlus,CheckCheck
+  PanelLeft,Terminal,Plus,KeyRound,Settings,Inbox,MessageCircle,Layers,List,UserCheck,CheckCircle,UserRoundPlus,CheckCheck
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -16,6 +16,7 @@ const icons = {
   graduation:GraduationCap,pencil:Pencil,logout:LogOut,dashboard:LayoutDashboard,
   alert:AlertTriangle,refresh:RefreshCw,audit:ClipboardList,users:Users,
   menu:Menu,close:X,search:Search,sidebar:PanelLeft,
+  terminal:Terminal,plus:Plus,key:KeyRound,
   settings:Settings,academic:GraduationCap,inbox:Inbox,messages:MessageCircle,
   edit:Pencil,list:List,"id-card":IdCard,"user-check":UserCheck,layers:Layers,
   complete:CheckCircle, message:MessageCircle, request:UserRoundPlus,"double-check":CheckCheck,
