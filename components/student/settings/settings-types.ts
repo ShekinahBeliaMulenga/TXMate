@@ -19,7 +19,9 @@ export type ProfileResponse = {
 /** The editable fields saved together by the Personal information and Privacy screens. */
 export type SettingsFormValues = {
   name: string;
-  /** The 9 local digits after +260. */
+  /** Country of the phone number (ISO code, for example "ZM"). */
+  phoneCountry: string;
+  /** The phone number without its country code, digits only. */
   phoneNumber: string;
   bio: string;
   profileVisibility: ProfileVisibility;

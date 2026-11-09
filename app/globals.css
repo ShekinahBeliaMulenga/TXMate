@@ -10,6 +10,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* TXMate design tokens: use these in new code (bg-brand, hover:bg-brand-hover, text-ink, ...). */
+  --color-brand: #7d1f2a;
+  --color-brand-hover: #681923;
+  --color-brand-soft: #f4eceb;
+  --color-ink: #282321;
+  --color-ink-muted: #6d6260;
+  --color-surface: #ffffff;
+  --color-surface-muted: #faf8f6;
+  --color-page: #f4f1ed;
+  --color-line: #e2d9d0;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

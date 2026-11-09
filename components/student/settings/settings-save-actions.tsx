@@ -32,7 +32,7 @@ export default function SettingsSaveActions({
         <button
           type="submit"
           disabled={!dirty || saving || blocked}
-          className={`h-12 flex-1 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#691923] disabled:cursor-not-allowed disabled:opacity-50 lg:flex-none lg:px-8 ${FOCUS}`}
+          className={`h-12 flex-1 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-50 lg:flex-none lg:px-8 ${FOCUS}`}
         >
           {saving ? "Saving…" : "Save changes"}
         </button>

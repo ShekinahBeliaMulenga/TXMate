@@ -113,7 +113,7 @@ export default function ResolveDisputeDialog({ item, onClose, onResolved }: { it
 
         <div className="mt-5 flex gap-2">
           <button type="button" onClick={onClose} disabled={busy} className="h-12 rounded-md border border-[#d9cec5] px-5 text-sm font-semibold text-[#4e4742] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 disabled:opacity-50">Cancel</button>
-          <button type="submit" disabled={!valid || busy} className="h-12 flex-1 rounded-md bg-[#7d1f2a] text-sm font-semibold text-white transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="submit" disabled={!valid || busy} className="h-12 flex-1 rounded-md bg-[#7d1f2a] text-sm font-semibold text-white transition hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             {busy ? "Saving…" : "Confirm decision"}
           </button>
         </div>

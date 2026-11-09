@@ -8,7 +8,7 @@ import PasswordSection from "@/components/student/settings/password-section";
 import PersonalInfoSection from "@/components/student/settings/personal-info-section";
 import PrivacySection from "@/components/student/settings/privacy-section";
 import ProfilePhotoSection from "@/components/student/settings/profile-photo-section";
-import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, toLocalPhone } from "@/components/student/settings/phone";
+import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, splitPhone } from "@/lib/phone";
 import { requestJson } from "@/components/student/settings/settings-api";
 import { isSettingsSectionId, SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/student/settings/settings-config";
 import SettingsMenu from "@/components/student/settings/settings-menu";
@@ -22,7 +22,8 @@ const DEFAULT_SECTION: SettingsSectionId = SETTINGS_SECTIONS[0].id;
 function valuesFromProfile(data: ProfileResponse): SettingsFormValues {
   return {
     name: data.user.name,
-    phoneNumber: toLocalPhone(data.studentProfile.phoneNumber),
+    phoneCountry: splitPhone(data.studentProfile.phoneNumber).country,
+    phoneNumber: splitPhone(data.studentProfile.phoneNumber).national,
     bio: data.studentProfile.bio ?? "",
     profileVisibility: data.studentProfile.profileVisibility,
     showStudentId: data.studentProfile.showStudentId,
@@ -30,7 +31,7 @@ function valuesFromProfile(data: ProfileResponse): SettingsFormValues {
   };
 }
 
-const EMPTY_VALUES: SettingsFormValues = { name: "", phoneNumber: "", bio: "", profileVisibility: "PUBLIC", showStudentId: false, showPhoneNumber: false };
+const EMPTY_VALUES: SettingsFormValues = { name: "", phoneCountry: "ZM", phoneNumber: "", bio: "", profileVisibility: "PUBLIC", showStudentId: false, showPhoneNumber: false };
 
 function readSectionFromHash(): SettingsSectionId | null {
   const id = window.location.hash.replace(/^#/, "");
@@ -95,8 +96,7 @@ export default function StudentSettingsPage() {
     return () => window.clearTimeout(timer);
   }, [success]);
 
-  const savedPhone = profile ? toLocalPhone(profile.studentProfile.phoneNumber) : "";
-  const phone = usePhoneAvailability(values.phoneNumber, savedPhone);
+  const phone = usePhoneAvailability(values.phoneCountry, values.phoneNumber, profile?.studentProfile.phoneNumber ?? null);
 
   const updateValues = useCallback((patch: Partial<SettingsFormValues>) => {
     setValues((current) => ({ ...current, ...patch }));
@@ -115,7 +115,8 @@ export default function StudentSettingsPage() {
   const dirty = (() => {
     if (!profile) return false;
     const saved = valuesFromProfile(profile);
-    return (Object.keys(saved) as Array<keyof SettingsFormValues>).some((key) => saved[key] !== values[key]);
+    // The phone is compared as a number, so typing the same number another way is not a change.
+    return (Object.keys(saved) as Array<keyof SettingsFormValues>).some((key) => key === "phoneCountry" || key === "phoneNumber" ? false : saved[key] !== values[key]) || phone.changed;
   })();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -123,7 +124,7 @@ export default function StudentSettingsPage() {
     if (!profile) return;
     setError(null);
     setSuccess(false);
-    if (phone.changed && values.phoneNumber && !phone.valid) {
+    if (phone.formatError) {
       setError(PHONE_FORMAT_MESSAGE);
       return;
     }
@@ -140,7 +141,7 @@ export default function StudentSettingsPage() {
           headers: { Accept: "application/json", "Content-Type": "application/json" },
           body: JSON.stringify({
             name: values.name,
-            phoneNumber: phone.changed ? (values.phoneNumber ? `+260${values.phoneNumber}` : null) : (profile.studentProfile.phoneNumber ?? null),
+            phoneNumber: phone.untouched ? (profile.studentProfile.phoneNumber ?? null) : (values.phoneNumber ? phone.e164 : null),
             bio: values.bio || null,
             profileVisibility: values.profileVisibility,
             showStudentId: values.showStudentId,
@@ -155,7 +156,7 @@ export default function StudentSettingsPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to save your profile changes.";
       // Someone registered this number after the live check ran.
-      if (message.toLowerCase().includes("phone number is already registered")) phone.markTaken(values.phoneNumber);
+      if (message.toLowerCase().includes("phone number is already registered")) phone.markTaken(phone.e164);
       setError(message);
     } finally {
       setSaving(false);
@@ -185,7 +186,7 @@ export default function StudentSettingsPage() {
           <div role="alert" className="mx-auto max-w-xl rounded-2xl bg-white p-8 text-center shadow-sm">
             <h1 className="text-xl font-semibold text-[#282321]">Couldn’t load your settings</h1>
             <p className="mt-3 text-sm leading-6 text-[#6d6260]">{error}</p>
-            <button type="button" onClick={() => void loadProfile()} className={`mt-6 rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#691923] ${FOCUS}`}>
+            <button type="button" onClick={() => void loadProfile()} className={`mt-6 rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#681923] ${FOCUS}`}>
               Try again
             </button>
           </div>

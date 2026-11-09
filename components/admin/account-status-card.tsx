@@ -66,7 +66,7 @@ export default function AccountStatusCard({ userId, scope, title, status, detail
       </div>
 
       {canChange && next && !action ? (
-        <button type="button" onClick={() => setAction(next)} className={`mt-3 h-10 rounded-md px-4 text-sm font-semibold ${FOCUS} ${next === "SUSPEND" ? "border border-[#e3b5b7] text-[#a3262a] hover:bg-[#fdf1f1]" : "bg-[#7d1f2a] text-white hover:bg-[#691923]"}`}>
+        <button type="button" onClick={() => setAction(next)} className={`mt-3 h-10 rounded-md px-4 text-sm font-semibold ${FOCUS} ${next === "SUSPEND" ? "border border-[#e3b5b7] text-[#a3262a] hover:bg-[#fdf1f1]" : "bg-[#7d1f2a] text-white hover:bg-[#681923]"}`}>
           {next === "SUSPEND" ? "Suspend…" : "Reactivate…"}
         </button>
       ) : null}
@@ -88,7 +88,7 @@ export default function AccountStatusCard({ userId, scope, title, status, detail
           {error ? <p role="alert" className="mt-2 text-[13px] text-[#a3262a]">{error}</p> : null}
           <div className="mt-3 flex justify-end gap-2">
             <button type="button" onClick={() => { setAction(null); setReason(""); setError(null); }} disabled={busy} className={`h-10 rounded-md px-4 text-sm font-semibold text-[#4e4742] hover:bg-white ${FOCUS}`}>Cancel</button>
-            <button type="button" onClick={() => void submit()} disabled={!reasonOk || busy} className={`h-10 rounded-md bg-[#7d1f2a] px-5 text-sm font-semibold text-white hover:bg-[#691923] disabled:opacity-50 ${FOCUS}`}>
+            <button type="button" onClick={() => void submit()} disabled={!reasonOk || busy} className={`h-10 rounded-md bg-[#7d1f2a] px-5 text-sm font-semibold text-white hover:bg-[#681923] disabled:opacity-50 ${FOCUS}`}>
               {busy ? "Saving…" : action === "SUSPEND" ? "Confirm suspension" : "Confirm reactivation"}
             </button>
           </div>

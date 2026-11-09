@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { MateRequestStatus, Prisma } from "@/generated/prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ADMIN_SESSION_STATE_LABEL, adminSessionStateKey } from "@/lib/admin/session-state";
 
 const VALID_STATUSES = [
   "REQUESTED",
@@ -24,6 +25,49 @@ function getPositiveInteger(value: string | null, fallback: number) {
   const parsed = Number.parseInt(value, 10);
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Fields needed to work out a session's real state, the same way the other screens do. */
+const SESSION_FIELDS = {
+  id: true,
+  status: true,
+  scheduledStart: true,
+  scheduledEnd: true,
+  meetingLocation: true,
+  completedAt: true,
+  studentCompletionConfirmedAt: true,
+  mateCompletionConfirmedAt: true,
+  completionDisputedAt: true,
+  completionReviewRequiredAt: true,
+  attendance: { select: { status: true, studentAttended: true, mateConfirmedStudentAttended: true } },
+} as const;
+
+type SessionFields = {
+  id: string;
+  status: string;
+  scheduledStart: Date;
+  scheduledEnd: Date;
+  meetingLocation: string;
+  completedAt: Date | null;
+  studentCompletionConfirmedAt: Date | null;
+  mateCompletionConfirmedAt: Date | null;
+  completionDisputedAt: Date | null;
+  completionReviewRequiredAt: Date | null;
+  attendance: { status: string; studentAttended: boolean | null; mateConfirmedStudentAttended: boolean | null } | null;
+};
+
+/** The stored status can still say "In progress" days after a session ended, so also send the real state (same rules as the Tutoring page for admins). */
+function serializeSession(item: SessionFields, request: { status: string; arrangementStatus: string }) {
+  const state = adminSessionStateKey({ ...item, requestStatus: request.status, arrangementStatus: request.arrangementStatus }, Date.now());
+  return {
+    id: item.id,
+    status: item.status,
+    state,
+    stateLabel: ADMIN_SESSION_STATE_LABEL[state],
+    scheduledStart: item.scheduledStart.toISOString(),
+    scheduledEnd: item.scheduledEnd.toISOString(),
+    meetingLocation: item.meetingLocation,
+  };
 }
 
 export async function GET(request: Request) {
@@ -239,6 +283,7 @@ export async function GET(request: Request) {
             requestedStart: true,
             requestedEnd: true,
             arrangementType: true,
+            arrangementStatus: true,
             recurrenceEveryWeeks: true,
             recurrenceWeekday: true,
             recurrenceLocalStartMinute: true,
@@ -294,23 +339,11 @@ export async function GET(request: Request) {
             },
 
             tutoringSession: {
-              select: {
-                id: true,
-                status: true,
-                scheduledStart: true,
-                scheduledEnd: true,
-                meetingLocation: true,
-              },
+              select: SESSION_FIELDS,
             },
             sessions: {
               orderBy: { scheduledStart: "asc" },
-              select: {
-                id: true,
-                status: true,
-                scheduledStart: true,
-                scheduledEnd: true,
-                meetingLocation: true,
-              },
+              select: SESSION_FIELDS,
             },
           },
         }),
@@ -382,6 +415,7 @@ export async function GET(request: Request) {
       requestedStart: record.requestedStart?.toISOString() ?? null,
       requestedEnd: record.requestedEnd?.toISOString() ?? null,
       arrangementType: record.arrangementType,
+      arrangementStatus: record.arrangementStatus,
       recurrenceEveryWeeks: record.recurrenceEveryWeeks,
       recurrenceWeekday: record.recurrenceWeekday,
       recurrenceLocalStartMinute: record.recurrenceLocalStartMinute,
@@ -413,24 +447,8 @@ export async function GET(request: Request) {
         course: record.offering.course,
       },
 
-      tutoringSession: record.tutoringSession
-        ? {
-            id: record.tutoringSession.id,
-            status: record.tutoringSession.status,
-            scheduledStart:
-              record.tutoringSession.scheduledStart.toISOString(),
-            scheduledEnd:
-              record.tutoringSession.scheduledEnd.toISOString(),
-            meetingLocation: record.tutoringSession.meetingLocation,
-          }
-        : null,
-      sessions: record.sessions.map((item) => ({
-        id: item.id,
-        status: item.status,
-        scheduledStart: item.scheduledStart.toISOString(),
-        scheduledEnd: item.scheduledEnd.toISOString(),
-        meetingLocation: item.meetingLocation,
-      })),
+      tutoringSession: record.tutoringSession ? serializeSession(record.tutoringSession, record) : null,
+      sessions: record.sessions.map((item) => serializeSession(item, record)),
     }));
 
     return NextResponse.json({

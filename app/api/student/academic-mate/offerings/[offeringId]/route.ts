@@ -389,7 +389,7 @@ export async function PATCH(
             );
         }
 
-        if (rate !== undefined && !isValidRate(rate)) {
+        if (rate !== undefined && rateType !== MateOfferingRateType.FREE && !isValidRate(rate)) {
             return NextResponse.json(
                 {
                     error:
@@ -453,6 +453,18 @@ export async function PATCH(
             rateType !== undefined
                 ? rateType
                 : existingOffering.rateType;
+
+        // Moving a free offering to a paid basis needs a real amount, not the stored 0.
+        if (
+            existingOffering.rateType === MateOfferingRateType.FREE &&
+            nextRateType !== MateOfferingRateType.FREE &&
+            rate === undefined
+        ) {
+            return NextResponse.json(
+                { error: "Enter the amount you charge." },
+                { status: 400 },
+            );
+        }
 
         if (
             nextRateType === MateOfferingRateType.CUSTOM &&
@@ -563,9 +575,11 @@ export async function PATCH(
                         }
                         : {}),
 
-                    ...(rate !== undefined
-                        ? { rate: String(rate).trim() }
-                        : {}),
+                    ...(nextRateType === MateOfferingRateType.FREE
+                        ? { rate: "0" }
+                        : rate !== undefined
+                            ? { rate: String(rate).trim() }
+                            : {}),
 
                     ...(currency !== undefined
                         ? {

@@ -95,7 +95,8 @@ type Offering = {
     | "PER_WEEK"
     | "PER_MONTH"
     | "PER_COURSE"
-    | "CUSTOM";
+    | "CUSTOM"
+    | "FREE";
   rateDetails: string | null;
   createdAt: string;
   updatedAt: string;
@@ -185,6 +186,7 @@ type DetailResponse = {
   verificationHistory: VerificationHistory[];
   evidence: AdminEvidence[];
   evidenceBlockers: string[];
+  canApproveException?: boolean;
 };
 
 const DAY_LABELS: Record<Availability["day"], string> = {
@@ -434,6 +436,7 @@ const RATE_TYPE_LABEL: Record<Offering["rateType"], string> = {
   PER_MONTH: "month",
   PER_COURSE: "course",
   CUSTOM: "",
+  FREE: "",
 };
 
 function formatRate(
@@ -745,6 +748,7 @@ export default function AcademicMateVerificationDetailPage() {
   );
 
   const [notes, setNotes] = useState("");
+  const [exceptionReason, setExceptionReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [success, setSuccess] = useState("");
@@ -942,6 +946,12 @@ export default function AcademicMateVerificationDetailPage() {
       return;
     }
 
+    const waiving = decision === "VERIFIED" && !!data && data.evidenceBlockers.length > 0;
+    if (waiving && exceptionReason.trim().length < 20) {
+      setError("Explain the exception in at least 20 characters.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError("");
@@ -957,6 +967,7 @@ export default function AcademicMateVerificationDetailPage() {
           body: JSON.stringify({
             decision,
             notes: notes.trim() || null,
+            ...(waiving ? { exceptionReason: exceptionReason.trim() } : {}),
           }),
         }
       );
@@ -973,6 +984,7 @@ export default function AcademicMateVerificationDetailPage() {
 
       setDecision(null);
       setNotes("");
+      setExceptionReason("");
 
       await loadProfile(false);
     } catch (err) {
@@ -1754,6 +1766,30 @@ export default function AcademicMateVerificationDetailPage() {
                       Reject application
                     </button>
                   </div>
+
+                  {data.evidenceBlockers.length > 0 && data.canApproveException && (
+                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-xs font-semibold text-amber-900">Approve as an exception</p>
+                      <p className="mt-1 text-xs leading-5 text-amber-900/90">Only for a real case where the documents cannot be provided. Your reason is saved in the audit trail with your name.</p>
+                      <textarea
+                        value={exceptionReason}
+                        onChange={(event) => setExceptionReason(event.target.value)}
+                        maxLength={1000}
+                        rows={3}
+                        aria-label="Reason for the exception"
+                        placeholder="Why is this approval justified? (at least 20 characters)"
+                        className="mt-2 w-full resize-none rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-stone-400 focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/15"
+                      />
+                      <button
+                        type="button"
+                        disabled={submitting || exceptionReason.trim().length < 20}
+                        onClick={() => setDecision("VERIFIED")}
+                        className={`mt-2 inline-flex w-full items-center justify-center rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING}`}
+                      >
+                        Approve as exception
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="mt-4 space-y-3 text-sm leading-6 text-stone-600">
@@ -1803,7 +1839,9 @@ export default function AcademicMateVerificationDetailPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              {decision === "VERIFIED"
+              {decision === "VERIFIED" && data && data.evidenceBlockers.length > 0
+                ? "Some required documents are missing or not accepted. This approves the profile as an exception and saves your reason in the audit trail."
+                : decision === "VERIFIED"
                 ? "This will mark the Academic Mate profile as verified and record you as the reviewing administrator."
                 : "This will reject the application. The applicant will need to correct the issue and submit again."}
             </p>

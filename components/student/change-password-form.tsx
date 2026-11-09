@@ -115,7 +115,7 @@ export default function ChangePasswordForm() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-md bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#691923] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
+          className="rounded-md bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#681923] disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2"
         >
           {busy ? "Changing…" : "Change password"}
         </button>

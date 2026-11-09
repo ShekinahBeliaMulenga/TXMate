@@ -7,13 +7,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   attendanceOutcome,
   availableActions,
-  isCancelled,
   resolutionStatus,
   timeStatus,
   type ResolutionStatus,
   type TimeStatus,
 } from "@/lib/session-lifecycle-rules";
 import { snapshotOf } from "@/lib/session-lifecycle-serialize";
+import { isSessionClosed } from "@/lib/session-list";
 import type { SessionLifecycleItem } from "@/lib/session-lifecycle-types";
 
 const ZONE = "Africa/Lusaka";
@@ -54,9 +54,7 @@ export function useNow(intervalMs = 30_000) {
 // ----------------------------------------------------------------- classification
 
 /** Sessions that have left the active schedule for good. */
-export function isClosed(session: SessionLifecycleItem) {
-  return isCancelled(snapshotOf(session)) || ["COMPLETED", "NO_SHOW"].includes(session.status);
-}
+export const isClosed = isSessionClosed;
 /** The tab a session belongs in. Closed sessions are always "past". */
 export function tabOf(session: SessionLifecycleItem, now: number): TimeStatus {
   if (isClosed(session)) return "PAST";

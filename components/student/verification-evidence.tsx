@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { EVIDENCE_HINT, EVIDENCE_KINDS, EVIDENCE_LABEL, MAX_FILE_BYTES, MAX_PER_KIND, MAX_TOTAL, type EvidenceKind, type EvidenceReview } from "@/lib/verification-evidence";
+import { EVIDENCE_HINT, EVIDENCE_LABEL, IDENTITY_KINDS, MAX_FILE_BYTES, MAX_PER_KIND, MAX_TOTAL, PROOF_KINDS, type EvidenceKind, type EvidenceReview } from "@/lib/verification-evidence";
 
 export type EvidenceItem = { id: string; kind: EvidenceKind; contentType: string; sizeBytes: number; reviewStatus: EvidenceReview; rejectionReason: string | null; createdAt: string };
 
@@ -9,6 +9,10 @@ const STATUS: Record<EvidenceReview, { label: string; className: string }> = {
   ACCEPTED: { label: "Accepted", className: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
   REJECTED: { label: "Rejected", className: "bg-red-50 text-red-800 ring-red-200" },
 };
+const GROUPS = [
+  { title: "Proof of who you are: choose any one", kinds: IDENTITY_KINDS },
+  { title: "Proof you study here: choose one", kinds: PROOF_KINDS },
+];
 const FOCUS = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40";
 const size = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 const typeName = (type: string) => (type === "application/pdf" ? "PDF" : type.replace("image/", "").toUpperCase());
@@ -60,17 +64,19 @@ export default function VerificationEvidence({ items, locked, onChanged }: { ite
 
   return (
     <div>
-      <p className="text-xs leading-5 text-[#6d6260]">Upload a clear photo or PDF (JPG, PNG, WebP or PDF, up to 5 MB each). You need your student ID and either proof of enrolment or your results. Only TXMate reviewers can open these files, and they are deleted after your application is decided.</p>
-      <ul className="mt-3 divide-y divide-[#eee7df] rounded-xl border border-[#eee7df]">
-        {EVIDENCE_KINDS.map((kind) => {
+      <p className="text-xs leading-5 text-[#6d6260]">Upload a clear photo or PDF (JPG, PNG, WebP or PDF, up to 5 MB each). You need one identity document (student ID, NRC or passport) and either proof of enrolment or your results. Only TXMate reviewers can open these files, and they are deleted after your application is decided.</p>
+      {GROUPS.map((group) => (
+      <div key={group.title} className="mt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6d6260]">{group.title}</p>
+      <ul className="mt-1.5 divide-y divide-[#eee7df] rounded-xl border border-[#eee7df]">
+        {group.kinds.map((kind) => {
           const mine = items.filter((item) => item.kind === kind);
           const full = mine.length >= MAX_PER_KIND || items.length >= MAX_TOTAL;
-          const required = kind === "STUDENT_ID";
           return (
             <li key={kind} className="px-3.5 py-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#282321]">{EVIDENCE_LABEL[kind]} <span className="text-[11px] font-medium text-[#8a7f7a]">{required ? "Required" : "One of these two is required"}</span></p>
+                  <p className="text-sm font-semibold text-[#282321]">{EVIDENCE_LABEL[kind]}</p>
                   <p className="text-xs text-[#6d6260]">{EVIDENCE_HINT[kind]}</p>
                 </div>
                 {!locked && (
@@ -99,6 +105,8 @@ export default function VerificationEvidence({ items, locked, onChanged }: { ite
           );
         })}
       </ul>
+      </div>
+      ))}
     </div>
   );
 }

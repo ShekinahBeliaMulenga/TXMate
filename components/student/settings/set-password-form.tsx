@@ -56,7 +56,7 @@ export default function SetPasswordForm({ onDone }: { onDone: () => void }) {
         {errors.confirm ? <p role="alert" className="mt-1 text-xs text-red-700">{errors.confirm}</p> : null}
       </div>
       {formError ? <p role="alert" className="rounded-lg bg-red-50 px-3 py-2.5 text-xs leading-4 text-red-700">{formError}</p> : null}
-      <button type="submit" disabled={busy} className={`flex h-11 w-full items-center justify-center rounded-xl bg-[#7d1f2a] px-4 text-sm font-semibold text-white transition hover:bg-[#691923] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}>
+      <button type="submit" disabled={busy} className={`flex h-11 w-full items-center justify-center rounded-xl bg-[#7d1f2a] px-4 text-sm font-semibold text-white transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}>
         {busy ? "Saving…" : "Set password"}
       </button>
     </form>

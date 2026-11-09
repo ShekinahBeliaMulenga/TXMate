@@ -32,7 +32,7 @@ export default function AccountSection({ studentProfile }: { studentProfile: Pro
 
       <Link
         href="/student/repeating-courses"
-        className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#691923] ${FOCUS}`}
+        className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] ${FOCUS}`}
       >
         <Icon name="book" className="h-[18px] w-[18px]" />
         Manage courses

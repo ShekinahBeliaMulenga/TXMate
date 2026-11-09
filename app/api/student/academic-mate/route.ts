@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseExperiences, parseQualifications } from "@/lib/academic-mate-credentials";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,12 @@ function isValidYearsExperience(value: unknown): value is number | null {
   return value >= 0 && value <= 100;
 }
 
+/** Listed qualifications and experience, returned with the profile so the form can show and edit them. */
+const CREDENTIALS_SELECT = {
+  qualifications: { orderBy: { createdAt: "asc" as const }, select: { id: true, name: true, issuer: true, year: true, credentialUrl: true } },
+  experiences: { orderBy: { createdAt: "asc" as const }, select: { id: true, title: true, organisation: true, description: true, startYear: true, endYear: true } },
+};
+
 async function getSession() {
   return auth.api.getSession({
     headers: await headers(),
@@ -77,6 +84,7 @@ async function getAcademicMateProfile(userId: string) {
       verifiedByAdminId: true,
       createdAt: true,
       updatedAt: true,
+      ...CREDENTIALS_SELECT,
     },
   });
 }
@@ -175,6 +183,8 @@ export async function POST(request: Request) {
       "teachingExperience",
       "yearsExperience",
       "profileVisibility",
+      "qualifications",
+      "experiences",
     ]);
 
     const unknownField = Object.keys(data).find(
@@ -269,6 +279,16 @@ export async function POST(request: Request) {
       );
     }
 
+    const qualifications = "qualifications" in data ? parseQualifications(data.qualifications) : null;
+    if (qualifications && !qualifications.ok) {
+      return NextResponse.json({ error: qualifications.error }, { status: 400 });
+    }
+
+    const experiences = "experiences" in data ? parseExperiences(data.experiences) : null;
+    if (experiences && !experiences.ok) {
+      return NextResponse.json({ error: experiences.error }, { status: 400 });
+    }
+
     const studentProfile = await prisma.studentProfile.findUnique({
       where: {
         userId: session.user.id,
@@ -327,6 +347,8 @@ export async function POST(request: Request) {
         teachingExperience: teachingExperience || null,
         yearsExperience,
         profileVisibility,
+        ...(qualifications?.ok && qualifications.value.length ? { qualifications: { create: qualifications.value } } : {}),
+        ...(experiences?.ok && experiences.value.length ? { experiences: { create: experiences.value } } : {}),
       },
       select: {
         id: true,
@@ -344,6 +366,7 @@ export async function POST(request: Request) {
         verifiedByAdminId: true,
         createdAt: true,
         updatedAt: true,
+        ...CREDENTIALS_SELECT,
       },
     });
 
@@ -426,6 +449,8 @@ export async function PATCH(request: Request) {
       "teachingExperience",
       "yearsExperience",
       "profileVisibility",
+      "qualifications",
+      "experiences",
     ]);
 
     const unknownField = Object.keys(data).find(
@@ -564,28 +589,54 @@ export async function PATCH(request: Request) {
       updateData.profileVisibility = data.profileVisibility;
     }
 
-    const academicMate = await prisma.academicMateProfile.update({
-      where: {
-        id: existing.id,
-      },
-      data: updateData,
-      select: {
-        id: true,
-        userId: true,
-        universityId: true,
-        studentProfileId: true,
-        status: true,
-        verificationStatus: true,
-        headline: true,
-        bio: true,
-        teachingExperience: true,
-        yearsExperience: true,
-        profileVisibility: true,
-        verifiedAt: true,
-        verifiedByAdminId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const qualifications = "qualifications" in data ? parseQualifications(data.qualifications) : null;
+    if (qualifications && !qualifications.ok) {
+      return NextResponse.json({ error: qualifications.error }, { status: 400 });
+    }
+
+    const experiences = "experiences" in data ? parseExperiences(data.experiences) : null;
+    if (experiences && !experiences.ok) {
+      return NextResponse.json({ error: experiences.error }, { status: 400 });
+    }
+
+    // The lists are replaced as a whole, together with the profile fields, so a failure changes nothing.
+    const academicMate = await prisma.$transaction(async (tx) => {
+      if (qualifications?.ok) {
+        await tx.academicMateQualification.deleteMany({ where: { academicMateProfileId: existing.id } });
+        if (qualifications.value.length) {
+          await tx.academicMateQualification.createMany({ data: qualifications.value.map((item) => ({ ...item, academicMateProfileId: existing.id })) });
+        }
+      }
+      if (experiences?.ok) {
+        await tx.academicMateExperience.deleteMany({ where: { academicMateProfileId: existing.id } });
+        if (experiences.value.length) {
+          await tx.academicMateExperience.createMany({ data: experiences.value.map((item) => ({ ...item, academicMateProfileId: existing.id })) });
+        }
+      }
+      return tx.academicMateProfile.update({
+        where: {
+          id: existing.id,
+        },
+        data: updateData,
+        select: {
+          id: true,
+          userId: true,
+          universityId: true,
+          studentProfileId: true,
+          status: true,
+          verificationStatus: true,
+          headline: true,
+          bio: true,
+          teachingExperience: true,
+          yearsExperience: true,
+          profileVisibility: true,
+          verifiedAt: true,
+          verifiedByAdminId: true,
+          createdAt: true,
+          updatedAt: true,
+          ...CREDENTIALS_SELECT,
+        },
+      });
     });
 
     return NextResponse.json({

@@ -349,7 +349,7 @@ export default function Home() {
           <nav className="flex items-center gap-1 text-sm font-semibold sm:gap-3">
             <a href="#about" className="hidden rounded-full px-4 py-2 text-[#6d6260] hover:text-[#282321] sm:inline-block">About</a>
             <Link href="/login" className="rounded-full border border-[#7d1f2a]/25 px-4 py-2 text-[#7d1f2a] transition hover:bg-[#7d1f2a]/5">Log in</Link>
-            <Link href="/register" className="rounded-full bg-[#7d1f2a] px-5 py-2 text-white shadow-sm transition hover:bg-[#651922]">Get started</Link>
+            <Link href="/register" className="rounded-full bg-[#7d1f2a] px-5 py-2 text-white shadow-sm transition hover:bg-[#681923]">Get started</Link>
           </nav>
         </div>
       </header>
@@ -535,7 +535,7 @@ export default function Home() {
         <Reveal>
           <h2 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Ready to find your Academic Mate?</h2>
           <p className="mt-3 text-[#6b625d]">Join TXMate and find your Academic Mate today.</p>
-          <Link href="/register" className="mt-8 inline-block rounded-full bg-[#7d1f2a] px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#7d1f2a]/25 transition hover:-translate-y-0.5 hover:bg-[#651922]">Create your account</Link>
+          <Link href="/register" className="mt-8 inline-block rounded-full bg-[#7d1f2a] px-8 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#7d1f2a]/25 transition hover:-translate-y-0.5 hover:bg-[#681923]">Create your account</Link>
         </Reveal>
       </section>
 

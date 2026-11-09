@@ -220,6 +220,12 @@ export async function GET() {
     const rating = await getRatingSummary(academicMate.id);
     const totalReviews = rating.count;
     const averageRating = rating.average;
+    // Each reviewer's average and count, from the database, so they stay right beyond the 50 listed reviews.
+    const reviewerIds = [...new Set(academicMate.reviews.map((review) => review.reviewerUser.id))];
+    const reviewerRows = reviewerIds.length
+      ? await prisma.review.groupBy({ by: ["reviewerUserId"], where: { mateProfileId: academicMate.id, hiddenAt: null, reviewerUserId: { in: reviewerIds } }, _avg: { rating: true }, _count: { _all: true } })
+      : [];
+    const reviewerStats = Object.fromEntries(reviewerRows.map((row) => [row.reviewerUserId, { average: row._avg.rating, count: row._count._all }]));
 
     return NextResponse.json({
       profile: {
@@ -269,6 +275,7 @@ export async function GET() {
       experiences: academicMate.experiences,
       qualifications: academicMate.qualifications,
       reviews: academicMate.reviews,
+      reviewerStats,
       statistics: {
         totalOfferings: offerings.length,
         totalAvailabilitySlots: academicMate.availabilities.length,

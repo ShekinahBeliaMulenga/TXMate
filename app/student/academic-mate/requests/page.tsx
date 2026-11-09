@@ -3,6 +3,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/icon";
+import { priceBasisText, priceText } from "@/lib/offering-price";
 type RequestStatus = |"REQUESTED"| "ACCEPTED"| "DECLINED"| "CANCELLED"| "EXPIRED";
 type RequestAction = "ACCEPTED" | "DECLINED";
 type StatusFilter = "REQUESTED" | "ACCEPTED" | "DECLINED" | "ALL";
@@ -14,6 +16,7 @@ type Course = {
 type RequestItem = {
   id: string;
   status: RequestStatus;
+  arrangementStatus?: string;
   message: string | null;
   requestedStart: string | null;
   requestedEnd: string | null;
@@ -44,6 +47,8 @@ type RequestItem = {
     scheduledStart: string;
     scheduledEnd: string;
     meetingLocation: string;
+    state?: string;
+    stateLabel?: string;
   } | null;
   sessions?: Array<{
     id: string;
@@ -51,6 +56,8 @@ type RequestItem = {
     scheduledStart: string;
     scheduledEnd: string;
     meetingLocation: string;
+    state?: string;
+    stateLabel?: string;
   }>;
 };
 type RequestsResponse = {
@@ -107,24 +114,11 @@ function formatDateTime(value: string) {
     timeZone: "Africa/Lusaka",
   }).format(date);
 }
-function formatRateType(value: string) {
-  const labels: Record<string, string> = {
-    PER_SESSION: "per session",
-    PER_HOUR: "per hour",
-    PER_WEEK: "per week",
-    PER_MONTH: "per month",
-    PER_COURSE: "per course",
-    CUSTOM: "custom pricing",
-  };
-  return labels[value] ?? formatStatus(value);
+function formatRateType(value: string, rate?: string) {
+  return priceBasisText(value, rate);
 }
-function formatAmount(rate: string, currency: string) {
-  const amount = Number(rate);
-  if (!Number.isFinite(amount)) return `${currency} ${rate}`;
-  return `${currency} ${amount.toLocaleString("en-ZM", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+function formatAmount(rate: string, currency: string, rateType?: string) {
+  return priceText(rate, currency, rateType);
 }
 function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} minutes`;
@@ -143,26 +137,41 @@ function statusStyles(status: string) {
       return { badge: "bg-emerald-50 text-emerald-800 ring-emerald-200", dot: "bg-emerald-600" };
     case "REQUESTED":
     case "SCHEDULED":
+    case "UPCOMING":
     case "IN_PROGRESS":
+    case "AWAITING_CONFIRMATION":
+    case "PAUSED":
       return { badge: "bg-amber-50 text-amber-900 ring-amber-200", dot: "bg-amber-500" };
     case "DECLINED":
     case "CANCELLED":
     case "EXPIRED":
     case "DISPUTED":
+    case "NEEDS_REVIEW":
+    case "NO_RESPONSE":
     case "NO_SHOW":
       return { badge: "bg-red-50 text-red-800 ring-red-200", dot: "bg-red-600" };
     default:
       return { badge: "bg-stone-100 text-stone-700 ring-stone-200", dot: "bg-stone-400" };
   }
 }
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, label }: { status: string; label?: string }) {
   const styles = statusStyles(status);
   return (
     <span
       className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${styles.badge}`}
     >
       <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />
-      {status === "REQUESTED" ? "Pending" : formatStatus(status)}
+      {label ?? (status === "REQUESTED" ? "Pending" : formatStatus(status))}
+    </span>
+  );
+}
+/** The request's answer, plus where the arrangement stands when an accepted request is no longer simply active. */
+function RequestBadges({ item }: { item: Pick<RequestItem, "status" | "arrangementStatus"> }) {
+  const notable = item.status === "ACCEPTED" && item.arrangementStatus && !["ACTIVE", "PENDING"].includes(item.arrangementStatus);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <StatusBadge status={item.status} />
+      {notable ? <StatusBadge status={item.arrangementStatus as string} label={`Arrangement ${formatStatus(item.arrangementStatus as string).toLowerCase()}`} /> : null}
     </span>
   );
 }
@@ -211,8 +220,8 @@ function RequestActions({
         </>
       )}
       {item.tutoringSession && (
-        <button type="button" onClick={onOpenConversation} className="min-h-9 rounded-md border border-[#dcd3ca] bg-white px-3 text-xs font-medium text-[#7d1f2a] transition hover:bg-[#f7f4f1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
-          Open conversation
+        <button type="button" onClick={onOpenConversation} aria-label="Open conversation" title="Open conversation" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#dcd3ca] bg-white text-[#7d1f2a] transition hover:bg-[#f7f4f1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
+          <Icon name="message" className="h-4 w-4" />
         </button>
       )}
 
@@ -432,7 +441,7 @@ export default function AcademicMateRequestsPage() {
         {/* Title */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">
               Incoming requests
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-[#756b65]">
@@ -602,7 +611,7 @@ export default function AcademicMateRequestsPage() {
                           <p className="mt-0.5 text-xs text-[#756b65]">{item.student.programme.name}, Year {item.student.yearNumber}</p>
                         </div>
                       </div>
-                      <StatusBadge status={item.status} />
+                      <RequestBadges item={item} />
                     </div>
                     <div>
                       <p className="text-sm">
@@ -709,7 +718,7 @@ export default function AcademicMateRequestsPage() {
                         {formatDate(item.createdAt)}
                       </td>
                       <td className="px-4 py-4">
-                        <StatusBadge status={item.status} />
+                        <RequestBadges item={item} />
                       </td>
                       <td className="px-4 py-4">
                         <RequestActions
@@ -811,7 +820,7 @@ export default function AcademicMateRequestsPage() {
             </div>
             <div className="space-y-5 px-5 py-5 sm:px-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <StatusBadge status={selectedRequest.status} />
+                <RequestBadges item={selectedRequest} />
                 <span className="text-xs text-[#82776f]">
                   Received {formatDateTime(selectedRequest.createdAt)}
                 </span>
@@ -834,9 +843,13 @@ export default function AcademicMateRequestsPage() {
                 <p className="mt-2 text-sm text-[#625954]">
                   {formatAmount(
                     selectedRequest.offering.rate,
-                    selectedRequest.offering.currency
-                  )}{" "}
-                  {formatRateType(selectedRequest.offering.rateType)}, for{" "}
+                    selectedRequest.offering.currency,
+                    selectedRequest.offering.rateType
+                  )}
+                  {formatRateType(selectedRequest.offering.rateType, selectedRequest.offering.rate)
+                    ? ` ${formatRateType(selectedRequest.offering.rateType, selectedRequest.offering.rate)}`
+                    : ""}
+                  , for{" "}
                   {formatDuration(
                     selectedRequest.offering.sessionDurationMinutes
                   )}
@@ -877,7 +890,7 @@ export default function AcademicMateRequestsPage() {
                         <div className="min-w-0">
                           <p className="text-sm text-[#413a35]">{formatDateTime(scheduledSession.scheduledStart)}</p>
                           <p className="mt-1 text-xs text-[#756b65]">{scheduledSession.meetingLocation}</p>
-                          <div className="mt-2"><StatusBadge status={scheduledSession.status} /></div>
+                          <div className="mt-2"><StatusBadge status={scheduledSession.state ?? scheduledSession.status} label={scheduledSession.stateLabel} /></div>
                         </div>
                         <Link href={`/student/sessions/${encodeURIComponent(scheduledSession.id)}`} className="inline-flex min-h-9 items-center rounded-md border border-[#d8cec5] px-3 text-xs font-semibold text-[#7d1f2a] hover:bg-[#f7f4f1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/30">
                           Attendance &amp; completion

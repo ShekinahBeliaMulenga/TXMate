@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import PhoneField from "@/components/ui/phone-field";
+import { DEFAULT_PHONE_COUNTRY, PHONE_FORMAT_MESSAGE, parsePhone, type CountryCode } from "@/lib/phone";
 
 type University = {
   id: string;
@@ -131,70 +133,9 @@ async function getJson<T>(url: string): Promise<T> {
   }
 }
 
-/*
- * Zambian mobile numbers: +260 followed by 9 digits.
- * National format is 0XX XXX XXXX where XX is 95/96/97 (Zamtel/MTN/Airtel),
- * 75/76/77 or 55/56/57. The leading 0 is replaced by +260.
- */
-const ZAMBIA_MOBILE_PATTERN = /^[579][567]\d{7}$/;
-
 const PHONE_TAKEN_MESSAGE = "This number is already registered.";
 const PHONE_TAKEN_FORM_MESSAGE =
   "This phone number is already registered to another account.";
-
-function normalizeZambianInput(raw: string): string {
-  let digits = raw.replace(/\D/g, "");
-
-  if (digits.startsWith("260")) {
-    digits = digits.slice(3);
-  } else if (digits.startsWith("0")) {
-    digits = digits.slice(1);
-  }
-
-  return digits.slice(0, 9);
-}
-
-function formatZambianNumber(digits: string): string {
-  return [digits.slice(0, 2), digits.slice(2, 5), digits.slice(5, 9)]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function getPhoneError(digits: string): string {
-  if (!digits) {
-    return "";
-  }
-
-  if (digits.length < 9) {
-    return "Enter all 9 digits, for example 97 123 4567.";
-  }
-
-  if (!ZAMBIA_MOBILE_PATTERN.test(digits)) {
-    return "Enter a valid Zambian mobile number, for example 097 123 4567.";
-  }
-
-  return "";
-}
-
-function ZambiaFlag({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 30 20"
-      role="img"
-      aria-label="Zambia flag"
-      className={className}
-    >
-      <rect width="30" height="20" fill="#198a00" />
-      <rect x="21" y="10" width="3" height="10" fill="#de2010" />
-      <rect x="24" y="10" width="3" height="10" fill="#000000" />
-      <rect x="27" y="10" width="3" height="10" fill="#ef7d00" />
-      <path
-        d="M25.5 2.6l1.3 1.5 2.4-.9-1.4 2.1 1.2 1.4-2.2-.2-1.3 1.7-1.3-1.7-2.2.2 1.2-1.4-1.4-2.1 2.4.9z"
-        fill="#ef7d00"
-      />
-    </svg>
-  );
-}
 
 /* ---------- icons ---------- */
 
@@ -300,7 +241,7 @@ const ANIMATIONS = `
 /* ---------- shared pieces ---------- */
 
 const primaryButtonClass =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#651822] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#7d1f2a]/20 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#681923] focus:outline-none focus-visible:ring-4 focus-visible:ring-[#7d1f2a]/20 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none";
 
 const secondaryButtonClass =
   "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-700 transition-colors hover:bg-stone-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-stone-300/50";
@@ -456,6 +397,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
   const [programmeYearId, setProgrammeYearId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [gender, setGender] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<string>(DEFAULT_PHONE_COUNTRY);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneTouched, setPhoneTouched] = useState(false);
   const [phoneCheck, setPhoneCheck] = useState<PhoneCheck>(null);
@@ -722,35 +664,37 @@ export default function StudentOnboardingForm({ userName }: Props) {
   }, [success, alreadyOnboarded]);
 
   /*
-   * Live phone availability check. It only runs once the number is a complete,
-   * valid Zambian mobile number, and it is debounced. This is a convenience:
-   * the server re-checks on submit, so a failed lookup never blocks the user.
+   * Live phone availability check. It only runs once the number is complete and valid for the
+   * selected country, and it is debounced. This is a convenience: the server re-checks on submit,
+   * so a failed lookup never blocks the user.
    */
-  const phoneValid =
-    phoneNumber.length === 9 && ZAMBIA_MOBILE_PATTERN.test(phoneNumber);
+  const parsedPhone = useMemo(
+    () => parsePhone(phoneNumber, phoneCountry as CountryCode),
+    [phoneNumber, phoneCountry]
+  );
+  const phoneValid = parsedPhone.ok;
+  const phoneE164 = parsedPhone.ok ? parsedPhone.e164 : "";
 
   useEffect(() => {
-    if (!phoneValid) return;
+    if (!phoneE164) return;
 
     const controller = new AbortController();
 
     const timer = window.setTimeout(async () => {
       try {
         const data = await getJson<{ available: boolean }>(
-          `/api/student/phone-check?phone=${encodeURIComponent(
-            `+260${phoneNumber}`
-          )}`
+          `/api/student/phone-check?phone=${encodeURIComponent(phoneE164)}`
         );
 
         if (!controller.signal.aborted) {
           setPhoneCheck({
-            phone: phoneNumber,
+            phone: phoneE164,
             result: data.available ? "available" : "taken",
           });
         }
       } catch {
         if (!controller.signal.aborted) {
-          setPhoneCheck({ phone: phoneNumber, result: "error" });
+          setPhoneCheck({ phone: phoneE164, result: "error" });
         }
       }
     }, 400);
@@ -759,16 +703,16 @@ export default function StudentOnboardingForm({ userName }: Props) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [phoneNumber, phoneValid]);
+  }, [phoneE164]);
 
-  const phoneChecked = phoneValid && phoneCheck?.phone === phoneNumber;
+  const phoneChecked = phoneValid && phoneCheck?.phone === phoneE164;
   const phoneChecking = phoneValid && !phoneChecked;
   const phoneTaken = phoneChecked && phoneCheck?.result === "taken";
   const phoneAvailable = phoneChecked && phoneCheck?.result === "available";
 
-  const phoneError = getPhoneError(phoneNumber);
-  const showPhoneError =
-    phoneError !== "" && (phoneTouched || phoneNumber.length >= 9);
+  // The phone number is optional; when something is typed it must be valid for the selected country.
+  const phoneError = phoneNumber !== "" && !phoneValid ? PHONE_FORMAT_MESSAGE : "";
+  const showPhoneError = phoneError !== "" && (phoneTouched || phoneNumber.length >= 9);
   const phoneInvalid = showPhoneError || phoneTaken;
 
   const studentIdHint = useMemo(() => {
@@ -1017,7 +961,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
           programmeYearId,
           studentId,
           gender,
-          phoneNumber: phoneNumber ? `+260${phoneNumber}` : undefined,
+          phoneNumber: phoneE164 || undefined,
           selectedElectiveCourseIds,
           informationConfirmed,
         }),
@@ -1064,7 +1008,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
           response.status === 409 &&
           data.error?.toLowerCase().includes("phone")
         ) {
-          setPhoneCheck({ phone: phoneNumber, result: "taken" });
+          setPhoneCheck({ phone: phoneE164, result: "taken" });
         }
 
         throw new Error(data.error || "Unable to complete onboarding.");
@@ -1465,7 +1409,7 @@ export default function StudentOnboardingForm({ userName }: Props) {
                     ? "Checking availability..."
                     : phoneAvailable
                       ? "This number is available."
-                      : "Zambian mobile number. Kept private by default."
+                      : "Optional. Zambia is selected by default; pick another country if your number is from elsewhere. Kept private by default."
                 }
                 error={
                   showPhoneError
@@ -1475,30 +1419,18 @@ export default function StudentOnboardingForm({ userName }: Props) {
                       : undefined
                 }
               >
-                <div className="flex w-full min-w-0">
-                  <span className="inline-flex h-12 shrink-0 items-center gap-2 rounded-l-lg border border-r-0 border-stone-300 bg-stone-50 px-3 text-base font-medium text-stone-700 md:h-11 md:text-sm">
-                    <ZambiaFlag className="h-3.5 w-5 shrink-0 rounded-[2px] ring-1 ring-black/10" />
-                    +260
-                  </span>
-                  <input
-                    value={formatZambianNumber(phoneNumber)}
-                    onChange={(event) =>
-                      setPhoneNumber(normalizeZambianInput(event.target.value))
-                    }
-                    onBlur={() => setPhoneTouched(true)}
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    aria-invalid={phoneInvalid}
-                    disabled={submitting}
-                    placeholder="97 123 4567"
-                    className={`h-12 min-w-0 flex-1 rounded-r-lg border bg-white px-3.5 text-base text-stone-900 outline-none transition placeholder:text-stone-400 disabled:cursor-not-allowed disabled:bg-stone-100 md:h-11 md:text-sm ${
-                      phoneInvalid
-                        ? "border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                        : "border-stone-300 focus:border-[#7d1f2a] focus:ring-4 focus:ring-[#7d1f2a]/10"
-                    }`}
-                  />
-                </div>
+                <PhoneField
+                  id="onboarding-phone"
+                  country={phoneCountry}
+                  national={phoneNumber}
+                  onChange={(value) => {
+                    setPhoneCountry(value.country);
+                    setPhoneNumber(value.national);
+                  }}
+                  onBlur={() => setPhoneTouched(true)}
+                  invalid={phoneInvalid}
+                  disabled={submitting}
+                />
               </Field>
             </div>
           </FormSection>

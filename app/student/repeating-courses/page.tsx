@@ -382,10 +382,10 @@ export default function RepeatingCoursesPage() {
       : "DROPPED";
 
   return (
-    <main className="min-h-screen bg-[#faf9f7] px-4 py-6 text-[#1f1a17] sm:px-6 lg:px-8 lg:py-10">
+    <main className="min-h-screen bg-[#f4f1ed] px-4 py-6 text-[#1f1a17] sm:px-6 lg:px-8 lg:py-10">
       <div className="mx-auto w-full max-w-6xl">
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">
             Repeating courses
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#756b65]">

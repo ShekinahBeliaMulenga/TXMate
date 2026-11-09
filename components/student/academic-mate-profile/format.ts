@@ -23,6 +23,7 @@ export const rateTypeLabel: Record<MateOfferingRateType, string> = {
   PER_MONTH: "per month",
   PER_COURSE: "per course",
   CUSTOM: "custom rate",
+  FREE: "",
 };
 
 export const weekdayLabel: Record<Weekday, string> = {

@@ -539,7 +539,7 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={retry}
-                className="mt-4 rounded-lg bg-[#7d1f2a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#651822] active:scale-95"
+                className="mt-4 rounded-lg bg-[#7d1f2a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#681923] active:scale-95"
               >
                 Try again
               </button>

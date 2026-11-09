@@ -171,12 +171,7 @@ const BOTTOM_TABS: {
   { label: "Dashboard", href: "/student/dashboard", icon: "dashboard" },
   { label: "Find a Mate", href: "/student/find-academic-mate", icon: "search" },
   { label: "Sessions", href: "/student/sessions", icon: "calendar" },
-  {
-    label: "My Requests",
-    href: "/student/requests",
-    icon: "inbox",
-    badge: "accepted",
-  },
+  { label: "Messages", href: "/student/messages", icon: "messages", badge: "unread" },
 ];
 
 const BOTTOM_TAB_HREFS = BOTTOM_TABS.map((tab) => tab.href);
@@ -358,6 +353,30 @@ type ProfileUser = {
   image?: string | null;
 };
 
+function initialsOf(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "S";
+}
+
+/** Round profile photo (or initials) in the top right corner. Opens the student profile. */
+function ProfileAvatarLink({ user, active }: { user?: ProfileUser; active: boolean }) {
+  const name = user?.name?.trim() || "Student";
+  return (
+    <Link
+      href="/student/profile"
+      aria-label="Your profile"
+      aria-current={active ? "page" : undefined}
+      title={name}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 ${active ? "ring-2 ring-[#7d1f2a] ring-offset-2" : "hover:ring-2 hover:ring-[#e2d9d0] hover:ring-offset-2"}`}
+    >
+      {user?.image ? (
+        <Image src={user.image} alt="" width={64} height={64} unoptimized className="h-8 w-8 rounded-full object-cover" />
+      ) : (
+        <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#7d1f2a] text-[11px] font-semibold text-white">{initialsOf(name)}</span>
+      )}
+    </Link>
+  );
+}
+
 /** Profile card shown first in the mobile drawer. Links to the student profile page. */
 function ProfileCard({
   user,
@@ -444,8 +463,6 @@ function SidebarContents({
     <>
       <div className="flex h-18 shrink-0 items-center justify-between border-b border-[#eee8e2] px-5">
         <Brand onClick={onNavigate} />
-
-        {!mobile && <NotificationBell align="left" />}
 
         {mobile && (
           <button
@@ -640,6 +657,9 @@ export default function StudentAppShell({
   };
 
   const menuAttention = [
+    acceptedCount > 0
+      ? `${acceptedCount} newly accepted ${acceptedCount === 1 ? "request" : "requests"}`
+      : "",
     pendingCount > 0
       ? `${pendingCount} pending ${pendingCount === 1 ? "request" : "requests"}`
       : "",
@@ -671,6 +691,12 @@ export default function StudentAppShell({
         />
       </aside>
 
+      {/* Desktop top bar: notifications and the profile sit in the right corner */}
+      <header className="sticky top-0 z-20 hidden h-18 items-center justify-end gap-2 border-b border-[#e2d9d0] bg-white/95 px-6 backdrop-blur lg:ml-72 lg:flex">
+        <NotificationBell />
+        <ProfileAvatarLink user={session?.user} active={isActivePath(pathname, "/student/profile")} />
+      </header>
+
       {/* Mobile top bar: brand only, navigation lives in the bottom bar */}
       <header className="sticky top-0 z-30 border-b border-[#e2d9d0] bg-white lg:hidden">
         <div className="flex h-14 items-center justify-between gap-2 px-4">
@@ -685,18 +711,8 @@ export default function StudentAppShell({
             >
               <Icon name="search" className="h-5 w-5" />
             </button>
-            <Link
-              href="/student/messages"
-              aria-label={unreadCount > 0 ? `Messages, ${unreadCount} unread` : "Messages"}
-              aria-current={isActivePath(pathname, "/student/messages") ? "page" : undefined}
-              className={`inline-flex h-11 w-11 items-center justify-center rounded-lg transition hover:bg-[#f5f0eb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${isActivePath(pathname, "/student/messages") ? "text-[#7d1f2a]" : "text-[#625954]"}`}
-            >
-              <span className="relative">
-                <Icon name="messages" className="h-5 w-5" />
-                <TabBadge count={unreadCount} tone="brand" />
-              </span>
-            </Link>
             <NotificationBell />
+            <ProfileAvatarLink user={session?.user} active={isActivePath(pathname, "/student/profile")} />
           </div>
         </div>
         {mobileSearchOpen && (
@@ -760,8 +776,8 @@ export default function StudentAppShell({
             >
               <span className="relative">
                 <Icon name="menu" className="h-5.5 w-5.5" />
-                {/* Mate requests live inside the drawer, so flag them here */}
-                {(pendingCount > 0 || rescheduleCount > 0) && (
+                {/* My Requests and Mate requests live inside the drawer, so flag them here */}
+                {(pendingCount > 0 || rescheduleCount > 0 || acceptedCount > 0) && (
                   <span
                     aria-hidden="true"
                     className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#7d1f2a] ring-2 ring-white"

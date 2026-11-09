@@ -364,7 +364,7 @@ export default function AcademicMateVerificationPage() {
           <button
             type="button"
             onClick={() => void loadVerification()}
-            className="mt-6 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#691923] shadow-sm hover:shadow"
+            className="mt-6 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#681923] shadow-sm hover:shadow"
           >
             Try again
           </button>
@@ -391,7 +391,7 @@ export default function AcademicMateVerificationPage() {
               <Icon name="shield" className="h-3.5 w-3.5" />
               Academic Mate
             </span>
-            <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#241f1c] sm:text-4xl">
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">
               Verification
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#625b55] sm:text-base">
@@ -531,7 +531,7 @@ export default function AcademicMateVerificationPage() {
                     <ReadinessItem label="Linked active student profile" complete={readiness.studentProfile} />
                     <ReadinessItem label="University, programme and year available" complete={readiness.academicBackground} />
                     <ReadinessItem label="At least one active course offering" complete={readiness.offerings} />
-                    <ReadinessItem label="Student ID and proof of enrolment or results uploaded" complete={readiness.evidence} />
+                    <ReadinessItem label="An identity document and proof of enrolment or results uploaded" complete={readiness.evidence} />
                   </div>
 
                   {!readiness.readyForVerification && (
@@ -560,7 +560,7 @@ export default function AcademicMateVerificationPage() {
                       ["Academic Mate profile", "Your headline, bio and teaching experience."],
                       ["Courses supported", "The courses you have listed as Academic Mate offerings."],
                       ["Experience and qualifications", "Relevant information you have added to your profile."],
-                      ["Identity documents", "Your student ID and proof of enrolment or results, checked one by one."],
+                      ["Identity documents", "A student ID, NRC or passport, plus proof of enrolment or results, checked one by one."],
                     ].map(([title, description]) => (
                       <div key={title} className="flex items-start gap-3">
                         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f6eaec] text-[#7d1f2a]">
@@ -693,7 +693,7 @@ export default function AcademicMateVerificationPage() {
                     type="button"
                     disabled={!canRequest || submitting}
                     onClick={() => void requestVerification()}
-                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#691923] shadow-sm hover:shadow disabled:cursor-not-allowed disabled:bg-[#b9a6a2] disabled:shadow-none"
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7d1f2a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#681923] shadow-sm hover:shadow disabled:cursor-not-allowed disabled:bg-[#b9a6a2] disabled:shadow-none"
                   >
                     {submitting ? (
                       <>

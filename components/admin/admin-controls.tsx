@@ -66,7 +66,7 @@ export function GhostButton({ children, ...props }: ButtonHTMLAttributes<HTMLBut
 }
 
 export function PrimaryButton({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" {...props} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#7d1f2a] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#691923] disabled:opacity-50 ${FOCUS} ${props.className ?? ""}`}>{children}</button>;
+  return <button type="button" {...props} className={`inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#7d1f2a] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#681923] disabled:opacity-50 ${FOCUS} ${props.className ?? ""}`}>{children}</button>;
 }
 
 /** Labelled text input with optional hint, used by the admin forms. */

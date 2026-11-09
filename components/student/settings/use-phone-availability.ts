@@ -1,22 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "./settings-api";
-import { ZAMBIA_MOBILE_PATTERN } from "./phone";
+import { normalizePhone, parsePhone, splitPhone, type CountryCode } from "@/lib/phone";
 
 type PhoneCheck = { phone: string; result: "available" | "taken" | "error" } | null;
 
 /**
- * Live phone availability check. It only runs for a complete, valid number that differs from the
- * one already saved on this account, and it is debounced. The server re-checks on save, so a
- * failed lookup never blocks saving.
+ * Live phone check for the number being typed (`country` + `national`) against the one already saved.
+ * It validates the format with the shared phone service, and only asks the server whether the number is
+ * free when it is complete, valid and different from the saved one. The check is debounced, and the
+ * server checks again on save, so a failed lookup never blocks saving.
  */
-export function usePhoneAvailability(phoneNumber: string, savedPhone: string) {
+export function usePhoneAvailability(country: string, national: string, savedStored: string | null) {
   const [check, setCheck] = useState<PhoneCheck>(null);
 
-  const valid = ZAMBIA_MOBILE_PATTERN.test(phoneNumber);
-  const changed = phoneNumber !== savedPhone;
-  const phoneToCheck = valid && changed ? phoneNumber : "";
+  const parsed = useMemo(() => parsePhone(national, country as CountryCode), [national, country]);
+  const e164 = parsed.ok ? parsed.e164 : "";
+  const saved = useMemo(() => splitPhone(savedStored), [savedStored]);
+  const savedE164 = normalizePhone(savedStored) ?? "";
+
+  // "Untouched" means the field still shows what was saved, so an older saved format never blocks other edits.
+  const untouched = country === saved.country && national === saved.national;
+  const changed = !untouched && e164 !== savedE164;
+  const phoneToCheck = changed && e164 ? e164 : "";
 
   useEffect(() => {
     if (!phoneToCheck) return;
@@ -24,7 +31,7 @@ export function usePhoneAvailability(phoneNumber: string, savedPhone: string) {
     const timer = window.setTimeout(async () => {
       try {
         const body = await requestJson<{ available: boolean }>(
-          `/api/student/phone-check?phone=${encodeURIComponent(`+260${phoneToCheck}`)}`,
+          `/api/student/phone-check?phone=${encodeURIComponent(phoneToCheck)}`,
           { method: "GET", headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal },
           "Unable to check this phone number."
         );
@@ -44,12 +51,15 @@ export function usePhoneAvailability(phoneNumber: string, savedPhone: string) {
   const markTaken = useCallback((phone: string) => setCheck({ phone, result: "taken" }), []);
 
   return {
-    valid,
+    valid: parsed.ok,
+    /** The number in E.164 form, or "" when it is empty or not valid yet. */
+    e164,
     changed,
+    untouched,
     checking: phoneToCheck !== "" && !checked,
     taken: checked && check?.result === "taken",
     available: checked && check?.result === "available",
-    formatError: changed && phoneNumber.length === 9 && !valid,
+    formatError: !untouched && national !== "" && !parsed.ok,
     markTaken,
   };
 }

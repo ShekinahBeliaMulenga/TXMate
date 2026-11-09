@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { priceText } from "@/lib/offering-price";
 
 type RateType =
   | "PER_SESSION"
@@ -9,7 +10,8 @@ type RateType =
   | "PER_WEEK"
   | "PER_MONTH"
   | "PER_COURSE"
-  | "CUSTOM";
+  | "CUSTOM"
+  | "FREE";
 
 type Course = {
   id: string;
@@ -46,6 +48,11 @@ type RateOption = {
 };
 
 const rateOptions: RateOption[] = [
+  {
+    value: "FREE",
+    label: "Free",
+    description: "No charge. Students can request this tutorial without paying.",
+  },
   {
     value: "PER_SESSION",
     label: "Per session",
@@ -100,6 +107,8 @@ function formatRateType(rateType: RateType) {
       return "Per course";
     case "CUSTOM":
       return "Custom";
+    case "FREE":
+      return "Free";
     default:
       return rateType;
   }
@@ -565,7 +574,7 @@ export default function AcademicMateOfferingsPage() {
       return;
     }
 
-    if (!rate.trim()) {
+    if (rateType !== "FREE" && !rate.trim()) {
       setError("Enter a rate.");
       return;
     }
@@ -605,7 +614,7 @@ export default function AcademicMateOfferingsPage() {
           courseId: selectedCourseId,
           title: title.trim() || null,
           description: description.trim() || null,
-          rate: rate.trim(),
+          rate: rateType === "FREE" ? "0" : rate.trim(),
           currency: "ZMW",
           rateType,
           rateDetails: rateType === "CUSTOM" ? rateDetails.trim() : null,
@@ -766,7 +775,7 @@ export default function AcademicMateOfferingsPage() {
         <div className="mb-8">
           <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+              <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">
                 Your Course offers
               </h1>
 
@@ -1100,6 +1109,7 @@ export default function AcademicMateOfferingsPage() {
               </div>
 
               <div className="space-y-6 px-6 py-6 sm:px-8">
+                {rateType !== "FREE" && (
                 <Field
                   label="Amount"
                   description="Enter the amount you charge for the pricing basis below."
@@ -1119,6 +1129,7 @@ export default function AcademicMateOfferingsPage() {
                     />
                   </div>
                 </Field>
+                )}
 
                 <Field
                   label="Pricing basis"
@@ -1143,7 +1154,11 @@ export default function AcademicMateOfferingsPage() {
                               name="rateType"
                               value={option.value}
                               checked={selected}
-                              onChange={() => setRateType(option.value)}
+                              onChange={() => {
+                                // A free offering stores 0, so don't carry that over as the amount of a paid basis.
+                                if (rateType === "FREE" && option.value !== "FREE") setRate("");
+                                setRateType(option.value);
+                              }}
                               className="mt-0.5 h-4 w-4 accent-[#7d1f2a]"
                             />
                             <span>
@@ -1435,8 +1450,9 @@ export default function AcademicMateOfferingsPage() {
                         <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-[#4e4742]">
                           <span className="inline-flex items-center gap-1.5 font-semibold text-[#241f1c]">
                             <RateIcon className="h-3.5 w-3.5 text-[#7d1f2a]" />
-                            {offering.currency} {offering.rate} ·{" "}
-                            {formatRateType(offering.rateType)}
+                            {offering.rateType === "FREE"
+                              ? "Free"
+                              : `${priceText(offering.rate, offering.currency, offering.rateType)} · ${formatRateType(offering.rateType)}`}
                           </span>
 
                           <span className="inline-flex items-center gap-1.5">

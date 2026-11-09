@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "tsx server.ts --production",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test tests",
+    "test:watch": "bun test --watch tests",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -20,6 +23,7 @@
     "dotenv": "^18.0.5",
     "firebase": "^13.1.0",
     "firebase-admin": "^14.5.0",
+    "libphonenumber-js": "^1.13.15",
     "lucide-react": "^1.61.0",
     "next": "16.3.8",
     "nodemailer": "^7.0.0",

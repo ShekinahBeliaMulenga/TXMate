@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useState, type ChangeEvent } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ImageCropModal from "@/components/ImageCropModal";
 import { initials, requestJson, resizeProfileImage } from "./settings-api";
 import { FOCUS, Icon, InfoNote } from "./settings-ui";
@@ -20,6 +21,7 @@ export default function ProfilePhotoSection({ name, image, onImageChange }: { na
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [inputKey, setInputKey] = useState(0);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   // Step 1: validate the chosen file, then open the crop dialog instead of uploading.
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -71,6 +73,7 @@ export default function ProfilePhotoSection({ name, image, onImageChange }: { na
 
   async function removeImage() {
     if (!image || uploading) return;
+    setConfirmRemove(false);
     setError(null);
     setSuccess(false);
     setUploading(true);
@@ -87,8 +90,8 @@ export default function ProfilePhotoSection({ name, image, onImageChange }: { na
 
   return (
     <div>
-      <div className="flex justify-center py-4">
-        <div className="relative">
+      <div className="flex flex-col items-center gap-4 py-4">
+        <div>
           {image ? (
             <Image src={image} alt={name} width={176} height={176} unoptimized className="h-40 w-40 rounded-full object-cover ring-4 ring-white shadow-sm sm:h-44 sm:w-44" />
           ) : (
@@ -96,49 +99,54 @@ export default function ProfilePhotoSection({ name, image, onImageChange }: { na
               {initials(name)}
             </div>
           )}
+        </div>
+        <div className="flex items-center gap-6">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            aria-label="Change profile photo"
-            className={`absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-[#f4f1ed] bg-[#7d1f2a] text-white shadow-sm transition hover:bg-[#691923] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
+            aria-label={image ? "Change profile photo" : "Add profile photo"}
+            title={image ? "Change photo" : "Add photo"}
+            className={`flex h-10 w-10 items-center justify-center rounded-full bg-[#7d1f2a] text-white shadow-sm transition hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
           >
             <Icon name="camera" className="h-5 w-5" />
           </button>
+          {image ? (
+            <button
+              type="button"
+              onClick={() => setConfirmRemove(true)}
+              disabled={uploading}
+              aria-label="Remove profile photo"
+              title="Remove photo"
+              className={`flex h-10 w-10 items-center justify-center rounded-full border border-[#e3d9d3] bg-white text-[#7d1f2a] shadow-sm transition hover:bg-[#faeef0] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
+            >
+              <Icon name="trash" className="h-5 w-5" />
+            </button>
+          ) : null}
         </div>
       </div>
 
       <input key={inputKey} ref={inputRef} type="file" accept={ACCEPTED_TYPES.join(",")} className="sr-only" tabIndex={-1} onChange={handleFileChange} disabled={uploading} />
 
-      <div className="mt-2 space-y-3">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#691923] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
-        >
-          <Icon name="camera" className="h-[18px] w-[18px]" />
-          {uploading ? "Updating…" : image ? "Change photo" : "Add photo"}
-        </button>
-        {image ? (
-          <button
-            type="button"
-            onClick={() => void removeImage()}
-            disabled={uploading}
-            className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#e3cfd2] bg-[#fdf7f8] text-sm font-semibold text-[#7d1f2a] transition hover:bg-[#faeef0] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`}
-          >
-            <Icon name="trash" className="h-[18px] w-[18px]" />
-            Remove photo
-          </button>
-        ) : null}
-      </div>
-
+      {uploading && !pendingFile ? <p role="status" className="mt-2 text-center text-sm text-[#6d6260]">Updating…</p> : null}
       {!pendingFile && error ? <p role="alert" className="mt-4 text-sm leading-5 text-[#7d1f2a]">{error}</p> : null}
       {success ? <p role="status" className="mt-4 text-sm leading-5 text-[#28633b]">Profile picture updated successfully.</p> : null}
 
       <div className="mt-5">
         <InfoNote>Use a clear photo of yourself. Avoid group photos, filters or images that are not yours.</InfoNote>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove your profile photo?"
+        message="Your initials will be shown instead. You can add a new photo at any time."
+        confirmLabel="Remove photo"
+        busyLabel="Removing…"
+        tone="danger"
+        busy={uploading}
+        onConfirm={() => void removeImage()}
+        onCancel={() => setConfirmRemove(false)}
+      />
 
       {pendingFile ? <ImageCropModal file={pendingFile} busy={uploading} externalError={error} onCancel={cancelCrop} onConfirm={(cropped) => void uploadCropped(cropped)} /> : null}
     </div>

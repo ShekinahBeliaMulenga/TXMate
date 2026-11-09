@@ -3,7 +3,7 @@ import { authorizeAdmin, type AdminContext } from "@/lib/admin/guard";
 import { recordAudit } from "@/lib/admin/audit";
 import { canAccessUniversity as adminCanAccessUniversity } from "@/lib/admin/permissions";
 import { prisma } from "@/lib/prisma";
-import { blockersForApproval, purgeDate } from "@/lib/verification-evidence";
+import { blockersForApproval, exceptionProblem, purgeDate } from "@/lib/verification-evidence";
 type VerificationDecision = "VERIFIED" | "REJECTED";
 function canAccessUniversity(admin: AdminContext, universityId: string) {
     return adminCanAccessUniversity(admin.scope, universityId);
@@ -480,6 +480,7 @@ export async function GET(
                 uploadedAt: item.createdAt.toISOString(),
             })),
             evidenceBlockers: blockersForApproval(academicMate.evidence),
+            canApproveException: admin.role === "PLATFORM_ADMIN",
             verificationHistory:
                 academicMate.verificationHistory.map(
                     (entry) => ({
@@ -618,6 +619,7 @@ export async function PATCH(
                 { status: 400 },
             );
         }
+        const exceptionReason = typeof payload.exceptionReason === "string" ? payload.exceptionReason.trim() : "";
         if (decision === "REJECTED" && !notes) {
             return NextResponse.json(
                 {
@@ -748,9 +750,12 @@ export async function PATCH(
                     where: { academicMateProfileId: academicMate.id },
                     select: { kind: true, reviewStatus: true },
                 });
-                if (decision === "VERIFIED" && blockersForApproval(evidence).length > 0) {
-                    throw new Error("EVIDENCE_INCOMPLETE");
+                const blockers = decision === "VERIFIED" ? blockersForApproval(evidence) : [];
+                // Missing or unreviewed documents can only be waived by a platform admin, with a written reason that is audited.
+                if (blockers.length > 0 && (!exceptionReason || exceptionProblem(admin.role, exceptionReason))) {
+                    throw new Error(exceptionReason ? "EXCEPTION_NOT_ALLOWED" : "EVIDENCE_INCOMPLETE");
                 }
+                const exception = blockers.length > 0;
                 // Documents are deleted a while after the decision, by the clean-up script.
                 await tx.academicMateEvidence.updateMany({
                     where: { academicMateProfileId: academicMate.id },
@@ -790,7 +795,7 @@ export async function PATCH(
                                     academicMate.id,
                                 status:
                                     decision as VerificationDecision,
-                                notes,
+                                notes: exception ? [`Approved as an exception: ${exceptionReason}`, notes].filter(Boolean).join("\n\n") : notes,
                                 reviewedByAdminId:
                                     admin.adminId,
                                 reviewedAt,
@@ -807,19 +812,25 @@ export async function PATCH(
                 await recordAudit(tx, {
                     actor: admin,
                     action:
-                        decision === "VERIFIED"
+                        exception
+                            ? "VERIFICATION_EXCEPTION_APPROVED"
+                            : decision === "VERIFIED"
                             ? "VERIFICATION_APPROVED"
                             : "VERIFICATION_REJECTED",
                     targetType: "ACADEMIC_MATE",
                     targetId: academicMate.id,
                     universityId: academicMate.universityId,
                     summary:
-                        decision === "VERIFIED"
+                        exception
+                            ? "Approved an Academic Mate profile as an exception, without all required documents"
+                            : decision === "VERIFIED"
                             ? "Approved an Academic Mate profile"
                             : "Rejected an Academic Mate profile",
                     metadata: {
                         decision,
                         notes: notes ?? null,
+                        exceptionReason: exception ? exceptionReason : null,
+                        waivedRequirements: exception ? blockers.join(" | ") : null,
                     },
                     context: requestContext,
                 });
@@ -871,6 +882,12 @@ export async function PATCH(
                         "This verification was already processed by another administrator.",
                 },
                 { status: 409 },
+            );
+        }
+        if (error instanceof Error && error.message === "EXCEPTION_NOT_ALLOWED") {
+            return NextResponse.json(
+                { error: "Only a platform admin can approve without the required documents, and the reason must be at least 20 characters." },
+                { status: 403 },
             );
         }
         if (error instanceof Error && error.message === "EVIDENCE_INCOMPLETE") {

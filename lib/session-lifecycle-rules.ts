@@ -102,7 +102,14 @@ export function completionDeadlineExpired(snapshot: LifecycleSnapshot, now: numb
 // ------------------------------------------------------------------- status
 
 export function isCancelled(snapshot: LifecycleSnapshot): boolean {
-  return snapshot.status === "CANCELLED" || snapshot.requestStatus === "CANCELLED" || snapshot.arrangementStatus === "CANCELLED";
+  // Cancelling this session itself always counts.
+  if (snapshot.status === "CANCELLED") return true;
+  // Cancelling the arrangement later must not rewrite an outcome that was already recorded.
+  const hasRecordedOutcome = snapshot.status === "COMPLETED" || snapshot.status === "NO_SHOW" || snapshot.status === "DISPUTED" ||
+    toMs(snapshot.completedAt) !== null || snapshot.attendance?.status === "DISPUTED" ||
+    toMs(snapshot.completionDisputedAt) !== null || toMs(snapshot.completionReviewRequiredAt) !== null;
+  if (hasRecordedOutcome) return false;
+  return snapshot.requestStatus === "CANCELLED" || snapshot.arrangementStatus === "CANCELLED";
 }
 
 /** True when the session is still live enough to accept attendance/completion answers. */
@@ -117,7 +124,7 @@ export function acceptsResponses(snapshot: LifecycleSnapshot): boolean {
 }
 
 export function needsReview(snapshot: LifecycleSnapshot, now: number): boolean {
-  if (isCancelled(snapshot) || snapshot.status === "COMPLETED") return false;
+  if (snapshot.status === "CANCELLED" || snapshot.status === "COMPLETED" || toMs(snapshot.completedAt) !== null) return false;
   return snapshot.status === "DISPUTED" ||
     snapshot.attendance?.status === "DISPUTED" ||
     toMs(snapshot.completionDisputedAt) !== null ||
@@ -139,10 +146,12 @@ export function timeStatus(snapshot: LifecycleSnapshot, now: number): TimeStatus
 /** Resolution status: whether the session still needs anyone, independent of the clock. */
 export type ResolutionStatus = "NONE" | "AWAITING_CONFIRMATION" | "NEEDS_REVIEW" | "NO_RESPONSE" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
 export function resolutionStatus(snapshot: LifecycleSnapshot, now: number): ResolutionStatus {
-  if (isCancelled(snapshot)) return "CANCELLED";
-  if (snapshot.status === "NO_SHOW") return "NO_SHOW";
+  // Individual outcomes come first; only an unresolved session inherits its arrangement's cancellation.
+  if (snapshot.status === "CANCELLED") return "CANCELLED";
   if (snapshot.status === "COMPLETED" || toMs(snapshot.completedAt) !== null) return "COMPLETED";
+  if (snapshot.status === "NO_SHOW") return "NO_SHOW";
   if (needsReview(snapshot, now)) return "NEEDS_REVIEW";
+  if (isCancelled(snapshot)) return "CANCELLED";
   // Closed because nobody answered in time; it no longer takes answers.
   if (snapshot.arrangementStatus === "EXPIRED") return "NO_RESPONSE";
   const start = toMs(snapshot.scheduledStart);

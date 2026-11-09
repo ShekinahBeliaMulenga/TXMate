@@ -2,20 +2,29 @@
  * Rules for the documents an Academic Mate uploads to prove who they are. Pure functions, so they can be tested
  * on their own; the routes add the database, storage and sign-in checks.
  */
-export const EVIDENCE_KINDS = ["STUDENT_ID", "PROOF_OF_ENROLMENT", "ACADEMIC_RESULTS"] as const;
+export const EVIDENCE_KINDS = ["STUDENT_ID", "NATIONAL_ID", "PASSPORT", "PROOF_OF_ENROLMENT", "ACADEMIC_RESULTS"] as const;
 export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 export type EvidenceReview = "PENDING" | "ACCEPTED" | "REJECTED";
 
 export const EVIDENCE_LABEL: Record<EvidenceKind, string> = {
   STUDENT_ID: "Student ID card",
+  NATIONAL_ID: "National Registration Card (NRC)",
+  PASSPORT: "Passport",
   PROOF_OF_ENROLMENT: "Proof of enrolment",
   ACADEMIC_RESULTS: "Academic results",
 };
 export const EVIDENCE_HINT: Record<EvidenceKind, string> = {
   STUDENT_ID: "A clear photo of the front of your university student ID card.",
+  NATIONAL_ID: "A clear photo of the front and back of your NRC.",
+  PASSPORT: "A clear photo of the page with your photo and name.",
   PROOF_OF_ENROLMENT: "A registration slip, fee statement or enrolment letter for this year.",
   ACADEMIC_RESULTS: "A recent statement of results or transcript.",
 };
+
+/** Any one of these proves who the person is. */
+export const IDENTITY_KINDS: EvidenceKind[] = ["STUDENT_ID", "NATIONAL_ID", "PASSPORT"];
+/** Either of these proves they study at the university. */
+export const PROOF_KINDS: EvidenceKind[] = ["PROOF_OF_ENROLMENT", "ACADEMIC_RESULTS"];
 
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_PER_KIND = 2;
@@ -48,22 +57,21 @@ export const extensionFor = (type: AllowedType) => EXTENSION[type];
 export const storageKeyFor = (profileId: string, evidenceId: string, type: AllowedType) => `verification/${profileId}/${evidenceId}.${EXTENSION[type]}`;
 
 export type EvidenceLike = { kind: EvidenceKind; reviewStatus: EvidenceReview };
-const PROOF_KINDS: EvidenceKind[] = ["PROOF_OF_ENROLMENT", "ACADEMIC_RESULTS"];
 
 /** What is still missing before the application can be submitted. Rejected files do not count. */
 export function missingForSubmission(items: EvidenceLike[]): string[] {
   const usable = items.filter((item) => item.reviewStatus !== "REJECTED");
   const missing: string[] = [];
-  if (!usable.some((item) => item.kind === "STUDENT_ID")) missing.push("a photo of your student ID card");
+  if (!usable.some((item) => IDENTITY_KINDS.includes(item.kind))) missing.push("a photo of your student ID card, NRC or passport");
   if (!usable.some((item) => PROOF_KINDS.includes(item.kind))) missing.push("proof of enrolment or your academic results");
   return missing;
 }
 
-/** What stops an admin from approving: every file must be reviewed, the ID and one proof must be accepted. */
+/** What stops an admin from approving: every file must be reviewed, one identity document and one proof must be accepted. */
 export function blockersForApproval(items: EvidenceLike[]): string[] {
   const blockers: string[] = [];
   if (items.some((item) => item.reviewStatus === "PENDING")) blockers.push("Some documents have not been reviewed yet.");
-  if (!items.some((item) => item.kind === "STUDENT_ID" && item.reviewStatus === "ACCEPTED")) blockers.push("The student ID has not been accepted.");
+  if (!items.some((item) => IDENTITY_KINDS.includes(item.kind) && item.reviewStatus === "ACCEPTED")) blockers.push("No identity document (student ID, NRC or passport) has been accepted.");
   if (!items.some((item) => PROOF_KINDS.includes(item.kind) && item.reviewStatus === "ACCEPTED")) blockers.push("Neither proof of enrolment nor academic results has been accepted.");
   return blockers;
 }
@@ -81,3 +89,14 @@ export const REJECTION_REASONS = [
   "This is not the document type requested",
   "The document looks edited or unreadable",
 ] as const;
+
+export const EXCEPTION_REASON_MIN = 20;
+export const EXCEPTION_REASON_MAX = 1000;
+/** Only a platform admin may approve while documents are missing, and must say why in writing. Returns the problem, or null when fine. */
+export function exceptionProblem(role: string, reason: unknown): string | null {
+  if (role !== "PLATFORM_ADMIN") return "Only a platform admin can approve without the required documents.";
+  const text = typeof reason === "string" ? reason.trim() : "";
+  if (text.length < EXCEPTION_REASON_MIN) return `Explain the exception in at least ${EXCEPTION_REASON_MIN} characters.`;
+  if (text.length > EXCEPTION_REASON_MAX) return `The reason cannot exceed ${EXCEPTION_REASON_MAX} characters.`;
+  return null;
+}

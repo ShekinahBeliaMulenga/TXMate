@@ -13,7 +13,7 @@ type Props = {
   compact?: boolean;
 };
 
-const PRIMARY = `flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f2a] text-[13px] font-semibold text-white shadow-sm shadow-[#7d1f2a]/20 transition hover:bg-[#691923] ${FOCUS}`;
+const PRIMARY = `flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#7d1f2a] text-[13px] font-semibold text-white shadow-sm shadow-[#7d1f2a]/20 transition hover:bg-[#681923] ${FOCUS}`;
 const DISABLED = "flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[#e2d9d0] bg-[#f6f2ee] text-[13px] font-semibold text-[#7a6f6a]";
 
 /** The profile's main action. Always one element, whatever the viewer is allowed to do. Same height in both variants. */

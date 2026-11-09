@@ -1,5 +1,6 @@
 "use client";
 
+import { formatPhone } from "@/lib/phone";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -148,7 +149,7 @@ function SkeletonTab({ active, width }: { active?: boolean; width: string }) {
 
 function ProfileSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4" aria-busy="true">
+    <main className="min-h-screen bg-[#f4f1ed] px-3 py-3 pb-8 sm:px-6 sm:py-4" aria-busy="true">
       <div className="mx-auto max-w-3xl animate-pulse motion-reduce:animate-none">
         <span role="status" aria-live="polite" className="sr-only">Loading student profile...</span>
 
@@ -273,7 +274,7 @@ export default function StudentMateProfilePage() {
           <button
             type="button"
             onClick={() => void loadProfile()}
-            className="mt-6 w-full rounded-xl bg-[#7d1f2a] px-5 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#691923]"
+            className="mt-6 w-full rounded-xl bg-[#7d1f2a] px-5 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#681923]"
           >
             Try Again
           </button>
@@ -298,7 +299,7 @@ export default function StudentMateProfilePage() {
   const chip = "inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-2.5 py-0.5 text-[11px] font-medium text-[#5f5551]";
 
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4">
+    <main className="min-h-screen bg-[#f4f1ed] px-3 py-3 pb-8 sm:px-6 sm:py-4">
       <div className="mx-auto max-w-3xl">
         <BackButton onClick={() => router.back()} />
 
@@ -403,7 +404,7 @@ export default function StudentMateProfilePage() {
           {currentTab === "contact" && hasContact && (
             <Section title="Contact Information">
               <dl>
-                {studentProfile.phoneNumber && <DetailRow icon="phone" label="Phone Number">{studentProfile.phoneNumber}</DetailRow>}
+                {studentProfile.phoneNumber && <DetailRow icon="phone" label="Phone Number">{formatPhone(studentProfile.phoneNumber)}</DetailRow>}
                 {studentProfile.studentId && <DetailRow icon="idCard" label="Student ID">{studentProfile.studentId}</DetailRow>}
               </dl>
             </Section>

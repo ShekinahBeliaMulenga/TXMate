@@ -156,7 +156,7 @@ export default function ImageCropModal({
           <button type="button" disabled={busy} onClick={onCancel} className="rounded-md border border-[#d9cec5] px-4 py-2 text-sm font-medium text-[#4e4742] hover:bg-white disabled:opacity-60">
             Cancel
           </button>
-          <button type="button" disabled={busy || !area || !src} onClick={() => void confirm()} className="rounded-md bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white hover:bg-[#691923] disabled:opacity-60">
+          <button type="button" disabled={busy || !area || !src} onClick={() => void confirm()} className="rounded-md bg-[#7d1f2a] px-5 py-2 text-sm font-semibold text-white hover:bg-[#681923] disabled:opacity-60">
             {busy ? "Uploading…" : "Save photo"}
           </button>
         </div>

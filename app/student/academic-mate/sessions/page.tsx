@@ -46,11 +46,11 @@ export default function AcademicMateSessionManagementPage() {
   const showEmptyState = !busy && !error && proposals.length === 0;
 
   return (
-    <main className="min-h-screen bg-[#fcfbfa] text-[#282321]">
+    <main className="min-h-screen bg-[#f4f1ed] text-[#282321]">
       <header className="mx-auto max-w-[1280px] px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">Reschedules</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Reschedules</h1>
             <p className="mt-1.5 hidden text-sm leading-5 text-[#6d6260] sm:block">
               Respond to rescheduling proposals, including ones for cancelled occurrences of recurring sessions.
             </p>

@@ -11,6 +11,7 @@ const MATE_OFFERING_RATE_TYPES = [
   "PER_MONTH",
   "PER_COURSE",
   "CUSTOM",
+  "FREE",
 ] as const;
 
 type MateOfferingRateType = (typeof MATE_OFFERING_RATE_TYPES)[number];
@@ -353,7 +354,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!isValidRate(rate)) {
+    // A free offering has no amount: the rate is stored as 0.
+    if (rateType !== "FREE" && !isValidRate(rate)) {
       return NextResponse.json(
         {
           error:
@@ -409,11 +411,11 @@ export async function POST(request: Request) {
       typeof title === "string" ? title.trim() || null : null;
     const normalizedDescription =
       typeof description === "string" ? description.trim() || null : null;
-    const normalizedRate = String(rate).trim();
+    const normalizedRateType = normalizeRateType(rateType);
+    const normalizedRate = normalizedRateType === "FREE" ? "0" : String(rate).trim();
     const normalizedCurrency =
       typeof currency === "string" ? currency.trim().toUpperCase() : "ZMW";
     const normalizedSessionDuration = sessionDurationMinutes ?? 60;
-    const normalizedRateType = normalizeRateType(rateType);
     const normalizedRateDetails = normalizeRateDetails(
       normalizedRateType,
       rateDetails,

@@ -2,7 +2,7 @@ export type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 export type AcademicMateStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
 export type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 export type MateOfferingStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
-export type MateOfferingRateType = "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM";
+export type MateOfferingRateType = "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM" | "FREE";
 export type Weekday = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 export type StudentStatus = "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
 export type RequestStatus = "REQUESTED" | "ACCEPTED";
@@ -120,6 +120,7 @@ export type ProfileResponse = {
   experiences: Experience[];
   qualifications: Qualification[];
   reviews: Review[];
+  reviewerStats?: Record<string, { average: number | null; count: number }>;
   statistics: Statistics;
   viewer: Viewer;
   requestsByOffering: RequestsByOffering;

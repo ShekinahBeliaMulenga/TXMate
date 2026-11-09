@@ -17,6 +17,7 @@ import { ADMIN_ROLE_LABEL, isAdminRole } from "./admin/permissions";
 import { adminInviteEmail, changeEmailConfirmation, existingAccountNotice, passwordResetEmail, verificationEmail } from "./email/templates";
 import { createSendThrottle } from "./email/throttle";
 import { consumeToken } from "./email/token-use";
+import { resolveAppOrigin, trustedOriginsFor } from "./app-config";
 import { prismaTokenStore } from "./email/token-store";
 import { prisma } from "./prisma";
 
@@ -29,7 +30,7 @@ const verificationThrottle = createSendThrottle({ cooldownMs: RESEND_COOLDOWN_SE
 const resetThrottle = createSendThrottle({ cooldownMs: RESEND_COOLDOWN_SECONDS * 1000, maxPerHour: RESEND_MAX_PER_HOUR });
 
 function appOrigin(): string {
-  return (process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  return resolveAppOrigin(process.env);
 }
 
 export const auth = betterAuth({
@@ -37,12 +38,8 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
 
-  trustedOrigins: [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://192.168.*.*:3000",
-    "https://crestless-appetizer-secular.ngrok-free.dev",
-  ],
+  // Local addresses only in development or when the app itself runs locally; extra ones (a test tunnel) come from TRUSTED_ORIGINS.
+  trustedOrigins: trustedOriginsFor(process.env),
 
   emailAndPassword: {
     enabled: true,

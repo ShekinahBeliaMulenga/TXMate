@@ -130,7 +130,7 @@ export default function EmailSection({ email }: { email: string }) {
           {changeNotice ? (
             <p role={changeNotice.tone === "error" ? "alert" : "status"} className={`rounded-lg px-3 py-2.5 text-xs leading-4 ${changeNotice.tone === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"}`}>{changeNotice.text}</p>
           ) : null}
-          <button type="submit" disabled={changing || !newEmail.trim()} className={`${BUTTON} w-full bg-[#7d1f2a] text-white hover:bg-[#691923]`}>
+          <button type="submit" disabled={changing || !newEmail.trim()} className={`${BUTTON} w-full bg-[#7d1f2a] text-white hover:bg-[#681923]`}>
             {changing ? "Sending…" : "Change email address"}
           </button>
         </form>
@@ -151,7 +151,7 @@ export default function EmailSection({ email }: { email: string }) {
                 <span className="text-xs text-[#7a6f6a]">Always on</span>
               ) : confirmUnlink === account.id ? (
                 <span className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => disconnect(account)} disabled={accountBusy === account.id} className={`${BUTTON} h-9 bg-[#7d1f2a] text-white hover:bg-[#691923]`}>{accountBusy === account.id ? "Disconnecting…" : "Yes, disconnect"}</button>
+                  <button type="button" onClick={() => disconnect(account)} disabled={accountBusy === account.id} className={`${BUTTON} h-9 bg-[#7d1f2a] text-white hover:bg-[#681923]`}>{accountBusy === account.id ? "Disconnecting…" : "Yes, disconnect"}</button>
                   <button type="button" onClick={() => setConfirmUnlink(null)} className={`${BUTTON} h-9 bg-white text-[#282321] shadow-sm`}>Keep it</button>
                 </span>
               ) : (

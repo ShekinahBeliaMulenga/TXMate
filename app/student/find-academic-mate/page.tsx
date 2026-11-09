@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import SessionRequestDialog from "@/components/student/session-request-dialog";
+import { priceBasisText, priceText } from "@/lib/offering-price";
 
 type Course = { id: string; code: string; name: string };
 
@@ -14,7 +15,7 @@ type AcademicMateOffering = {
   rate: string;
   currency: string;
   sessionDurationMinutes: number;
-  rateType: "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM";
+  rateType: "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM" | "FREE";
   rateDetails: string | null;
   course: Course;
   topics: Array<{ id: string; name: string; description: string | null }>;
@@ -67,22 +68,12 @@ function getInitials(name: string) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-function formatRateType(rateType: AcademicMateOffering["rateType"]) {
-  const labels: Record<AcademicMateOffering["rateType"], string> = {
-    PER_SESSION: "per session",
-    PER_HOUR: "per hour",
-    PER_WEEK: "per week",
-    PER_MONTH: "per month",
-    PER_COURSE: "per course",
-    CUSTOM: "custom pricing",
-  };
-  return labels[rateType];
+function formatRateType(rateType: AcademicMateOffering["rateType"], rate?: string) {
+  return priceBasisText(rateType, rate);
 }
 
-function formatRate(rate: string, currency: string) {
-  const amount = Number(rate);
-  if (!Number.isFinite(amount)) return `${currency} ${rate}`;
-  return `${currency} ${amount.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+function formatRate(rate: string, currency: string, rateType?: AcademicMateOffering["rateType"]) {
+  return priceText(rate, currency, rateType);
 }
 
 function formatDuration(minutes: number) {
@@ -411,8 +402,8 @@ function OfferingRow({
               </div>
   
               <div className="shrink-0 text-right">
-                <p className="text-sm font-bold tabular-nums tracking-tight text-[#7d1f2a]">{formatRate(offering.rate, offering.currency)}</p>
-                <p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatRateType(offering.rateType)}</p>
+                <p className="text-sm font-bold tabular-nums tracking-tight text-[#7d1f2a]">{formatRate(offering.rate, offering.currency, offering.rateType)}</p>
+                {formatRateType(offering.rateType, offering.rate) && <p className="mt-0.5 text-[10px] text-[#8a7f7a]">{formatRateType(offering.rateType, offering.rate)}</p>}
               </div>
             </div>
   
@@ -784,7 +775,7 @@ export default function FindAcademicMatePage() {
 
       <div className="mx-auto max-w-6xl">
         <header className="mb-3">
-          <h1 className="text-lg font-bold tracking-tight text-[#282321] sm:text-xl">Find an Academic Mate</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Find an Academic Mate</h1>
           <p className="mt-0.5 max-w-2xl text-xs leading-4 text-[#6d6260]">
             Compare course offerings, experience and rates. Tap a card to see the full profile.
           </p>
@@ -1022,8 +1013,8 @@ export default function FindAcademicMatePage() {
                 {detailsOffering.title && <SpecRow label="Offering">{detailsOffering.title}</SpecRow>}
                 <SpecRow label="Session">{formatDuration(detailsOffering.sessionDurationMinutes)}</SpecRow>
                 <SpecRow label="Rate">
-                  <span className="font-semibold tabular-nums">{formatRate(detailsOffering.rate, detailsOffering.currency)}</span>
-                  <span className="text-[#6d6260]"> {formatRateType(detailsOffering.rateType)}</span>
+                  <span className="font-semibold tabular-nums">{formatRate(detailsOffering.rate, detailsOffering.currency, detailsOffering.rateType)}</span>
+                  <span className="text-[#6d6260]"> {formatRateType(detailsOffering.rateType, detailsOffering.rate)}</span>
                 </SpecRow>
                 {detailsOffering.rateType === "CUSTOM" && detailsOffering.rateDetails && (
                   <SpecRow label="Pricing">{detailsOffering.rateDetails}</SpecRow>

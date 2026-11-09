@@ -5,6 +5,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   ADMIN_LOGIN: "Signed in",
   VERIFICATION_APPROVED: "Approved verification",
   VERIFICATION_REJECTED: "Rejected verification",
+  VERIFICATION_EXCEPTION_APPROVED: "Approved verification as an exception",
   VERIFICATION_EVIDENCE_VIEWED: "Opened a verification document",
   VERIFICATION_EVIDENCE_REVIEWED: "Reviewed a verification document",
   DISPUTE_RESOLVED: "Resolved session review",
@@ -38,7 +39,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
 /** Colour cue for an action: red for restrictions, green for approvals, brand for access changes. */
 export function auditTone(action: string): "neutral" | "brand" | "success" | "warning" | "danger" {
   if (action === "VERIFICATION_APPROVED" || action === "STUDENT_REACTIVATED" || action === "MATE_REACTIVATED") return "success";
-  if (action === "VERIFICATION_REJECTED" || action === "STUDENT_SUSPENDED" || action === "ACCOUNT_ANONYMISED" || action === "REVIEW_HIDDEN" || action === "MESSAGING_DISABLED" || action === "MATE_SUSPENDED" || action === "ADMIN_REVOKED" || action === "ADMIN_TWO_STEP_FAILED" || action === "ADMIN_TWO_STEP_LOCKED") return "danger";
+  if (action === "VERIFICATION_REJECTED" || action === "VERIFICATION_EXCEPTION_APPROVED" || action === "STUDENT_SUSPENDED" || action === "ACCOUNT_ANONYMISED" || action === "REVIEW_HIDDEN" || action === "MESSAGING_DISABLED" || action === "MATE_SUSPENDED" || action === "ADMIN_REVOKED" || action === "ADMIN_TWO_STEP_FAILED" || action === "ADMIN_TWO_STEP_LOCKED") return "danger";
   if (action.startsWith("ADMIN_") && action !== "ADMIN_LOGIN") return "brand";
   if (action.startsWith("UNIVERSITY_") || action.startsWith("ACADEMIC_STRUCTURE_")) return "brand";
   if (action === "DISPUTE_RESOLVED" || action === "MESSAGES_VIEWED" || action === "VERIFICATION_EVIDENCE_VIEWED" || action === "ADMIN_TWO_STEP_BACKUP_USED" || action === "ADMIN_TWO_STEP_RESET") return "warning";

@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import RatingSummary from "@/components/student/rating-summary";
+import { ReviewerList } from "@/components/student/academic-mate-profile/reviews-tab";
+import { priceBasisText, priceText } from "@/lib/offering-price";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
 type ProfileVisibility = "PUBLIC" | "MEMBERS_ONLY" | "PRIVATE";
 type AcademicMateStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
 type MateOfferingStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED";
-type MateOfferingRateType = "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM";
+type MateOfferingRateType = "PER_SESSION" | "PER_HOUR" | "PER_WEEK" | "PER_MONTH" | "PER_COURSE" | "CUSTOM" | "FREE";
 type Weekday = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 type StudentStatus = "ACTIVE" | "GRADUATED" | "SUSPENDED" | "WITHDRAWN";
 
@@ -31,6 +33,7 @@ type AcademicMateProfileResponse = {
   experiences: Array<{ id: string; title: string; organisation: string | null; description: string | null; startYear: number | null; endYear: number | null; createdAt: string; updatedAt: string }>;
   qualifications: Array<{ id: string; name: string; issuer: string | null; year: number | null; credentialUrl: string | null; createdAt: string; updatedAt: string }>;
   reviews: Array<{ id: string; rating: number; comment: string | null; createdAt: string; reviewerUser: { id: string; name: string; image: string | null } }>;
+  reviewerStats?: Record<string, { average: number | null; count: number }>;
   statistics: { totalOfferings: number; totalAvailabilitySlots: number; totalExperiences: number; totalQualifications: number; totalReviews: number; averageRating: number | null; ratingDistribution?: Record<string, number> };
 };
 
@@ -46,7 +49,7 @@ const academicMateStatusLabel: Record<AcademicMateStatus, string> = { ACTIVE: "A
 const statusDot: Record<AcademicMateStatus, string> = { ACTIVE: "bg-emerald-500", INACTIVE: "bg-stone-400", SUSPENDED: "bg-amber-500" };
 const verificationLabel: Record<VerificationStatus, string> = { UNVERIFIED: "Unverified", PENDING: "Verification pending", VERIFIED: "Verified", REJECTED: "Verification rejected" };
 const verificationStyle: Record<VerificationStatus, string> = { UNVERIFIED: "bg-stone-100 text-stone-700 ring-stone-200", PENDING: "bg-amber-50 text-amber-800 ring-amber-200", VERIFIED: "bg-emerald-50 text-emerald-800 ring-emerald-200", REJECTED: "bg-red-50 text-red-800 ring-red-200" };
-const rateTypeLabel: Record<MateOfferingRateType, string> = { PER_SESSION: "per session", PER_HOUR: "per hour", PER_WEEK: "per week", PER_MONTH: "per month", PER_COURSE: "per course", CUSTOM: "Custom rate" };
+const rateTypeLabel: Record<MateOfferingRateType, string> = { PER_SESSION: "per session", PER_HOUR: "per hour", PER_WEEK: "per week", PER_MONTH: "per month", PER_COURSE: "per course", CUSTOM: "Custom rate", FREE: "" };
 const weekdayLabel: Record<Weekday, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday", FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
 const weekdayOrder: Weekday[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
 
@@ -113,25 +116,6 @@ function Field({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <span className="inline-flex gap-0.5" role="img" aria-label={`${rating} out of 5 stars`}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <Icon key={i} name="star" className={`h-3 w-3 ${i < rating ? "fill-amber-500 text-amber-500" : "text-[#d8cec5]"}`} />
-      ))}
-    </span>
-  );
-}
-
-function Avatar({ name, image, size = 32 }: { name: string; image: string | null; size?: number }) {
-  const dim = { width: size, height: size };
-  return image ? (
-    <Image src={image} alt="" width={size} height={size} unoptimized className="shrink-0 rounded-full object-cover" style={dim} />
-  ) : (
-    <div aria-hidden="true" className="flex shrink-0 items-center justify-center rounded-full bg-[#f2e9e4] text-[11px] font-semibold text-[#7d1f2a]" style={dim}>{initials(name)}</div>
-  );
-}
-
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "TM";
@@ -141,15 +125,9 @@ function initials(name: string) {
 
 const titleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 const formatStatus = (status: string) => titleCase(status.replace(/_/g, " "));
-const formatRateType = (rateType: MateOfferingRateType) => rateTypeLabel[rateType] || titleCase(rateType);
+const formatRateType = (rateType: MateOfferingRateType) => rateTypeLabel[rateType] ?? titleCase(rateType);
 const reviewsLabel = (count: number) => `${count} ${count === 1 ? "review" : "reviews"}`;
 const experienceShort = (years: number | null) => (years === null ? "—" : `${years} ${years === 1 ? "yr" : "yrs"}`);
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(date);
-}
 
 function formatTime(minutes: number) {
   const hours = Math.floor(minutes / 60);
@@ -227,16 +205,6 @@ export default function AcademicMateProfilePage() {
 
   const offeringById = useMemo(() => new Map((data?.offerings ?? []).map((o) => [o.id, o] as const)), [data]);
 
-  const groupedReviews = useMemo(() => {
-    const groups = new Map<string, { reviewer: AcademicMateProfileResponse["reviews"][number]["reviewerUser"]; reviews: AcademicMateProfileResponse["reviews"] }>();
-    for (const review of data?.reviews ?? []) {
-      const group = groups.get(review.reviewerUser.id);
-      if (group) group.reviews.push(review);
-      else groups.set(review.reviewerUser.id, { reviewer: review.reviewerUser, reviews: [review] });
-    }
-    return Array.from(groups.values());
-  }, [data?.reviews]);
-
   if (loading) {
     const block = "animate-pulse rounded-xl border border-[#e2d9d0] bg-white";
     return (
@@ -266,7 +234,7 @@ export default function AcademicMateProfilePage() {
         <div role="alert" className="mx-auto max-w-md rounded-2xl border border-[#e2d9d0] bg-white p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-[#282321]">Couldn’t load your Academic Mate profile</h1>
           <p className="mt-2 text-[13px] leading-5 text-[#6d6260]">{error ?? "Your Academic Mate profile could not be loaded."}</p>
-          <button type="button" onClick={() => window.location.reload()} className={`mt-4 rounded-xl bg-[#7d1f2a] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#691923] ${FOCUS}`}>Try again</button>
+          <button type="button" onClick={() => window.location.reload()} className={`mt-4 rounded-xl bg-[#7d1f2a] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#681923] ${FOCUS}`}>Try again</button>
         </div>
       </main>
     );
@@ -427,8 +395,8 @@ export default function AcademicMateProfilePage() {
                               {offering.title && <p className="mt-0.5 truncate text-xs text-[#6b625c]">{offering.title}</p>}
                             </div>
                             <p className="shrink-0 text-right">
-                              <span className="block text-[13px] font-bold leading-5 text-[#241f1c]">{offering.currency} {offering.rate}</span>
-                              <span className="block text-[11px] leading-4 text-[#6d6260]">{formatRateType(offering.rateType)}</span>
+                              <span className="block text-[13px] font-bold leading-5 text-[#241f1c]">{priceText(offering.rate, offering.currency, offering.rateType)}</span>
+                              {formatRateType(offering.rateType) && <span className="block text-[11px] leading-4 text-[#6d6260]">{formatRateType(offering.rateType)}</span>}
                             </p>
                           </div>
                           {offering.description && <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-[#625b55]">{offering.description}</p>}
@@ -451,34 +419,7 @@ export default function AcademicMateProfilePage() {
               <Surface>
                 <Block title="Reviews" icon="star" aside={statistics.totalReviews > 0 ? <span className="text-[11px] font-medium text-[#6d6260]">{reviewsLabel(statistics.totalReviews)}</span> : null}>
                   <RatingSummary average={statistics.averageRating} count={statistics.totalReviews} distribution={statistics.ratingDistribution} />
-                  {reviews.length === 0 ? <Empty text="No reviews yet." /> : (
-                    <ul className="divide-y divide-[#efe8e1]">
-                      {groupedReviews.map(({ reviewer, reviews: studentReviews }) => (
-                        <li key={reviewer.id} className="py-3 first:pt-0 last:pb-0">
-                          <div className="flex items-start gap-2.5">
-                            <Avatar name={reviewer.name} image={reviewer.image} />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                                <p className="text-[13px] font-semibold text-[#282321]">{reviewer.name}</p>
-                                {studentReviews.length > 1 && <span className="text-[11px] text-[#7a6f6a]">{studentReviews.length} reviews</span>}
-                              </div>
-                              <ul className="mt-2 space-y-2.5">
-                                {studentReviews.map((review) => (
-                                  <li key={review.id} className="border-l-2 border-[#efe8e1] pl-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                                      <Stars rating={review.rating} />
-                                      <time dateTime={review.createdAt} className="text-[10px] text-[#7a6f6a]">{formatDate(review.createdAt)}</time>
-                                    </div>
-                                    {review.comment && <p className="mt-1 whitespace-pre-wrap wrap-break-word text-[12px] leading-[1.45] text-[#514844]">{review.comment}</p>}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  {reviews.length === 0 ? <Empty text="No reviews yet." /> : <ReviewerList reviews={reviews} reviewerStats={data.reviewerStats} />}
                 </Block>
               </Surface>
             )}

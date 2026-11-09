@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uniqueViolationTarget } from "@/lib/db-errors";
-import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, normalizeZambianMobile, zambianPhoneVariants } from "@/lib/zambia-phone";
+import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, normalizePhone, phoneVariants } from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     if (body.phoneNumber !== undefined && body.phoneNumber !== null) {
       if (!isNonEmptyString(body.phoneNumber)) return fail("Phone number must be a non-empty string when provided.", 400);
       if (body.phoneNumber.trim().length > 30) return fail("Phone number is too long.", 400);
-      phoneNumber = normalizeZambianMobile(body.phoneNumber);
+      phoneNumber = normalizePhone(body.phoneNumber);
       if (!phoneNumber) return fail(PHONE_FORMAT_MESSAGE, 400);
     }
 
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     // The phone number must not already belong to another account.
     if (phoneNumber) {
       const duplicatePhone = await prisma.studentProfile.findFirst({
-        where: { phoneNumber: { in: zambianPhoneVariants(phoneNumber) } },
+        where: { phoneNumber: { in: phoneVariants(phoneNumber) } },
         select: { id: true },
       });
       if (duplicatePhone) return fail(PHONE_TAKEN_MESSAGE, 409);

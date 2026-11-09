@@ -1,13 +1,14 @@
 "use client";
 
 import type { usePhoneAvailability } from "./use-phone-availability";
-import { cleanPhoneInput, PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE } from "./phone";
+import PhoneField from "@/components/ui/phone-field";
+import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE } from "@/lib/phone";
 import type { SettingsFormValues } from "./settings-types";
 import { HINT, Icon, INPUT, INPUT_READONLY, LABEL } from "./settings-ui";
 
 type Props = {
   email: string;
-  values: Pick<SettingsFormValues, "name" | "phoneNumber" | "bio">;
+  values: Pick<SettingsFormValues, "name" | "phoneCountry" | "phoneNumber" | "bio">;
   onChange: (patch: Partial<SettingsFormValues>) => void;
   phone: ReturnType<typeof usePhoneAvailability>;
 };
@@ -32,23 +33,14 @@ export default function PersonalInfoSection({ email, values, onChange, phone }: 
 
       <div>
         <label htmlFor="settings-phone" className={LABEL}>Phone number</label>
-        <div className={`mt-2 flex items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 ${phoneInvalid ? "border-[#7d1f2a] focus-within:ring-[#7d1f2a]/10" : "border-[#ded3ca] focus-within:border-[#7d1f2a] focus-within:ring-[#7d1f2a]/10"}`}>
-          <div className="flex items-center gap-2 border-r border-[#ded3ca] bg-[#fcfaf7] px-4 py-3 text-sm font-medium text-[#3f3734]">
-            <Icon name="phone" className="h-4 w-4 text-[#8a7f7a]" />
-            <span>+260</span>
-          </div>
-          <input
+        <div className="mt-2">
+          <PhoneField
             id="settings-phone"
-            name="phone"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel-national"
-            placeholder="97 1234567"
-            value={values.phoneNumber}
-            aria-invalid={phoneInvalid}
-            aria-describedby="settings-phone-hint"
-            onChange={(event) => onChange({ phoneNumber: cleanPhoneInput(event.target.value) })}
-            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm outline-none placeholder:text-[#a79b95]"
+            country={values.phoneCountry}
+            national={values.phoneNumber}
+            onChange={(value) => onChange({ phoneCountry: value.country, phoneNumber: value.national })}
+            invalid={phoneInvalid}
+            describedBy="settings-phone-hint"
           />
         </div>
         <div id="settings-phone-hint" className="min-h-5">
@@ -61,7 +53,7 @@ export default function PersonalInfoSection({ email, values, onChange, phone }: 
           ) : phone.available ? (
             <p role="status" className="mt-1.5 text-xs leading-5 text-[#28633b]">This number is available.</p>
           ) : (
-            <p className={HINT}>Enter a valid Zambian mobile number, for example 97 123 4567.</p>
+            <p className={HINT}>Choose your country, then enter your number. Zambia is selected by default.</p>
           )}
         </div>
       </div>

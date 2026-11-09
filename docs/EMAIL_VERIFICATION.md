@@ -9,8 +9,11 @@
 | `SMTP_SECURE` | no | `true` for TLS from the start. Defaults to true only on port 465 |
 | `SMTP_USER`, `SMTP_PASS` | together | Omit both only for a relay that needs no login |
 | `SMTP_FROM` | yes | e.g. `TXMate <no-reply@yourdomain.com>`. Use an address your SMTP provider allows |
-| `BETTER_AUTH_URL` | yes in production | Public address of the app, e.g. `https://txmate.example.com`. Verification links are built from it |
+| `BETTER_AUTH_URL` | yes in production | Public address of the app, e.g. `https://txmate.example.com`. Verification links are built from it. In production the app refuses to start without it, so links can never point at localhost |
+| `TRUSTED_ORIGINS` | no | Extra browser addresses allowed to call sign-in, comma separated, e.g. a test tunnel: `https://your-name.ngrok-free.dev`. Needed if you test through ngrok. Wildcards are ignored |
 | `BETTER_AUTH_SECRET` | yes | Already required by Better Auth |
+
+In production only the app's own address (plus `TRUSTED_ORIGINS`) is trusted. `localhost` and local-network addresses are trusted only in development, or when `BETTER_AUTH_URL` itself is a localhost address.
 
 If SMTP is not configured, sending fails with an error that names what is missing. Nothing pretends to succeed, and nobody is marked verified.
 STARTTLS is required when `SMTP_SECURE` is not true, so a relay that offers no TLS will be refused.

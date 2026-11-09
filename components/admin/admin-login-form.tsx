@@ -89,7 +89,7 @@ export default function AdminLoginForm({ expired }: { expired: boolean }) {
       <button
         type="submit"
         disabled={busy}
-        className="h-12 w-full rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-12 w-full rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? "Signing in…" : "Sign in"}
       </button>

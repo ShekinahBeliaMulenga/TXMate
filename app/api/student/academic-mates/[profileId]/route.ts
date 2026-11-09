@@ -252,6 +252,12 @@ export async function GET(_request: Request, context: RouteContext) {
 
     // Totals come from the database, so they stay right when the list below is capped.
     const rating = await getRatingSummary(mate.id);
+    // Each reviewer's average and count come from the database too, so they stay right beyond the 50 listed reviews.
+    const reviewerIds = [...new Set(mate.reviews.map((review) => review.reviewerUser.id))];
+    const reviewerRows = reviewerIds.length
+      ? await prisma.review.groupBy({ by: ["reviewerUserId"], where: { mateProfileId: mate.id, hiddenAt: null, reviewerUserId: { in: reviewerIds } }, _avg: { rating: true }, _count: { _all: true } })
+      : [];
+    const reviewerStats = Object.fromEntries(reviewerRows.map((row) => [row.reviewerUserId, { average: row._avg.rating, count: row._count._all }]));
     const totalReviews = rating.count;
     const averageRating = rating.average;
 
@@ -299,6 +305,7 @@ export async function GET(_request: Request, context: RouteContext) {
       experiences: mate.experiences,
       qualifications: mate.qualifications,
       reviews: mate.reviews,
+      reviewerStats,
       statistics: {
         totalOfferings: offerings.length,
         totalAvailabilitySlots: availability.length,

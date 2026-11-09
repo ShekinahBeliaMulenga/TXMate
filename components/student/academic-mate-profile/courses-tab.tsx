@@ -1,4 +1,5 @@
 import { formatStatus, rateTypeLabel } from "./format";
+import { priceText } from "@/lib/offering-price";
 import { FOCUS, Icon, Surface } from "./profile-ui";
 import type { Offering, RequestsByOffering, Viewer } from "./types";
 
@@ -36,8 +37,8 @@ function OfferingCard({ offering, request, canRequest, busy, onRequest, onCancel
           </p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[13px] font-bold leading-5 text-[#282321]">{offering.currency} {offering.rate}</p>
-          <p className="text-[11px] leading-4 text-[#6d6260]">{rateTypeLabel[offering.rateType]}</p>
+          <p className="text-[13px] font-bold leading-5 text-[#282321]">{priceText(offering.rate, offering.currency, offering.rateType)}</p>
+          {rateTypeLabel[offering.rateType] && <p className="text-[11px] leading-4 text-[#6d6260]">{rateTypeLabel[offering.rateType]}</p>}
         </div>
       </div>
 

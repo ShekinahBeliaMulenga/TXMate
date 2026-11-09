@@ -13,8 +13,12 @@ export type AnalyticsReport = {
   weeks: WeekPoint[];
   /** Share of answered requests (accepted, declined or expired) in the period that were accepted. */
   acceptance: { current: number | null; previous: number | null; answered: number };
-  /** Share of sessions that ended in the period that were completed. */
-  completion: { current: number | null; previous: number | null; ended: number };
+  /**
+   * Completion rate among sessions with a reportable outcome: completed, no-show, cancelled, needs review, or no response.
+   * Sessions still awaiting confirmation within the 24-hour window are excluded. Only sessions whose scheduled end fell
+   * in the period count. `parts` lists each outcome for the current period.
+   */
+  completion: { current: number | null; previous: number | null; ended: number; parts: Slice[] };
   rating: { average: number | null; count: number; distribution: number[] };
   requestMix: Slice[];
   sessionMix: Slice[];

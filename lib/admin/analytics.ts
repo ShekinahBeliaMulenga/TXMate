@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { AdminContext } from "./guard";
 import { canAccessUniversity, isPlatformWide, universityScopeFilter } from "./permissions";
+import { bucketByWeek, share } from "./analytics-math";
 import type { AnalyticsReport, Kpi, RangeWeeks, Slice, WeekPoint } from "./analytics-types";
 
 const DAY = 24 * 3600 * 1000;
@@ -8,6 +9,9 @@ const LABEL = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short",
 const REQUEST_STATUSES = ["REQUESTED", "ACCEPTED", "DECLINED", "CANCELLED", "EXPIRED"] as const;
 import { ADMIN_SESSION_STATES, ADMIN_SESSION_STATE_LABEL, sessionStateWhere } from "./session-state";
 const words = (value: string) => value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " ");
+
+/** The session states that count when working out the completion rate: everything that has ended and is settled or overdue. */
+export const COMPLETION_STATES = ["COMPLETED", "NO_SHOW", "CANCELLED", "NEEDS_REVIEW", "NO_RESPONSE"] as const;
 
 /**
  * Real counts only, for a chosen number of weeks and, optionally, one university. Every figure is
@@ -41,11 +45,12 @@ export async function getAnalytics(admin: AdminContext, input: { weeks: RangeWee
       prisma.tutoringSession.count({ where: { status: "COMPLETED", completedAt: range, ...sScope } }),
       prisma.mateRequest.count({ where: { status: "ACCEPTED", createdAt: range, ...scope } }),
       prisma.mateRequest.count({ where: { status: { in: ["DECLINED", "EXPIRED"] }, createdAt: range, ...scope } }),
-      prisma.tutoringSession.count({ where: { status: "COMPLETED", scheduledEnd: range, ...sScope } }),
-      prisma.tutoringSession.count({ where: { status: { in: ["NO_SHOW", "CANCELLED", "DISPUTED"] }, scheduledEnd: range, ...sScope } }),
+      // Sessions whose scheduled end fell in the period, sorted by the same states the Tutoring page shows.
+      ...COMPLETION_STATES.map((state) => prisma.tutoringSession.count({ where: { AND: [sessionStateWhere(state, new Date(now)) as never, { scheduledEnd: range }, sScope] } })),
     ]);
   const [cur, prev] = await Promise.all([period(current), period(previous)]);
-  const rate = (good: number, bad: number) => (good + bad > 0 ? good / (good + bad) : null);
+  const rate = share;
+  const ended = (row: number[]) => row.slice(6).reduce((sum, value) => sum + value, 0);
 
   const kpis: Kpi[] = [
     { key: "students", label: "New students", current: cur[0], previous: prev[0] },
@@ -54,26 +59,34 @@ export async function getAnalytics(admin: AdminContext, input: { weeks: RangeWee
     { key: "completed", label: "Sessions completed", current: cur[3], previous: prev[3] },
   ];
 
-  const weeks: WeekPoint[] = [];
-  for (let index = 0; index < input.weeks; index++) {
-    const end = new Date(now - (input.weeks - 1 - index) * 7 * DAY);
-    const from = new Date(end.getTime() - 7 * DAY);
-    const range = { gte: from, lt: end };
-    const [students, mates, requests, completed] = await Promise.all([
-      prisma.studentProfile.count({ where: { createdAt: range, ...scope } }),
-      prisma.academicMateProfile.count({ where: { createdAt: range, ...scope } }),
-      prisma.mateRequest.count({ where: { createdAt: range, ...scope } }),
-      prisma.tutoringSession.count({ where: { status: "COMPLETED", completedAt: range, ...sScope } }),
-    ]);
-    weeks.push({ label: LABEL.format(from), students, mates, requests, completed });
-  }
+  // Four queries for the whole chart instead of four per week: fetch only the dates, then count them per week.
+  const [studentDates, mateDates, requestDates, completedDates] = await Promise.all([
+    prisma.studentProfile.findMany({ where: { createdAt: current, ...scope }, select: { createdAt: true } }),
+    prisma.academicMateProfile.findMany({ where: { createdAt: current, ...scope }, select: { createdAt: true } }),
+    prisma.mateRequest.findMany({ where: { createdAt: current, ...scope }, select: { createdAt: true } }),
+    prisma.tutoringSession.findMany({ where: { status: "COMPLETED", completedAt: current, ...sScope }, select: { completedAt: true } }),
+  ]);
+  const bucket = (dates: Array<Date | null>) => bucketByWeek(dates, start, input.weeks);
+  const [studentWeeks, mateWeeks, requestWeeks, completedWeeks] = [
+    bucket(studentDates.map((row: { createdAt: Date }) => row.createdAt)),
+    bucket(mateDates.map((row: { createdAt: Date }) => row.createdAt)),
+    bucket(requestDates.map((row: { createdAt: Date }) => row.createdAt)),
+    bucket(completedDates.map((row: { completedAt: Date | null }) => row.completedAt)),
+  ];
+  const weeks: WeekPoint[] = studentWeeks.map((students, index) => ({
+    label: LABEL.format(new Date(start.getTime() + index * 7 * DAY)),
+    students,
+    mates: mateWeeks[index],
+    requests: requestWeeks[index],
+    completed: completedWeeks[index],
+  }));
 
   const [requestCounts, sessionCounts, ratingRows, ratingAvg, courseGroups, requestsByUniversity] = await Promise.all([
     Promise.all(REQUEST_STATUSES.map((status) => prisma.mateRequest.count({ where: { status, createdAt: current, ...scope } }))),
     Promise.all(ADMIN_SESSION_STATES.map((state) => prisma.tutoringSession.count({ where: { AND: [sessionStateWhere(state, new Date()) as never, { scheduledStart: current }, sScope] } }))),
     Promise.all([1, 2, 3, 4, 5].map((rating) => prisma.review.count({ where: { rating, hiddenAt: null, createdAt: current, session: { is: sScope } } }))),
     prisma.review.aggregate({ where: { hiddenAt: null, createdAt: current, session: { is: sScope } }, _avg: { rating: true } }),
-    prisma.mateRequest.groupBy({ by: ["offeringId"], where: { createdAt: current, ...scope }, _count: { _all: true }, orderBy: { _count: { offeringId: "desc" } }, take: 40 }),
+    prisma.mateRequest.groupBy({ by: ["offeringId"], where: { createdAt: current, ...scope }, _count: { _all: true } }),
     Promise.all(universities.map((university: { id: string }) => prisma.mateRequest.count({ where: { universityId: university.id, createdAt: current } }))),
   ]);
 
@@ -98,7 +111,12 @@ export async function getAnalytics(admin: AdminContext, input: { weeks: RangeWee
     kpis,
     weeks,
     acceptance: { current: rate(cur[4], cur[5]), previous: rate(prev[4], prev[5]), answered: cur[4] + cur[5] },
-    completion: { current: rate(cur[6], cur[7]), previous: rate(prev[6], prev[7]), ended: cur[6] + cur[7] },
+    completion: {
+      current: rate(cur[6], ended(cur) - cur[6]),
+      previous: rate(prev[6], ended(prev) - prev[6]),
+      ended: ended(cur),
+      parts: COMPLETION_STATES.map((state, index) => ({ label: ADMIN_SESSION_STATE_LABEL[state], value: cur[6 + index] })),
+    },
     rating: { average: ratingAvg._avg.rating === null ? null : Number(ratingAvg._avg.rating.toFixed(2)), count: ratingRows.reduce((sum: number, value: number) => sum + value, 0), distribution: ratingRows },
     requestMix: slices(REQUEST_STATUSES, requestCounts),
     sessionMix: ADMIN_SESSION_STATES.map((state, index) => ({ label: ADMIN_SESSION_STATE_LABEL[state], value: sessionCounts[index] })),

@@ -1,4 +1,5 @@
 "use client";
+import { formatPhone } from "@/lib/phone";
 import Image from "next/image";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -72,7 +73,6 @@ const iconPaths = {
 type IconName = keyof typeof iconPaths;
 
 const TABS = [
-  { id: "overview", label: "Overview", icon: "university" },
   { id: "courses", label: "Academic Record", icon: "book" },
   { id: "privacy", label: "Contact & Privacy", icon: "lock" },
 ] as const;
@@ -134,10 +134,6 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
   );
 }
 
-function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
-
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
@@ -182,7 +178,7 @@ function SkeletonTab({ active, width }: { active?: boolean; width: string }) {
 
 function ProfileSkeleton() {
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8" aria-busy="true">
+    <main className="min-h-screen bg-[#f4f1ed] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8" aria-busy="true">
       <div className="mx-auto max-w-4xl animate-pulse motion-reduce:animate-none">
         <span role="status" aria-live="polite" className="sr-only">Loading your student profile...</span>
 
@@ -191,7 +187,6 @@ function ProfileSkeleton() {
           <div className="relative h-16 overflow-hidden bg-linear-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-28">
             <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-26 border-white/6" />
             <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full border-22 border-white/5" />
-            <div className="absolute right-4 top-4 sm:right-5 sm:top-5"><div className="h-6 w-28 rounded-full bg-white/20" /></div>
           </div>
           <div className="px-3 pb-3 sm:px-6 sm:pb-4">
             <div className="relative z-10 -mt-8 flex items-end justify-between gap-4 sm:-mt-12">
@@ -203,10 +198,6 @@ function ProfileSkeleton() {
                 <div className="h-8 w-48 max-w-[75%] rounded-md bg-[#e8e0d8] sm:h-9 sm:w-60" />
                 <div className="mt-1.5 flex h-[22px] items-center"><div className="h-4 w-64 max-w-full rounded bg-[#eee8e2]" /></div>
                 <div className="mt-1 flex h-5 items-center"><div className="h-3.5 w-full max-w-md rounded bg-[#f0ebe5]" /></div>
-                <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
-                  <div className="h-6 w-28 rounded-full bg-[#f0ebe5]" />
-                  <div className="h-6 w-40 rounded-full bg-[#f0ebe5]" />
-                </div>
                 <div className="mt-3 sm:mt-4">
                   <div className="mb-1.5 flex h-3.75 items-center"><div className="h-2.5 w-12 rounded bg-[#e8e0d8]" /></div>
                   <div className="max-w-2xl">
@@ -230,24 +221,15 @@ function ProfileSkeleton() {
         {/* Tabs */}
         <div aria-hidden="true" className="mb-3 mt-3 flex justify-center sm:mb-4 sm:mt-4">
           <div className="inline-flex rounded-xl bg-white p-1 shadow-sm ring-1 ring-black/5">
-            <SkeletonTab active width="sm:w-[108px]" />
-            <SkeletonTab width="sm:w-[150px]" />
+            <SkeletonTab active width="sm:w-[150px]" />
             <SkeletonTab width="sm:w-[160px]" />
           </div>
         </div>
 
-        {/* Overview tab */}
-        <div aria-hidden="true" className="grid items-stretch gap-3 sm:gap-4 md:grid-cols-2">
-          <SkeletonSection titleWidth="w-36" className="h-full">
+        {/* Academic Record tab */}
+        <div aria-hidden="true">
+          <SkeletonSection titleWidth="w-36">
             <div>{Array.from({ length: 6 }, (_, i) => <SkeletonRow key={i} />)}</div>
-          </SkeletonSection>
-          <SkeletonSection titleWidth="w-32" className="h-full">
-            <div className="flex h-full min-h-35 flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
-              <div className="mb-2.5 h-7 w-7 rounded bg-[#e8e0d8]" />
-              <div className="h-3.5 w-24 rounded bg-[#e8e0d8]" />
-              <div className="mt-1 h-5 w-24 rounded-full bg-[#f3e8e9]" />
-              <div className="mt-3.5 h-2.5 w-28 rounded bg-[#eee8e2]" />
-            </div>
           </SkeletonSection>
         </div>
 
@@ -263,7 +245,7 @@ export default function StudentProfilePage() {
   const [data, setData] = useState<StudentProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("courses");
 
   // loading starts as true and error as null, so nothing is set synchronously inside the effect.
   useEffect(() => {
@@ -319,7 +301,7 @@ export default function StudentProfilePage() {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="mt-6 w-full rounded-xl bg-[#7d1f2a] px-5 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#691923]"
+            className="mt-6 w-full rounded-xl bg-[#7d1f2a] px-5 py-3 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#681923]"
           >
             Try Again
           </button>
@@ -329,31 +311,22 @@ export default function StudentProfilePage() {
   }
 
   const { studentProfile, user, university, academic } = data;
-  const currentAcademicYear = academic.currentAcademicYear;
   const actionLink = "inline-flex items-center gap-2 text-xs font-medium text-[#6d6260] transition-colors hover:text-[#7d1f2a] focus-visible:outline-none focus-visible:underline";
-  const chip = "inline-flex items-center gap-1.5 rounded-full bg-[#f6f1ec] px-2.5 py-0.5 text-[11px] font-medium text-[#5f5551]";
 
   return (
-    <main className="min-h-screen bg-[#f8f6f3] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8">
+    <main className="min-h-screen bg-[#f4f1ed] px-3 py-3 pb-8 sm:px-6 sm:py-4 lg:px-8">
       <div className="mx-auto max-w-4xl">
         {/* --- HERO PROFILE SECTION --- */}
         <section className="overflow-hidden rounded-xl border border-[#e2d9d0] bg-white shadow-sm">
           <div aria-hidden="true" className="relative h-16 overflow-hidden bg-gradient-to-br from-[#8f2433] via-[#7d1f2a] to-[#4f121a] sm:h-28">
             <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full border-[26px] border-white/[0.06]" />
             <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full border-[22px] border-white/[0.05]" />
-            <div className="absolute right-4 top-4 sm:right-5 sm:top-5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm ring-1 ring-white/30 backdrop-blur-md">
-                <Icon name="eye" className="h-3 w-3 opacity-80" />
-                {visibilityLabel[studentProfile.profileVisibility]}
-              </span>
-            </div>
           </div>
           <div className="px-3 pb-3 sm:px-6 sm:pb-4">
             <div className="relative z-10 -mt-8 flex items-end justify-between gap-4 sm:-mt-12">
               {/* Photo or initials, with an "active" dot on its bottom-right edge */}
               <div className="relative shrink-0">
                 <Avatar name={user.name} image={user.image} />
-                <span className={`absolute bottom-1 right-1 block h-2.5 w-2.5 rounded-full ring-2 ring-white ${statusDot[studentProfile.status]}`} />
               </div>
               <span className="mb-1 inline-flex items-center gap-2 bg-white px-3 py-1 text-xs font-semibold text-[#3f3734]">
                 <span className={`h-2 w-2 rounded-full ${statusDot[studentProfile.status]}`} />
@@ -365,17 +338,13 @@ export default function StudentProfilePage() {
                 <h1 className="text-base font-semibold tracking-tight text-[#282321] sm:text-2xl">{user.name}</h1>
                 <p className="mt-0.5 text-xs text-[#3f3734] sm:mt-1 sm:text-[13px]">
                   {academic.programme.name}
-                  <span className="text-[#8a7f7a]"> · Year {academic.year.yearNumber}</span>
+                  <span className="text-[#8a7f7a]"> · Year {academic.year.yearNumber} of {academic.programme.durationYears}</span>
                 </p>
                 <p className="mt-0.5 text-[11px] leading-4 text-[#6d6260] sm:text-xs">
                   {university.name}
                   <span className="text-[#8a7f7a]"> · {academic.school.name}</span>
                   <span className="text-[#8a7f7a]">{" · "}{academic.department?.name ?? "Department not assigned"}</span>
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
-                  <span className={chip}><Icon name="eye" className="h-3.5 w-3.5" />{visibilityLabel[studentProfile.profileVisibility]}</span>
-                  <span className={chip}><Icon name="calendar" className="h-3.5 w-3.5" />{currentAcademicYear?.name ?? "Academic year not assigned"}</span>
-                </div>
                 <div className="mt-3 sm:mt-4">
                   <h3 className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#8a7f7a]">About</h3>
                   {studentProfile.bio ? (
@@ -422,33 +391,6 @@ export default function StudentProfilePage() {
 
         {/* --- TAB CONTENT --- */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {activeTab === "overview" && (
-            <div className="grid items-stretch gap-3 sm:gap-4 md:grid-cols-2">
-              <Section title="Institutional Details" className="h-full">
-                <dl>
-                  <DetailRow icon="university" label="University">{university.name}</DetailRow>
-                  <DetailRow icon="university" label="School">{academic.school.name}</DetailRow>
-                  <DetailRow icon="academic" label="Department">{academic.department?.name ?? "Not assigned"}</DetailRow>
-                  <DetailRow icon="book" label="Programme">{academic.programme.name} ({academic.programme.code})</DetailRow>
-                  <DetailRow icon="academic" label="Degree Level">{titleCase(academic.programme.level)}</DetailRow>
-                  <DetailRow icon="calendar" label="Total Duration">{academic.programme.durationYears} Years</DetailRow>
-                </dl>
-              </Section>
-              <Section title="Academic Timeline" className="h-full">
-                <div className="flex h-full min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[#e2d9d0] bg-[#faf8f6]">
-                  <Icon name="calendar" className="mb-2.5 h-7 w-7 text-[#d8cec5]" />
-                  <p className="text-[13px] font-bold text-[#4b423e]">Academic Year</p>
-                  <p className="mt-1 rounded-full bg-[#f6eaec] px-2.5 py-0.5 text-[11px] font-semibold text-[#7d1f2a]">
-                    {currentAcademicYear?.name ?? "Unassigned"}
-                  </p>
-                  <p className="mt-3.5 text-[10px] font-bold uppercase tracking-wider text-[#8a7f7a]">
-                    Year {academic.year.yearNumber} of {academic.programme.durationYears}
-                  </p>
-                </div>
-              </Section>
-            </div>
-          )}
-
           {activeTab === "courses" && (
             <Section
               title="Course Enrollment"
@@ -506,7 +448,7 @@ export default function StudentProfilePage() {
                     label="Phone Number"
                     valueClass={studentProfile.phoneNumber && studentProfile.showPhoneNumber ? "text-[#282321]" : "text-[#8a7f7a]"}
                   >
-                    {studentProfile.phoneNumber ? (studentProfile.showPhoneNumber ? studentProfile.phoneNumber : "Hidden from public") : "Not provided"}
+                    {studentProfile.phoneNumber ? (studentProfile.showPhoneNumber ? formatPhone(studentProfile.phoneNumber) : "Hidden from public") : "Not provided"}
                   </DetailRow>
                   <DetailRow icon="idCard" label="Student ID" valueClass={studentProfile.showStudentId ? "text-[#282321]" : "text-[#8a7f7a]"}>
                     {studentProfile.showStudentId ? studentProfile.studentId : "Hidden from public"}

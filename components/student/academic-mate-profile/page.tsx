@@ -110,7 +110,7 @@ export default function PublicAcademicMateProfilePage() {
   if (loading) {
     const block = "animate-pulse rounded-2xl border border-[#e2d9d0] bg-white";
     return (
-      <main className="min-h-screen bg-[#f7f4f0] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <main className="min-h-screen bg-[#f4f1ed] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
         <div className="mx-auto max-w-7xl lg:grid lg:grid-cols-[21rem_minmax(0,1fr)] lg:gap-7 xl:grid-cols-[22rem_minmax(0,1fr)]">
           <div className="overflow-hidden rounded-3xl border border-[#e2d9d0] bg-white">
             <div className="h-36 animate-pulse bg-[#7d1f2a]/70 sm:h-40" />
@@ -132,11 +132,11 @@ export default function PublicAcademicMateProfilePage() {
 
   if (error || !data) {
     return (
-      <main className="min-h-screen bg-[#f7f4f0] px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <main className="min-h-screen bg-[#f4f1ed] px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div role="alert" className="mx-auto max-w-xl rounded-2xl border border-[#e2d9d0] bg-white p-10 text-center shadow-sm">
           <h1 className="text-xl font-semibold text-[#282321]">Couldn’t load this Academic Mate profile</h1>
           <p className="mt-3 text-sm leading-6 text-[#6d6260]">{error ?? "This Academic Mate profile could not be loaded."}</p>
-          <button type="button" onClick={() => window.location.reload()} className="mt-6 rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">Try again</button>
+          <button type="button" onClick={() => window.location.reload()} className="mt-6 rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">Try again</button>
           <div><Link href="/student/find-academic-mate" className="mt-4 inline-block text-sm font-semibold text-[#7d1f2a] hover:underline">Back to Find Academic Mate</Link></div>
         </div>
       </main>

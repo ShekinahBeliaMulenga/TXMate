@@ -7,15 +7,10 @@ import GroupCard from "@/components/student/group-card";
 import GroupSheetDialog from "@/components/student/group-sheet-dialog";
 import SessionDetailDialog from "@/components/student/session-detail-dialog";
 import SessionCard from "@/components/student/session-card";
-import { Glyph, dayLabel, dateKey, isClosed, resolutionOf, tabOf, useNow } from "@/components/student/session-ui";
-import { availableActions, type ResolutionStatus, type TimeStatus } from "@/lib/session-lifecycle-rules";
-import { snapshotOf } from "@/lib/session-lifecycle-serialize";
+import { Glyph, dayLabel, dateKey, isClosed, tabOf, useNow } from "@/components/student/session-ui";
+import type { TimeStatus } from "@/lib/session-lifecycle-rules";
+import { INITIAL_HISTORY, buildEntries, filterEntries, historyAfterPage, historyAfterRefresh, matchesFilter, matchesSearch, membersOf, needsAnswer, type HistoryState, type SessionEntry as Entry, type SessionFilter as Filter } from "@/lib/session-list";
 import type { SessionLifecycleApiResponse, SessionLifecycleItem } from "@/lib/session-lifecycle-types";
-
-type Entry =
-  | { kind: "group"; key: string; groupId: string; sessions: SessionLifecycleItem[]; start: number }
-  | { kind: "session"; key: string; session: SessionLifecycleItem; start: number };
-type Filter = "ALL" | Exclude<ResolutionStatus, "NONE" | "NO_SHOW">;
 
 const TABS: { id: TimeStatus; label: string }[] = [
   { id: "UPCOMING", label: "Upcoming" },
@@ -24,34 +19,13 @@ const TABS: { id: TimeStatus; label: string }[] = [
 ];
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "ALL", label: "All" },
+  { id: "ACTION", label: "Needs your answer" },
   { id: "AWAITING_CONFIRMATION", label: "Awaiting confirmation" },
   { id: "NEEDS_REVIEW", label: "Needs review" },
   { id: "NO_RESPONSE", label: "No response" },
   { id: "COMPLETED", label: "Completed" },
   { id: "CANCELLED", label: "Cancelled" },
 ];
-
-function startOf(session: SessionLifecycleItem) {
-  const value = new Date(session.scheduledStart).getTime();
-  return Number.isFinite(value) ? value : 0;
-}
-
-function buildEntries(sessions: SessionLifecycleItem[]): Entry[] {
-  const groups = new Map<string, SessionLifecycleItem[]>();
-  const entries: Entry[] = [];
-  for (const session of sessions) {
-    if (session.viewerRole === "ACADEMIC_MATE" && session.groupId && !isClosed(session) && session.arrangementStatus !== "EXPIRED") {
-      groups.set(session.groupId, [...(groups.get(session.groupId) ?? []), session]);
-    } else {
-      entries.push({ kind: "session", key: session.id, session, start: startOf(session) });
-    }
-  }
-  for (const [groupId, members] of groups) {
-    entries.push({ kind: "group", key: `group:${groupId}`, groupId, sessions: members, start: startOf(members[0]) });
-  }
-  return entries;
-}
-const membersOf = (entry: Entry) => entry.kind === "group" ? entry.sessions : [entry.session];
 
 function SearchIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9a8e86]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.2 4.2" /></svg>;
@@ -83,16 +57,22 @@ function SessionsView() {
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
-  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [history, setHistory] = useState<HistoryState>(INITIAL_HISTORY);
+  const { cursor: historyCursor, hasMore: hasMoreHistory } = history;
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [openLimitReached, setOpenLimitReached] = useState(false);
   const pickedTab = useRef(false);
+  // Only the newest refresh may update the list; an older, slower response is discarded.
+  const inflight = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const load = useCallback(async () => {
+    inflight.current?.abort();
+    const controller = new AbortController();
+    inflight.current = controller;
     try {
-      const response = await fetch("/api/student/sessions", { cache: "no-store", signal });
+      const response = await fetch("/api/student/sessions", { cache: "no-store", signal: controller.signal });
       const body = await response.json() as SessionLifecycleApiResponse;
+      if (controller.signal.aborted) return;
       if (!response.ok || !body.sessions) throw new Error(body.error || "We couldn't load your sessions.");
       setSessions((current) => {
         const merged = new Map<string, SessionLifecycleItem>();
@@ -101,18 +81,18 @@ function SessionsView() {
         for (const item of body.sessions ?? []) merged.set(item.id, item);
         return [...merged.values()];
       });
-      setHistoryCursor((current) => current ?? body.nextHistoryCursor ?? null);
-      setHasMoreHistory((current) => current || !!body.hasMoreHistory);
+      setHistory((current) => historyAfterRefresh(current, body));
       setOpenLimitReached(!!body.openLimitReached);
       setError("");
     } catch (err) {
-      if (!signal?.aborted) setError(err instanceof Error ? err.message : "We couldn't load your sessions.");
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "We couldn't load your sessions.");
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
+  const cancelLoad = useCallback(() => inflight.current?.abort(), []);
+  useEffect(() => { void load(); return cancelLoad; }, [load, cancelLoad]);
   useEffect(() => {
     const refresh = () => { if (document.visibilityState === "visible") void load(); };
     const timer = window.setInterval(refresh, 30_000);
@@ -132,24 +112,15 @@ function SessionsView() {
         for (const item of body.sessions ?? []) if (isClosed(item)) merged.set(item.id, item);
         return [...merged.values()];
       });
-      setHistoryCursor(body.nextHistoryCursor ?? null);
-      setHasMoreHistory(!!body.hasMoreHistory);
+      setHistory(historyAfterPage(body));
     } catch (err) { setError(err instanceof Error ? err.message : "We couldn't load older sessions."); }
     finally { setLoadingHistory(false); }
   }
 
   const search = query.trim().toLowerCase();
-  const entries = useMemo(() => buildEntries(sessions).filter((entry) => {
-    if (!search) return true;
-    return membersOf(entry).some((s) => [s.course.code, s.course.name, s.otherParticipantName, s.studentName, s.academicMateName, s.meetingLocation].some((value) => value.toLowerCase().includes(search)));
-  }), [sessions, search]);
+  const entries = useMemo(() => filterEntries(buildEntries(sessions), (s) => matchesSearch(s, search)), [sessions, search]);
 
   const tabOfEntry = useCallback((entry: Entry) => tabOf(membersOf(entry)[0], now), [now]);
-  const matchesFilter = useCallback((entry: Entry) => {
-    if (filter === "ALL") return true;
-    return membersOf(entry).some((s) => resolutionOf(s, now) === filter);
-  }, [filter, now]);
-
   const counts = useMemo(() => {
     const result: Record<TimeStatus, number> = { UPCOMING: 0, IN_PROGRESS: 0, PAST: 0 };
     for (const entry of entries) result[tabOfEntry(entry)]++;
@@ -157,10 +128,7 @@ function SessionsView() {
   }, [entries, tabOfEntry]);
 
   // People who must answer something right now.
-  const needAnswer = useMemo(() => entries.filter((entry) => membersOf(entry).some((s) => {
-    const actions = availableActions(snapshotOf(s), s.viewerRole, now);
-    return actions.attendance || actions.completion;
-  })), [entries, now]);
+  const needAnswer = useMemo(() => filterEntries(entries, (s) => needsAnswer(s, now)), [entries, now]);
 
   // Open on the tab that matters: what is happening now, else what is coming up.
   useEffect(() => {
@@ -173,9 +141,9 @@ function SessionsView() {
     else if (!upcoming) setTab("PAST");
   }, [loading, entries, needAnswer, tabOfEntry]);
 
-  const visible = useMemo(() => entries
-    .filter((entry) => tabOfEntry(entry) === tab && matchesFilter(entry))
-    .sort((a, b) => tab === "PAST" ? b.start - a.start : a.start - b.start), [entries, tab, matchesFilter, tabOfEntry]);
+  // A group card shows only the members that match the filter, not the whole group.
+  const visible = useMemo(() => filterEntries(entries.filter((entry) => tabOfEntry(entry) === tab), (s) => matchesFilter(s, filter, now))
+    .sort((a, b) => tab === "PAST" ? b.start - a.start : a.start - b.start), [entries, tab, filter, now, tabOfEntry]);
 
   const days = useMemo(() => {
     const result: { key: string; label: string; entries: Entry[] }[] = [];
@@ -190,7 +158,7 @@ function SessionsView() {
   }, [visible, now]);
 
   function showAnswers() {
-    setFilter("AWAITING_CONFIRMATION");
+    setFilter("ACTION");
     if (needAnswer[0]) setTab(tabOfEntry(needAnswer[0]));
   }
 
@@ -215,7 +183,7 @@ function SessionsView() {
           {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#81766f] hover:bg-[#f4f0ec]"><svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12" /></svg></button>}
         </div>
 
-        {needAnswer.length > 0 && filter !== "AWAITING_CONFIRMATION" && (
+        {needAnswer.length > 0 && filter !== "ACTION" && (
           <button type="button" onClick={showAnswers} role="status" aria-label={`${needAnswer.length} ${needAnswer.length === 1 ? "session needs" : "sessions need"} your answer. Show`} className="mt-2 inline-flex min-h-7 items-center gap-1.5 rounded-full bg-[#f8efec] px-2.5 text-[11px] font-medium text-[#6b3b36] transition hover:bg-[#f3e4df] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[#7d1f2a]" />
             {needAnswer.length} awaiting your answer
@@ -223,9 +191,9 @@ function SessionsView() {
           </button>
         )}
 
-        <div role="tablist" aria-label="Session time" className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-[#efeae5] p-1">
+        <div role="tablist" aria-label="Session time" className="mt-3 grid grid-cols-3 gap-0.5 rounded-lg bg-[#efeae5] p-0.5">
           {TABS.map((item) => (
-            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1 text-[13px] font-semibold transition sm:gap-1.5 sm:px-2 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
+            <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`flex min-h-8 items-center justify-center gap-1 whitespace-nowrap rounded-md px-1 text-xs font-semibold transition sm:gap-1.5 sm:px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 ${tab === item.id ? "bg-white text-[#7d1f2a] shadow-sm" : "text-[#6f655f] hover:text-[#282321]"}`}>
               {item.label}
               <span className={`rounded-full px-1.5 text-[10px] leading-4 tabular-nums ${tab === item.id ? "bg-[#f4e5e2] text-[#7d1f2a]" : "bg-[#e3dcd6] text-[#6f655f]"}`}>{counts[item.id]}{item.id === "PAST" && hasMoreHistory ? "+" : ""}</span>
             </button>

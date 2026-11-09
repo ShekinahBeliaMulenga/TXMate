@@ -378,7 +378,7 @@ export default function AcademicMateAvailabilityPage() {
     <main className="min-h-screen bg-[#f4f1ed] text-[#282321]">
       <div className="mx-auto max-w-6xl px-6 py-2 sm:px-6 lg:px-8">
         <header>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight">Availability</h1>
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Availability</h1>
           <p className="mt-1 text-sm text-[#6d6260]">Set the weekly times students can book sessions with you.</p>
 
           {availability.length > 0 && (
@@ -423,7 +423,7 @@ export default function AcademicMateAvailabilityPage() {
             <p className="mt-2 max-w-md text-sm leading-6 text-[#6d6260]">
               Availability is linked to the courses you offer. Add a course, then come back to set your times.
             </p>
-            <Link href="/student/academic-mate/offerings" className={`mt-6 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#681a23] ${FOCUS}`}>
+            <Link href="/student/academic-mate/offerings" className={`mt-6 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#681923] ${FOCUS}`}>
               Manage courses
             </Link>
           </section>
@@ -568,7 +568,7 @@ export default function AcademicMateAvailabilityPage() {
                         </div>
 
                         <div className="flex gap-2 pt-1">
-                          <button type="submit" disabled={!canSubmit} className={`flex-1 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#681a23] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}>
+                          <button type="submit" disabled={!canSubmit} className={`flex-1 rounded-lg bg-[#7d1f2a] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}>
                             {saving ? "Saving..." : editingId ? "Update slot" : "Add slot"}
                           </button>
                           {editingId && (
@@ -609,7 +609,7 @@ export default function AcademicMateAvailabilityPage() {
                         <button
                           type="button"
                           onClick={() => setView("form")}
-                          className={`mt-5 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#681a23] ${FOCUS}`}
+                          className={`mt-5 rounded-lg bg-[#7d1f2a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#681923] ${FOCUS}`}
                         >
                           Add a slot
                         </button>

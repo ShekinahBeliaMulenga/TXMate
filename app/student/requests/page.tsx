@@ -393,11 +393,11 @@ export default function StudentRequestsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9f8f6] px-4 py-4 text-[#282321] sm:px-6 sm:py-6">
+    <main className="min-h-screen bg-[#f4f1ed] px-4 py-4 text-[#282321] sm:px-6 sm:py-6">
       <div className="mx-auto max-w-4xl">
         <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">My Requests</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">My Requests</h1>
             <p className="mt-0.5 text-[13px] text-[#756b65]">Track responses and manage your Academic Mate requests.</p>
           </div>
         </header>

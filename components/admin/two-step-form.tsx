@@ -8,7 +8,7 @@ import { qrMatrix, qrSvgPath } from "@/lib/qr";
 type Mode = "setup" | "verify";
 
 const INPUT = "w-full rounded-xl border border-[#ded3ca] bg-white px-4 py-3 text-center font-mono text-lg tracking-[0.25em] text-[#282321] outline-none transition placeholder:text-[#a79b95] focus:border-[#7d1f2a] focus:ring-2 focus:ring-[#7d1f2a]/10";
-const BUTTON = "h-12 w-full rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
+const BUTTON = "h-12 w-full rounded-xl bg-[#7d1f2a] text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 const SECONDARY = "h-11 rounded-xl border border-[#d9d3cc] bg-white px-4 text-sm font-medium text-[#3a332f] hover:bg-[#faf8f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40";
 
 /** The setup QR code, drawn here from the setup link. Nothing is sent anywhere to make it. */

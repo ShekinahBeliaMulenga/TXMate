@@ -53,11 +53,13 @@ type Where = Record<string, unknown>;
 /**
  * The same states as `adminSessionStateKey`, written as database filters, so the dashboard counts and the
  * Tutoring status filter always agree with the label on each row. Each state excludes the ones above it.
+ * Keep the order identical to `resolutionStatus`: cancelled, completed, no show, needs review, then time.
  */
 export function sessionStateWhere(state: AdminSessionState, now: Date): Where {
   const cutoff24 = new Date(now.getTime() - NO_RESPONSE_AFTER_MS);
   const cutoff12 = new Date(now.getTime() - COMPLETION_DEADLINE_MS);
-  const cancelled: Where = { OR: [{ status: "CANCELLED" }, { request: { is: { status: "CANCELLED" } } }, { request: { is: { arrangementStatus: "CANCELLED" } } }] };
+  // An arrangement-level cancellation only applies to a session with no outcome already recorded.
+  const arrangementCancelled: Where = { OR: [{ request: { is: { status: "CANCELLED" } } }, { request: { is: { arrangementStatus: "CANCELLED" } } }] };
   const noShow: Where = { status: "NO_SHOW" };
   const completed: Where = { OR: [{ status: "COMPLETED" }, { completedAt: { not: null } }] };
   const review: Where = {
@@ -66,19 +68,22 @@ export function sessionStateWhere(state: AdminSessionState, now: Date): Where {
       { attendance: { is: { status: "DISPUTED" } } },
       { completionDisputedAt: { not: null } },
       { completionReviewRequiredAt: { not: null } },
-      { studentCompletionConfirmedAt: { lt: cutoff12 }, mateCompletionConfirmedAt: null },
-      { mateCompletionConfirmedAt: { lt: cutoff12 }, studentCompletionConfirmedAt: null },
+      // Each side's "not null" check comes first so the condition is never SQL "unknown"; an unknown value
+      // inside a NOT (...) below would otherwise drop the row from every filter.
+      { AND: [{ studentCompletionConfirmedAt: { not: null } }, { studentCompletionConfirmedAt: { lt: cutoff12 } }, { mateCompletionConfirmedAt: null }] },
+      { AND: [{ mateCompletionConfirmedAt: { not: null } }, { mateCompletionConfirmedAt: { lt: cutoff12 } }, { studentCompletionConfirmedAt: null }] },
     ],
   };
+  const cancelled: Where = { OR: [{ status: "CANCELLED" }, { AND: [arrangementCancelled, { NOT: { OR: [completed, noShow, review] } }] }] };
   const expired: Where = { request: { is: { arrangementStatus: "EXPIRED" } } };
 
   switch (state) {
     case "CANCELLED": return cancelled;
-    case "NO_SHOW": return { AND: [{ NOT: cancelled }, noShow] };
-    case "COMPLETED": return { AND: [{ NOT: cancelled }, { NOT: noShow }, completed] };
-    case "NEEDS_REVIEW": return { AND: [{ NOT: cancelled }, { NOT: noShow }, { NOT: completed }, review] };
+    case "COMPLETED": return { AND: [{ NOT: cancelled }, completed] };
+    case "NO_SHOW": return { AND: [{ NOT: cancelled }, { NOT: completed }, noShow] };
+    case "NEEDS_REVIEW": return { AND: [{ NOT: cancelled }, { NOT: completed }, { NOT: noShow }, review] };
   }
-  const open: Where[] = [{ NOT: cancelled }, { NOT: noShow }, { NOT: completed }, { NOT: review }];
+  const open: Where[] = [{ NOT: cancelled }, { NOT: completed }, { NOT: noShow }, { NOT: review }];
   switch (state) {
     case "NO_RESPONSE": return { AND: [...open, { OR: [expired, { scheduledEnd: { lte: cutoff24 } }] }] };
     case "AWAITING_CONFIRMATION": return { AND: [...open, { NOT: expired }, { scheduledEnd: { lte: now, gt: cutoff24 } }] };

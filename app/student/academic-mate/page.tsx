@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ReviewerList } from "@/components/student/academic-mate-profile/reviews-tab";
+import RatingSummary from "@/components/student/rating-summary";
+import { priceBasisText, priceText } from "@/lib/offering-price";
 
 type Status = "ACTIVE" | "INACTIVE" | "SUSPENDED";
 type VerificationStatus = "UNVERIFIED" | "PENDING" | "VERIFIED" | "REJECTED";
@@ -15,9 +18,9 @@ type Offering = {
   verificationStatus: VerificationStatus; isOutsideCurrentCurriculum: boolean;
 };
 type Availability = { id: string; mateOfferingId: string; day: string; startMinute: number; endMinute: number; timezone: string; isActive: boolean };
-type Experience = { id: string; title?: string | null; organisation?: string | null; description?: string | null; startDate?: string | null; endDate?: string | null };
-type Qualification = { id: string; title?: string | null; institution?: string | null; description?: string | null; year?: number | null };
-type Review = { id: string; rating: number; comment: string | null; createdAt: string };
+type Experience = { id: string; title?: string | null; organisation?: string | null; description?: string | null; startYear?: number | null; endYear?: number | null };
+type Qualification = { id: string; name?: string | null; issuer?: string | null; year?: number | null; credentialUrl?: string | null };
+type Review = { id: string; rating: number; comment: string | null; createdAt: string; reviewerUser: { id: string; name: string; image: string | null } };
 type Student = {
   id: string; studentId?: string | null; gender?: string | null;
   university?: { id?: string; name?: string } | null; school?: { id?: string; name?: string } | null;
@@ -33,7 +36,8 @@ type ProfileData = {
   user: { id: string; name: string; email?: string; image?: string | null };
   student: Student | null;
   offerings: Offering[]; availability: Availability[]; experiences: Experience[]; qualifications: Qualification[]; reviews: Review[];
-  statistics?: { offerings?: number; activeOfferings?: number; availability?: number; experiences?: number; qualifications?: number; reviews?: number };
+  reviewerStats?: Record<string, { average: number | null; count: number }>;
+  statistics?: { offerings?: number; activeOfferings?: number; availability?: number; experiences?: number; qualifications?: number; reviews?: number; totalReviews?: number; averageRating?: number | null; ratingDistribution?: Record<string, number> };
 };
 type ApiError = { error?: string };
 
@@ -139,7 +143,7 @@ export default function AcademicMatePage() {
           <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="mt-3">
             {tab === "about" && <AboutTab profile={profile} userName={data.user.name} experiences={experiences} qualifications={qualifications} />}
             {tab === "courses" && <CoursesTab offerings={offerings} />}
-            {tab === "reviews" && <ReviewsTab reviews={reviews} />}
+            {tab === "reviews" && <ReviewsTab reviews={reviews} reviewerStats={data.reviewerStats} statistics={data.statistics} />}
             {tab === "availability" && <AvailabilityTab availability={availability} offerings={offerings} />}
           </div>
         </div>
@@ -300,11 +304,11 @@ function AboutTab({ profile, userName, experiences, qualifications }: {
   const columns = [
     {
       title: "Experience", icon: "briefcase" as IconName, empty: "No experience added.",
-      items: experiences.slice(0, 3).map((e) => ({ id: e.id, primary: e.title || "Academic experience", secondary: e.organisation })),
+      items: experiences.slice(0, 3).map((e) => ({ id: e.id, primary: e.title || "Academic experience", secondary: [e.organisation, e.startYear ? `${e.startYear}–${e.endYear ?? "present"}` : null].filter(Boolean).join(", ") })),
     },
     {
       title: "Qualifications", icon: "cap" as IconName, empty: "No qualifications added.",
-      items: qualifications.slice(0, 3).map((q) => ({ id: q.id, primary: q.title || "Qualification", secondary: [q.institution, q.year].filter(Boolean).join(", ") })),
+      items: qualifications.slice(0, 3).map((q) => ({ id: q.id, primary: q.name || "Qualification", secondary: [q.issuer, q.year].filter(Boolean).join(", ") })),
     },
   ];
 
@@ -365,8 +369,8 @@ function CoursesTab({ offerings }: { offerings: Offering[] }) {
                   </div>
                 </div>
                 <p className="shrink-0 text-right">
-                  <span className="text-[13px] font-bold leading-5">{formatRate(o.rate, o.currency)}</span>
-                  <span className={`block text-[11px] leading-4 ${MUTED}`}>{formatStatus(o.rateType)}</span>
+                  <span className="text-[13px] font-bold leading-5">{priceText(o.rate, o.currency, o.rateType)}</span>
+                  {priceBasisText(o.rateType, o.rate) && <span className={`block text-[11px] leading-4 ${MUTED}`}>{formatStatus(o.rateType)}</span>}
                 </p>
               </li>
             ))}
@@ -382,26 +386,17 @@ function CoursesTab({ offerings }: { offerings: Offering[] }) {
   );
 }
 
-function ReviewsTab({ reviews }: { reviews: Review[] }) {
-  const average = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+function ReviewsTab({ reviews, reviewerStats, statistics }: { reviews: Review[]; reviewerStats?: ProfileData["reviewerStats"]; statistics?: ProfileData["statistics"] }) {
+  // The totals come from the database; the list below is only the newest reviews.
+  const count = statistics?.totalReviews ?? reviews.length;
+  const average = statistics?.averageRating ?? (reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : null);
   return (
     <Surface>
       <Block title="Reviews" icon="star">
         {reviews.length > 0 ? (
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-xl font-semibold">{average.toFixed(1)}</span>
-              <Stars value={Math.round(average)} />
-              <span className={`text-xs ${MUTED}`}>{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</span>
-            </div>
-            <ul className="mt-3 divide-y divide-[#efe8e1]">
-              {reviews.slice(0, 3).map((r) => (
-                <li key={r.id} className="py-2.5 first:pt-0 last:pb-0">
-                  <Stars value={r.rating} />
-                  {r.comment && <p className="mt-1 break-words text-[13px] leading-5 text-[#514844]">{r.comment}</p>}
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-3">
+            <RatingSummary average={average} count={count} distribution={statistics?.ratingDistribution} />
+            <ReviewerList reviews={reviews} reviewerStats={reviewerStats} />
           </div>
         ) : (
           <p className={`text-[13px] ${MUTED}`}>Reviews appear here after you complete tutoring sessions.</p>
@@ -454,18 +449,6 @@ function Pill({ value }: { value: string }) {
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium ring-1 ring-inset ${tone}`}>
       <Icon name={value === "VERIFIED" ? "shieldcheck" : "shield"} className="h-3.5 w-3.5" />
       {formatStatus(value)}
-    </span>
-  );
-}
-
-function Stars({ value }: { value: number }) {
-  return (
-    <span className="inline-flex gap-0.5" role="img" aria-label={`${value} out of 5 stars`}>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <svg key={i} className={`h-3.5 w-3.5 ${i < value ? "text-amber-500" : "text-[#d8cec5]"}`} viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3.8l2.5 5.1 5.6.8-4 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4-4 5.6-.8L12 3.8z" />
-        </svg>
-      ))}
     </span>
   );
 }
@@ -526,12 +509,6 @@ function LoadingState() {
 
 function formatStatus(value: string) {
   return value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function formatRate(rate: string, currency: string) {
-  const numeric = Number(rate);
-  if (!Number.isFinite(numeric)) return `${currency} ${rate}`;
-  return `${currency} ${numeric.toLocaleString("en-ZM", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 function formatDay(day: string) {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uniqueViolationTarget } from "@/lib/db-errors";
-import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, normalizeZambianMobile, zambianPhoneVariants } from "@/lib/zambia-phone";
+import { PHONE_FORMAT_MESSAGE, PHONE_TAKEN_MESSAGE, normalizePhone, phoneVariants } from "@/lib/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -143,16 +143,16 @@ export async function PATCH(request: Request) {
     if (!existingProfile) return fail("Student profile not found. Complete onboarding first.", 404);
 
     // An empty phone number is allowed. An unchanged value is kept as-is (so older saved formats never block
-    // other edits); a changed value must be a valid Zambian mobile number that no other account uses.
+    // other edits); a changed value must be a valid phone number (any country; no "+" means Zambia) that no other account uses.
     let phoneNumber = existingProfile.phoneNumber;
     if (rawPhone !== (existingProfile.phoneNumber ?? "")) {
       if (rawPhone === "") {
         phoneNumber = null;
       } else {
-        const normalized = normalizeZambianMobile(rawPhone);
+        const normalized = normalizePhone(rawPhone);
         if (!normalized) return fail(PHONE_FORMAT_MESSAGE, 400);
         const duplicate = await prisma.studentProfile.findFirst({
-          where: { phoneNumber: { in: zambianPhoneVariants(normalized) }, NOT: { id: existingProfile.id } },
+          where: { phoneNumber: { in: phoneVariants(normalized) }, NOT: { id: existingProfile.id } },
           select: { id: true },
         });
         if (duplicate) return fail(PHONE_TAKEN_MESSAGE, 409);

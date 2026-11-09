@@ -97,7 +97,7 @@ export async function getDashboardMetrics(admin: AdminContext): Promise<Dashboar
 
 const NAME_SELECT = { select: { user: { select: { name: true } } } } as const;
 
-export type DirectoryInput = { kind: DirectoryKind; status: string; q: string; page: number; from?: string; to?: string };
+export type DirectoryInput = { kind: DirectoryKind; status: string; q: string; page: number; from?: string; to?: string; arrangement?: string };
 
 /** Search + status filter + numbered pages for requests and sessions, always scoped to the admin's universities. */
 export async function listDirectory(admin: AdminContext, input: DirectoryInput): Promise<DirectoryPage> {
@@ -137,13 +137,15 @@ export async function listDirectory(admin: AdminContext, input: DirectoryInput):
 
   if (input.kind === "requests") {
     const statusOk = (REQUEST_STATUSES as readonly string[]).includes(input.status);
-    const arrangementOk = (ARRANGEMENT_STATUSES as readonly string[]).includes(input.status.replace(/^ARR_/, ""));
+    // The arrangement filter is its own field, so it can be combined with the request status; the older "ARR_" form still works.
+    const arrangement = (input.arrangement || (input.status.startsWith("ARR_") ? input.status.slice(4) : "")).slice(0, 30);
+    const arrangementOk = (ARRANGEMENT_STATUSES as readonly string[]).includes(arrangement);
     const where = {
       ...universityScopeFilter(admin.scope),
       ...textFilter,
       ...(dateRange ? { createdAt: dateRange } : {}),
       ...(statusOk ? { status: input.status as (typeof REQUEST_STATUSES)[number] } : {}),
-      ...(input.status.startsWith("ARR_") && arrangementOk ? { arrangementStatus: input.status.replace(/^ARR_/, "") as (typeof ARRANGEMENT_STATUSES)[number] } : {}),
+      ...(arrangementOk ? { arrangementStatus: arrangement as (typeof ARRANGEMENT_STATUSES)[number] } : {}),
     };
     const [total, rows] = await Promise.all([
       prisma.mateRequest.count({ where }),
@@ -192,6 +194,7 @@ export async function listDirectory(admin: AdminContext, input: DirectoryInput):
         scheduledStart: true,
         scheduledEnd: true,
         meetingLocation: true,
+        groupId: true,
         completedAt: true,
         cancelledAt: true,
         cancellationReason: true,
@@ -235,7 +238,10 @@ export async function listDirectory(admin: AdminContext, input: DirectoryInput):
       { label: "Student ID", value: row.request.studentProfile.studentId },
       { label: "Starts", value: fmt(row.scheduledStart) ?? "—" },
       { label: "Ends", value: fmt(row.scheduledEnd) ?? "—" },
-      { label: "Type", value: statusLabel(row.request.arrangementType) },
+      { label: "Session record", value: statusLabel(row.status) },
+      { label: "Arrangement", value: `${row.request.arrangementType === "RECURRING" ? "Recurring" : "One-time"} · ${statusLabel(row.request.arrangementStatus).toLowerCase()}` },
+      { label: "Request", value: statusLabel(row.request.status) },
+      ...(row.groupId ? [{ label: "Group session", value: "Shares this time slot with other students" }] : []),
       { label: "Attendance", value: row.attendance ? statusLabel(row.attendance.status) : "No record yet" },
       { label: "Student says", value: yesNo(row.attendance?.studentAttended) },
       { label: "Mate says", value: yesNo(row.attendance?.mateConfirmedStudentAttended) },

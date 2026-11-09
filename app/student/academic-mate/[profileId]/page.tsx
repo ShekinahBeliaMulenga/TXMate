@@ -136,14 +136,14 @@ export default function PublicAcademicMateProfilePage() {
         <div role="alert" className="mx-auto max-w-md rounded-2xl border border-[#e2d9d0] bg-white p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-[#282321]">Couldn’t load this Academic Mate profile</h1>
           <p className="mt-2 text-[13px] leading-5 text-[#6d6260]">{error ?? "This Academic Mate profile could not be loaded."}</p>
-          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-[#7d1f2a] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#691923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">Try again</button>
+          <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-[#7d1f2a] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#681923] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40 focus-visible:ring-offset-2">Try again</button>
           <div><Link href="/student/find-academic-mate" className="mt-3 inline-block text-[13px] font-semibold text-[#7d1f2a] hover:underline">Back to Find Academic Mate</Link></div>
         </div>
       </main>
     );
   }
 
-  const { profile, user, student, experiences, qualifications, reviews, statistics, viewer, requestsByOffering } = data;
+  const { profile, user, student, experiences, qualifications, reviews, reviewerStats, statistics, viewer, requestsByOffering } = data;
   const showStickyCta = viewer.canRequest && !ctaInView;
 
   const cta = (compact: boolean) => (
@@ -169,7 +169,7 @@ export default function PublicAcademicMateProfilePage() {
             {tab === "courses" ? (
               <CoursesTab offerings={sortedOfferings} requestsByOffering={requestsByOffering} viewer={viewer} busyOfferingId={busyOfferingId} onRequest={handleRequest} onCancel={(offering) => void handleCancel(offering)} />
             ) : null}
-            {tab === "reviews" ? <ReviewsTab reviews={reviews} statistics={statistics} /> : null}
+            {tab === "reviews" ? <ReviewsTab reviews={reviews} reviewerStats={reviewerStats} statistics={statistics} /> : null}
             {tab === "availability" ? <AvailabilityTab slots={data.availability} offerings={sortedOfferings} /> : null}
           </div>
         </div>

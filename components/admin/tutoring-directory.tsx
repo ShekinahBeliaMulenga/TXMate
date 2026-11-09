@@ -21,18 +21,17 @@ function tone(label: string): BadgeTone {
 }
 
 function statusOptions(kind: DirectoryKind) {
-  const any = [{ id: "all", label: "Any status" }];
+  const any = [{ id: "all", label: "Any" }];
   if (kind === "sessions") return [...any, ...ADMIN_SESSION_STATES.map((state) => ({ id: state, label: ADMIN_SESSION_STATE_LABEL[state] }))];
-  return [
-    ...any,
-    ...REQUEST_STATUSES.map((status) => ({ id: status, label: `Request ${statusLabel(status).toLowerCase()}` })),
-    ...ARRANGEMENT_STATUSES.map((status) => ({ id: `ARR_${status}`, label: `Arrangement ${statusLabel(status).toLowerCase()}` })),
-  ];
+  return [...any, ...REQUEST_STATUSES.map((status) => ({ id: status, label: statusLabel(status) }))];
 }
+
+const ARRANGEMENT_OPTIONS = [{ id: "all", label: "Any" }, ...ARRANGEMENT_STATUSES.map((status) => ({ id: status, label: statusLabel(status) }))];
 
 export default function TutoringDirectory({ canReadMessages = false }: { canReadMessages?: boolean }) {
   const [kind, setKind] = useState<DirectoryKind>("requests");
   const [status, setStatus] = useState("all");
+  const [arrangement, setArrangement] = useState("all");
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
   const [from, setFrom] = useState("");
@@ -48,12 +47,15 @@ export default function TutoringDirectory({ canReadMessages = false }: { canRead
     return () => window.clearTimeout(timer);
   }, [input]);
 
+  const dateInvalid = Boolean(from && to && from > to);
+
   useEffect(() => {
+    if (dateInvalid) { setData(null); setError(null); setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const controller = new AbortController();
     setLoading(true); // eslint-disable-line react-hooks/set-state-in-effect
     setError(null);
     setOpen(null);
-    fetch(`/api/admin/tutoring?${new URLSearchParams({ kind, status, q, from, to, page: String(page) }).toString()}`, { headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal })
+    fetch(`/api/admin/tutoring?${new URLSearchParams({ kind, status, arrangement: kind === "requests" ? arrangement : "all", q, from, to, page: String(page) }).toString()}`, { headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (response.status === 401) { window.location.assign("/admin/login?expired=1"); return; }
         const body = (await response.json().catch(() => ({}))) as Partial<DirectoryPage> & { error?: string };
@@ -67,28 +69,34 @@ export default function TutoringDirectory({ canReadMessages = false }: { canRead
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [kind, status, q, from, to, page]);
+  }, [kind, status, arrangement, q, from, to, page, dateInvalid]);
 
-  function changeKind(next: DirectoryKind) { setKind(next); setStatus("all"); setPage(1); }
-  const dateInvalid = Boolean(from && to && from > to);
+  function changeKind(next: DirectoryKind) { setKind(next); setStatus("all"); setArrangement("all"); setPage(1); }
+  const filtered = Boolean(input || status !== "all" || arrangement !== "all" || from || to);
+  function resetFilters() { setInput(""); setQ(""); setStatus("all"); setArrangement("all"); setFrom(""); setTo(""); setPage(1); }
 
   return (
     <div className="space-y-4">
       <Tabs tabs={KINDS} value={kind} onChange={changeKind} label="Choose a list" />
       <Toolbar>
         <SearchField value={input} onChange={setInput} placeholder="Search student, mate, course or student ID" label="Search tutoring" />
-        <SelectField label="Status" value={status} onChange={(value) => { setStatus(value); setPage(1); }} options={statusOptions(kind)} />
+        <SelectField label={kind === "sessions" ? "State" : "Request"} value={status} onChange={(value) => { setStatus(value); setPage(1); }} options={statusOptions(kind)} />
+        {kind === "requests" ? <SelectField label="Arrangement" value={arrangement} onChange={(value) => { setArrangement(value); setPage(1); }} options={ARRANGEMENT_OPTIONS} /> : null}
         <DateRangeFields from={from} to={to} onFrom={(v) => { setFrom(v); setPage(1); }} onTo={(v) => { setTo(v); setPage(1); }} fromLabel={kind === "sessions" ? "Session starts from" : "Requested from"} toLabel={kind === "sessions" ? "Session starts to" : "Requested to"} />
+        {filtered ? <GhostButton onClick={resetFilters}>Reset filters</GhostButton> : null}
       </Toolbar>
       {dateInvalid ? <p role="alert" className="text-sm text-[#a3262a]">The start date is after the end date, so nothing can match.</p> : null}
 
+      {data && !loading && !error ? <p className="text-[13px] text-[#6b635d]" aria-live="polite">{data.total} {data.total === 1 ? "result" : "results"}{filtered ? " match your filters" : ""}</p> : null}
       <Panel>
         {loading ? (
           <div aria-busy="true">{[0, 1, 2, 3, 4].map((n) => <div key={n} className="h-16 animate-pulse border-b border-[#eee9e3] bg-[#faf9f7]" />)}</div>
         ) : error ? (
           <div role="alert" className="p-6 text-center text-sm text-[#a3262a]">{error}</div>
+        ) : dateInvalid ? (
+          <div className="p-6 text-center text-sm text-[#6b635d]">Fix the date range to see results.</div>
         ) : !data || data.items.length === 0 ? (
-          <EmptyState icon="calendar" title={kind === "sessions" ? "No sessions found" : "No requests found"} hint="Try a different search or clear the status filter." />
+          <EmptyState icon="calendar" title={kind === "sessions" ? "No sessions found" : "No requests found"} hint={filtered ? "Nothing matches these filters. Reset them to see everything." : "Nothing here yet."} />
         ) : (
           <div className={TABLE.wrap}>
             <table className={TABLE.table}>
@@ -108,7 +116,7 @@ export default function TutoringDirectory({ canReadMessages = false }: { canRead
                     <Fragment key={row.id}>
                       <tr className={`${TABLE.row} cursor-pointer`} onClick={() => setOpen(expanded ? null : row.id)}>
                         <td className={TABLE.td}>
-                          <button type="button" aria-expanded={expanded} onClick={(event) => { event.stopPropagation(); setOpen(expanded ? null : row.id); }} className="text-left font-medium hover:text-[#7d1f2a] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
+                          <button type="button" aria-expanded={expanded} aria-controls={`details-${row.id}`} onClick={(event) => { event.stopPropagation(); setOpen(expanded ? null : row.id); }} className="text-left font-medium hover:text-[#7d1f2a] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7d1f2a]/40">
                             {row.title}
                           </button>
                           <p className="mt-0.5 text-[13px] text-[#6b635d] sm:hidden">{row.student} with {row.mate}</p>
@@ -120,7 +128,7 @@ export default function TutoringDirectory({ canReadMessages = false }: { canRead
                         <td className={TABLE.td}><Badge tone={tone(row.status)}>{row.status}</Badge></td>
                       </tr>
                       {expanded ? (
-                        <tr className="bg-[#faf9f7]">
+                        <tr id={`details-${row.id}`} className="bg-[#faf9f7]">
                           <td colSpan={5} className="border-b border-[#eee9e3] px-4 py-4">
                             <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                               {row.facts.map((fact) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { priceBasisText, priceText } from "@/lib/offering-price";
 
 type BookingSlot = {
   start: string;
@@ -56,11 +57,8 @@ function addDays(value: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function formatMoney(value: string, currency: string) {
-  const amount = Number(value);
-  return Number.isFinite(amount)
-    ? `${currency} ${amount.toLocaleString("en-ZM", { maximumFractionDigits: 2 })}`
-    : `${currency} ${value}`;
+function formatMoney(value: string, currency: string, rateType?: string) {
+  return priceText(value, currency, rateType);
 }
 
 export default function SessionRequestDialog({ offering, onClose, onSubmitted }: Props) {
@@ -178,9 +176,9 @@ export default function SessionRequestDialog({ offering, onClose, onSubmitted }:
               <p className="text-[11px] font-semibold text-[#7d1f2a]">{offering.course.code}</p>
               <h3 className="text-sm font-semibold text-[#282321]">{offering.course.name}</h3>
               {offering.title && <p className="mt-0.5 text-xs text-[#6d6260]">{offering.title}</p>}
-              <p className="mt-1 text-[11px] text-[#6d6260]">{offering.sessionDurationMinutes} minute session · {offering.rateType.toLowerCase().replace(/_/g, " ")}</p>
+              <p className="mt-1 text-[11px] text-[#6d6260]">{offering.sessionDurationMinutes} minute session{priceBasisText(offering.rateType, offering.rate) ? ` · ${priceBasisText(offering.rateType, offering.rate)}` : ""}</p>
             </div>
-            <p className="shrink-0 text-sm font-semibold text-[#282321]">{formatMoney(offering.rate, offering.currency)}</p>
+            <p className="shrink-0 text-sm font-semibold text-[#282321]">{formatMoney(offering.rate, offering.currency, offering.rateType)}</p>
           </div>
         </section>
 

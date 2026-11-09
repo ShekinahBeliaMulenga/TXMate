@@ -925,7 +925,7 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
               type="button"
               disabled={changingMessaging}
               onClick={() => void toggleStudentMessaging()}
-              className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${conversation.studentMessagingEnabled ? "border border-stone-300 text-stone-700 hover:bg-stone-50" : "bg-[#7d1f2a] text-white hover:bg-[#651822]"}`}
+              className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors disabled:opacity-50 ${conversation.studentMessagingEnabled ? "border border-stone-300 text-stone-700 hover:bg-stone-50" : "bg-[#7d1f2a] text-white hover:bg-[#681923]"}`}
             >
               {changingMessaging ? "Updating..." : conversation.studentMessagingEnabled ? "Pause" : "Reopen"}
             </button>
@@ -1011,7 +1011,7 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
                     {mustRespond && (
                       <div className="flex shrink-0 gap-2">
                         <button type="button" disabled={saving} onClick={() => void respondToReschedule(proposal, "DECLINED")} className="flex-1 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 sm:flex-none">Decline</button>
-                        <button type="button" disabled={saving} onClick={() => void respondToReschedule(proposal, "ACCEPTED")} title="Accepting confirms the new time for both of you" className="flex-1 rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#651822] disabled:opacity-50 sm:flex-none">{saving ? "Saving..." : "Accept new time"}</button>
+                        <button type="button" disabled={saving} onClick={() => void respondToReschedule(proposal, "ACCEPTED")} title="Accepting confirms the new time for both of you" className="flex-1 rounded-md bg-[#7d1f2a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#681923] disabled:opacity-50 sm:flex-none">{saving ? "Saving..." : "Accept new time"}</button>
                       </div>
                     )}
                   </div>
@@ -1142,7 +1142,7 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
                   onMouseDown={(event) => event.preventDefault()}
                   disabled={sending || loading || !conversation || !draft.trim()}
                   aria-label={sending ? "Sending" : "Send message"}
-                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full bg-[#7d1f2a] text-white shadow-sm transition-colors hover:bg-[#651822] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7d1f2a] active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full bg-[#7d1f2a] text-white shadow-sm transition-colors hover:bg-[#681923] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7d1f2a] active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
                 >
                   {sending ? <svg {...ic} className="h-5 w-5 animate-spin"><path d="M12 3a9 9 0 1 0 9 9" /></svg> : <PaperJetIcon />}
                 </button>
@@ -1277,7 +1277,7 @@ function SessionConversation({ sessionId }: { sessionId: string }) {
               <button
                 type="submit"
                 disabled={rescheduleBusy || rescheduleSlotsLoading || !!rescheduleSlotsError || (rescheduleSlots.length > 0 ? !proposedStart : !manualProposedStart)}
-                className="rounded-lg bg-[#7d1f2a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#651822] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-[#7d1f2a] px-4 py-2 text-xs font-semibold text-white hover:bg-[#681923] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {rescheduleBusy ? "Sending proposal..." : "Send proposal"}
               </button>

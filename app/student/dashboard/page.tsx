@@ -298,7 +298,7 @@ function DashboardContent({
 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#282321] sm:text-3xl">Welcome back, {firstName(student.name)}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#282321] sm:text-3xl">Welcome back, {firstName(student.name)}</h1>
           <p className="mt-1.5 text-sm leading-5 text-[#6d6260]">{headline}</p>
           <p className="mt-1 text-xs text-[#8a7f7a]">{student.university.code} · Year {student.programmeYear.yearNumber}</p>
         </div>

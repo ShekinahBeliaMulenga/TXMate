@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma";
 import { deleteR2Object } from "../lib/r2";
 
 /**
- * Deletes identity documents whose keep-until date has passed (30 days after an approval, 90 days after a
+ * Deletes identity documents whose keep-until date has passed (14 days after an approval or a
  * rejection), from private storage and from the database. Run it on a schedule, for example once a day:
  *
  *   npx tsx scripts/purge-verification-evidence.ts
