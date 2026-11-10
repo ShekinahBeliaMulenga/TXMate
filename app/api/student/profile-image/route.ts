@@ -4,11 +4,14 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { deleteR2Object, uploadR2Object } from "@/lib/r2";
+import { detectImageFormat } from "@/lib/image-signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+/** The largest request that can hold a 10 MB image: base64 is 4/3 the size, plus room for the JSON around it. */
+const MAX_REQUEST_BYTES = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4096;
 const IMAGE_PATTERN =
   /^data:image\/(webp|jpeg|png);base64,([A-Za-z0-9+/]+={0,2})$/;
 
@@ -46,6 +49,19 @@ export async function PUT(request: Request) {
       return NextResponse.json(
         { error: "Unauthorized." },
         { status: 401 },
+      );
+    }
+
+    // Refuse an oversized upload before reading it into memory.
+    const declaredLength = Number(request.headers.get("content-length"));
+
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+      return NextResponse.json(
+        {
+          error:
+            "The processed profile picture must not exceed 10 MB.",
+        },
+        { status: 413 },
       );
     }
 
@@ -106,6 +122,19 @@ export async function PUT(request: Request) {
       );
     }
 
+    // The data URL only claims a type; the bytes must really be that kind of image.
+    const imageBuffer = Buffer.from(base64Data, "base64");
+
+    if (detectImageFormat(imageBuffer) !== format) {
+      return NextResponse.json(
+        {
+          error:
+            "The selected file is not a valid image.",
+        },
+        { status: 400 },
+      );
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
       select: { image: true },
@@ -123,7 +152,7 @@ export async function PUT(request: Request) {
     // Upload the image before changing the database reference.
     await uploadR2Object(
       key,
-      Buffer.from(base64Data, "base64"),
+      imageBuffer,
       `image/${format}`,
     );
 

@@ -1,8 +1,16 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runScheduledJobs } from "@/lib/scheduled-jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Compares the Authorization header with the secret in constant time (both are hashed first so their lengths match). */
+function hasValidSecret(authorization: string | null, secret: string): boolean {
+  const given = createHash("sha256").update(authorization ?? "").digest();
+  const expected = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(given, expected);
+}
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -15,7 +23,7 @@ export async function GET(request: Request) {
     );
   }
 
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!hasValidSecret(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

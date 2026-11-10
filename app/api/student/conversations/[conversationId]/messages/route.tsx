@@ -5,11 +5,16 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { conversationClosedReason } from "@/lib/session-lifecycle-rules";
 import { emitConversationMessage } from "@/lib/realtime/socket-server";
+import { takeRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_MESSAGE_LENGTH = 4000;
+/** Each message also creates a notification and a push, so one person cannot flood a conversation. Normal chatting stays far below this. */
+const MESSAGE_RATE_LIMIT = { limit: 30, windowMs: 60_000 };
+/** A conversation opens with its most recent messages; this stops a very long one from loading in full on every open and refresh. */
+const MAX_MESSAGES_PER_LOAD = 1000;
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -160,12 +165,14 @@ export async function GET(
       );
     }
 
-    const messages = await prisma.message.findMany({
+    // Newest first so the limit keeps the most recent messages, then back into reading order.
+    const recentMessages = await prisma.message.findMany({
       where: { conversationId },
       orderBy: [
-        { createdAt: "asc" },
-        { id: "asc" },
+        { createdAt: "desc" },
+        { id: "desc" },
       ],
+      take: MAX_MESSAGES_PER_LOAD,
       select: {
         id: true,
         senderUserId: true,
@@ -174,6 +181,7 @@ export async function GET(
         createdAt: true,
       },
     });
+    const messages = recentMessages.reverse();
 
     return NextResponse.json({
       currentUserId: user.id,
@@ -223,6 +231,14 @@ export async function POST(
       return NextResponse.json(
         { error: "You must be signed in to send messages." },
         { status: 401 },
+      );
+    }
+
+    const rate = takeRateLimit(`message:${user.id}`, MESSAGE_RATE_LIMIT);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "You're sending messages too quickly. Please wait a moment and try again." },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds), "Cache-Control": "no-store" } },
       );
     }
 

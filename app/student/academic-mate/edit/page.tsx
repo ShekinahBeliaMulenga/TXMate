@@ -273,6 +273,8 @@ export default function AcademicMatePage() {
   /** In edit mode every section is shown; while creating, only the current step. */
   const show = (n: number) => isEditing || step === n;
   const isLastStep = step === STEPS.length - 1;
+  /** Same limits the server enforces: roles can't be in the future, a qualification may show an expected year up to 6 years ahead. */
+  const thisYear = new Date().getUTCFullYear();
   const busy = creating || saving;
   const secondary = "rounded-xl border border-[#d8cec5] bg-white px-5 py-2.5 text-sm font-semibold text-[#4e4742] shadow-sm transition hover:bg-[#faf8f6]";
   const primary = "inline-flex items-center justify-center rounded-xl bg-[#7d1f2a] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#681923] focus:outline-none focus:ring-2 focus:ring-[#7d1f2a]/40";
@@ -384,8 +386,8 @@ export default function AcademicMatePage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <MiniField label="Role"><input type="text" autoFocus={row.key === justAdded} value={row.title} maxLength={120} onChange={(e) => patchExperience(row.key, { title: e.target.value })} placeholder="e.g. Peer tutor" className={inputClass} /></MiniField>
                   <MiniField label="Where"><input type="text" value={row.organisation} maxLength={120} onChange={(e) => patchExperience(row.key, { organisation: e.target.value })} placeholder="e.g. School of Natural Sciences" className={inputClass} /></MiniField>
-                  <MiniField label="From (year)"><input type="number" inputMode="numeric" min={1950} max={2100} value={row.startYear} onChange={(e) => patchExperience(row.key, { startYear: e.target.value })} placeholder="e.g. 2023" className={inputClass} /></MiniField>
-                  <MiniField label="To (year, leave empty if current)"><input type="number" inputMode="numeric" min={1950} max={2100} value={row.endYear} onChange={(e) => patchExperience(row.key, { endYear: e.target.value })} placeholder="Present" className={inputClass} /></MiniField>
+                  <MiniField label="From (year)"><input type="number" inputMode="numeric" min={1950} max={thisYear} value={row.startYear} onChange={(e) => patchExperience(row.key, { startYear: e.target.value })} placeholder="e.g. 2023" className={inputClass} /></MiniField>
+                  <MiniField label="To (year, leave empty if current)"><input type="number" inputMode="numeric" min={1950} max={thisYear} value={row.endYear} onChange={(e) => patchExperience(row.key, { endYear: e.target.value })} placeholder="Present" className={inputClass} /></MiniField>
                   <MiniField label="What you did (optional)" className="sm:col-span-2">
                     <textarea value={row.description} maxLength={500} rows={3} onChange={(e) => patchExperience(row.key, { description: e.target.value })} placeholder="A sentence or two about your role." className={textareaClass} />
                     <CharacterCount value={row.description} max={500} />
@@ -409,7 +411,7 @@ export default function AcademicMatePage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <MiniField label="Qualification" className="sm:col-span-2"><input type="text" autoFocus={row.key === justAdded} value={row.name} maxLength={120} onChange={(e) => patchQualification(row.key, { name: e.target.value })} placeholder="e.g. BSc Computer Science (in progress)" className={inputClass} /></MiniField>
                   <MiniField label="Awarded by"><input type="text" value={row.issuer} maxLength={120} onChange={(e) => patchQualification(row.key, { issuer: e.target.value })} placeholder="e.g. University of Zambia" className={inputClass} /></MiniField>
-                  <MiniField label="Year (or expected year)"><input type="number" inputMode="numeric" min={1950} max={2100} value={row.year} onChange={(e) => patchQualification(row.key, { year: e.target.value })} placeholder="e.g. 2025" className={inputClass} /></MiniField>
+                  <MiniField label="Year (or expected year)"><input type="number" inputMode="numeric" min={1950} max={thisYear + 6} value={row.year} onChange={(e) => patchQualification(row.key, { year: e.target.value })} placeholder="e.g. 2025" className={inputClass} /></MiniField>
                   <MiniField label="Link to certificate (optional)" className="sm:col-span-2"><input type="url" value={row.credentialUrl} maxLength={300} onChange={(e) => patchQualification(row.key, { credentialUrl: e.target.value })} placeholder="https://" className={inputClass} /></MiniField>
                 </div>
               </RowCard>
